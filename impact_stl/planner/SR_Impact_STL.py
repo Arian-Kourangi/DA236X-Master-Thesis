@@ -865,13 +865,13 @@ class SR_Impact_STL:
             plan_to_csv(robots_rsol,self.robots_hsol[r],self.robots[r].ids,self.robots[r].other_names,
                         scenario_name=self.world.specification,
                         robot_name=self.robots[r].name,
-                        path='./impact_stl/impact_stl/planner/plans/')
+                        path='/home/arian/repos/thesis/impact_stl/planner/plans')
         for o in range(self.nobjects):
             objects_rsol = [np.vstack((self.objects_rsol[o][bz],np.zeros((1,self.objects_ncp[o])))) for bz in range(self.objects_nbzs[o])]
             plan_to_csv(objects_rsol,self.objects_hsol[o],self.objects[o].ids,self.objects[o].other_names,
                         scenario_name=self.world.specification,
                         robot_name=self.objects[o].name,
-                        path='./impact_stl/impact_stl/planner/plans/')
+                        path='/home/arian/repos/thesis/impact_stl/planner/plans')
             
     def evaluate_t(self,t):
         t_array_robots = [np.array([self.robots_hsol[r][bzr][0,0] for bzr in range(self.robots_nbzs[r])]) for r in range(self.nrobots)]
@@ -1039,8 +1039,8 @@ class SR_Impact_STL:
         
         fig.tight_layout()
         
-        plt.savefig("./impact_stl/impact_stl/planner/figures/plot.svg")
-        plt.savefig("./impact_stl/impact_stl/planner/figures/plot.png")
+        plt.savefig("/home/arian/repos/thesis/impact_stl/planner/figures/plot.svg")
+        plt.savefig("/home/arian/repos/thesis/impact_stl/planner/figures/plot.png")
 
         
     def animate(self):
@@ -1051,7 +1051,7 @@ class SR_Impact_STL:
         self.ax_anim = plt.axes()
         anim = animation.FuncAnimation(self.fig_anim,self._animate_update,
                                         frames=Neval,interval=self.world.spec.tf/Neval*1e6*2)
-        anim.save("./impact_stl/impact_stl/planner/figures/animation.mp4",writer="ffmpeg", fps=Neval/self.world.spec.tf)
+        anim.save("/home/arian/repos/thesis/impact_stl/planner/figures/animation.mp4",writer="ffmpeg", fps=Neval/self.world.spec.tf)
 
     def _animate_update(self,i):
         t = self.t_range[i]

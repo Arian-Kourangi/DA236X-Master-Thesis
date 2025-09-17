@@ -21,5 +21,6 @@ if __name__ == "__main__":
     opt.evaluate()
     
     opt.plot()
-    # opt.animate()
+    opt.animate()
+    
     
