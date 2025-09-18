@@ -24,6 +24,11 @@ class Robot():
             dq_ub: upper bound on velocity (np.array([dx_max,dy_max]))
 
         """
+        assert x0 is not None, "Robot must have an initial position"
+        assert dx0 is not None, "Robot must have an initial velocity"
+        assert xf is not None, "Robot must have a final position"
+        assert dxf is not None, "Robot must have a final velocity"
+        
         self.name = name
         self.mass = 16.8
         self.x0 = x0
@@ -47,6 +52,7 @@ class Object():
     def __init__(self, name: str, x0: np.ndarray, dx0: np.ndarray, xf: np.ndarray, dxf: np.ndarray, nbz: int=10, t0: int=0, tf: int=100,
                  dq_lb: np.ndarray=np.array([-2,-2]), dq_ub:np.ndarray=np.array([2,2])):
         """
+        Object must have a initial velocity and position, but not necessarily a final position or velocity.
         Args:
             name: name of the object
             x0: initial position (np.array([x,y]))
@@ -59,6 +65,8 @@ class Object():
             dq_lb: lower bound on velocity (np.array([dx_min,dy_min]))
             dq_ub: upper bound on velocity (np.array([dx_max,dy_max]))
         """
+        assert x0 is not None, "Object must have an initial position"
+        assert dx0 is not None, "Object must have an initial velocity"
         self.name = name
         self.mass = 16.8
         self.x0 = x0

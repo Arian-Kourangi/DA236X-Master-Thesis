@@ -148,6 +148,19 @@ class SR_Impact_STL:
 
 
     def _set_cost(self):
+
+        """
+        Set the cost function, which can include:
+        - path length
+        - path velocity
+        - path acceleration
+        - STL robustness
+        - number of impacts
+        The weights for each term can be set here
+        The cost expression is stored in self.cost_expression
+        The cost expression is added to the optimization problem in self.prog
+
+        """
         # # weights for throw_and_catch
         # weight_L = 0
         # weight_V = 0
@@ -265,6 +278,10 @@ class SR_Impact_STL:
                 print(f"Exception objN: {e}")
 
     def _continuity_constraints(self):
+        """
+        Enforce continuity between consecutive bezier curves for all robots and objects
+
+        """
         for r in range(self.nrobots):
             for bz in range(self.robots_nbzs[r]-1):
                 #size = [nr_robots][nr_bzs][dim, ncp]
@@ -277,6 +294,10 @@ class SR_Impact_STL:
                 self.prog.addConstr(self.objects_hvar[o][bz][0,-1] == self.objects_hvar[o][bz+1][0,0], name=f"continuity_{o}_{bz}_time")
              
     def _initial_final_position_constraints(self):
+
+        """
+        Enforce that the initial position is self.robots[r].x0 and final position is self.robots[r].xf
+        """
         for r in range(self.nrobots):
             try:
                 #size = [nr_robots][nr_bzs][dim, ncp]. ie for robot r, bz 0, dim i, cp 0 enforce it to be x0
@@ -295,6 +316,9 @@ class SR_Impact_STL:
                 print(f"Error in {o} _initial_final_position_constraints: {e}")
 
     def _initial_final_velocity_constraints(self):
+        """
+        Enforce that the initial velocity is self.robots[r].dx0 and final velocity is self.robots[r].dxf
+        """
         for r in range(self.nrobots):
             try:
                 for i in range(self.world.dim):
@@ -314,8 +338,12 @@ class SR_Impact_STL:
                 print(f"Error in {o} _initial_final_velocity_constraints: {e}")
 
     def _initial_final_time_constraints(self):
+        """
+        Enforce that the initial time is self.world.spec.t0 and final time is self.world.spec.tf
+        """
         for r in range(self.nrobots):
             try:
+                #size = [nr_robots][nr_bzs][dim, ncp], dim is 0 for time(1 time dimension)
                 self.prog.addConstr(self.robots_hvar[r][0][0,0]==self.world.spec.t0, name=f"initial_time_{r}")
                 self.prog.addConstr(self.robots_hvar[r][-1][0,-1]==self.world.spec.tf, name=f"final_time_{r}")
             except Exception as e:
@@ -329,6 +357,10 @@ class SR_Impact_STL:
                 print(f"Error in {o} _initial_final_time_constraints: {e}")
 
     def _positive_time_derivative_constraint(self):
+        """
+        Enforce that the time derivative is positive, ie time is always increasing
+
+        """
         for r in range(self.nrobots):
             for bz in range(self.robots_nbzs[r]):
                 for cp in range(self.robots_ncp[r]-1):
@@ -348,6 +380,14 @@ class SR_Impact_STL:
                         print(f"Error in {o} {bz} {cp} _positive_time_derivative_constraint: {e}")
 
     def _velocity_constraints(self):
+        """
+        Enforce that the velocity is within the bounds of the robot and object
+        dr/dh = velocity
+        dr/dh <= dq_ub --> dr <= dq_ub * dh
+        dr/dh >= dq_lb --> dr >= dq_lb * dh
+        Note that dh is always positive, so we don't need to worry about the sig
+
+        """
         for r in range(self.nrobots):
             for bz in range(self.robots_nbzs[r]):
                 for cp in range(self.robots_ncp[r]-1):
@@ -370,7 +410,13 @@ class SR_Impact_STL:
                     except Exception as e:
                         print(f"Error in {o} {bz} {cp} _velocity_constraints: {e}")
 
-    def _world_box_constraints(self):
+    def _world_box_constraints(self):   
+        """
+        Enforce that the robots and objects stay within the world box
+        rvar[r][bz][:,cp] <= world.x_ub
+        rvar[r][bz][:,cp] >= world.x_lb
+        
+        """
         for r in range(self.nrobots):
             for bz in range(self.robots_nbzs[r]):
                 for cp in range(self.robots_ncp[r]):
@@ -399,6 +445,7 @@ class SR_Impact_STL:
         #! for a robot, for each bezier, we can bump with each object at each bezier or we are continuous
         #! for an object, for each bezier, we can bump with each robot at each bezier or we are continuous
         for r in range(self.nrobots):
+            #size = [nobjects][nr_bzs_robot-1][nr_bzs_object-1]
             zs = [self.prog.addMVar((self.robots_nbzs[r]-1,self.objects_nbzs[o]-1),vtype=gp.GRB.BINARY) for o in range(self.nobjects)]
             self.robots[r].zs = zs
             #? for each robot bezier, we can only bump with one object bezier
@@ -429,7 +476,11 @@ class SR_Impact_STL:
 
                         # if collision
                         try:
-                            # position and time should be matched between robot and object
+                            # NOTE: Here we could perhaps enforce velocity should be the same in each dimension in order for it to be considered a collision.
+                            # NOTE: Idea, Somehow enforce that if the magnitude of the velocity in any dimension is to be decreased the robots position
+                            # NOTE: should be ahead in that dimensions in order for it to "slow it down"
+                            
+                            # position and time should be matched between robot and object, the zs binary variables flag if collision happens
                             self.prog.addConstrs((self.robots_rvar[r][bzr][d,-1] >= self.objects_rvar[o][bzo][d,-1] - self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
                                                  name=f"collision_{r}_{bzr}_{o}_{bzo}_1")
                             self.prog.addConstrs((self.robots_rvar[r][bzr][d,-1] <= self.objects_rvar[o][bzo][d,-1] + self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
@@ -441,29 +492,45 @@ class SR_Impact_STL:
                         except Exception as e:
                             print(f"Error in {o} {bzo} {r} {bzr} if collision constraint: {e}")
 
+
+                        ## Up until here has been constraint for collision per bzs, and flags for if collision happens,
+                        # that the time and place of the last cp of the bzs are the same
+
+                        #Dynamics for after collision
                         m1 = (self.robots[r].mass - self.objects[o].mass)/(self.robots[r].mass + self.objects[o].mass)
                         m2 = 2*self.objects[o].mass/(self.robots[r].mass + self.objects[o].mass)
                         m3 = 2*self.robots[r].mass/(self.robots[r].mass + self.objects[o].mass)
                         m4 = (self.objects[o].mass - self.robots[r].mass)/(self.robots[r].mass + self.objects[o].mass)
-
+                    
+                    ####### CHECKPOINT: ive read and understood the code uptil here #########
                         try:
+                            # NOTE: This should be replaced by some other control law, not just inelastic collision
+                            # NOTE: 
                             # impact dynamics
                             # inelastic collision (depending on e)
                             self.prog.addConstrs(self.robots[r].mass*self.robots_drvar[r][bzr+1][d,0] + self.objects[o].mass*self.objects_drvar[o][bzo+1][d,0] >=
                                                  self.robots[r].mass*self.robots_drvar[r][bzr][d,-1] + self.objects[o].mass*self.objects_drvar[o][bzo][d,-1] - self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim))
+                            
                             self.prog.addConstrs(self.robots[r].mass*self.robots_drvar[r][bzr+1][d,0] + self.objects[o].mass*self.objects_drvar[o][bzo+1][d,0] <=
                                                  self.robots[r].mass*self.robots_drvar[r][bzr][d,-1] + self.objects[o].mass*self.objects_drvar[o][bzo][d,-1] + self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim))
+                            
                             self.prog.addConstr(self.robots[r].mass*self.robots_dhvar[r][bzr+1][0,0] + self.objects[o].mass*self.objects_dhvar[o][bzo+1][0,0] >=
                                                  self.robots[r].mass*self.robots_dhvar[r][bzr][0,-1] + self.objects[o].mass*self.objects_dhvar[o][bzo][0,-1] - self.bigM*(1-zs[o][bzr,bzo]))
+                            
                             self.prog.addConstr(self.robots[r].mass*self.robots_dhvar[r][bzr+1][0,0] + self.objects[o].mass*self.objects_dhvar[o][bzo+1][0,0] <=
                                                  self.robots[r].mass*self.robots_dhvar[r][bzr][0,-1] + self.objects[o].mass*self.objects_dhvar[o][bzo][0,-1] + self.bigM*(1-zs[o][bzr,bzo]))
                             
+                            #### NO MASS IN THE EQUATIONS BELOW TO ENFORCE RESTITUTION COEFFICIENT ####
+                            # e = 1 is elastic collision, e = 0 is inelastic collision
                             self.prog.addConstrs(self.robots_drvar[r][bzr+1][d,0] - self.objects_drvar[o][bzo+1][d,0] >= 
                                                  -self.e*(self.robots_drvar[r][bzr][d,-1] - self.objects_drvar[o][bzo][d,-1]) - self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim))
+                            
                             self.prog.addConstrs(self.robots_drvar[r][bzr+1][d,0] - self.objects_drvar[o][bzo+1][d,0] <=
                                                  -self.e*(self.robots_drvar[r][bzr][d,-1] - self.objects_drvar[o][bzo][d,-1]) + self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim))
+                            
                             self.prog.addConstr(self.robots_dhvar[r][bzr+1][0,0] - self.objects_dhvar[o][bzo+1][0,0] >=
                                                 -self.e*(self.robots_dhvar[r][bzr][0,-1] - self.objects_dhvar[o][bzo][0,-1]) - self.bigM*(1-zs[o][bzr,bzo]))
+                            
                             self.prog.addConstr(self.robots_dhvar[r][bzr+1][0,0] - self.objects_dhvar[o][bzo+1][0,0] <=
                                                 -self.e*(self.robots_dhvar[r][bzr][0,-1] - self.objects_dhvar[o][bzo][0,-1]) + self.bigM*(1-zs[o][bzr,bzo]))
                         except Exception as e:
@@ -536,7 +603,7 @@ class SR_Impact_STL:
                     print(f"Error in {r} {bzr} continuity constraint: {e}")
     
     def _robot_dynamics(self):
-        # so apparently there are no obstacles, so all robots are just having smooth trajectories
+        # so apparently there are no objects, so all robots are just having smooth trajectories
         for r in range(self.nrobots):
             for bzr in range(self.robots_nbzs[r]-1):
                 try:
@@ -546,7 +613,7 @@ class SR_Impact_STL:
                                          name=f"robot_{r}_{bzr}_2")
                 except Exception as e:
                     print(f"Error in {r} {bzr} robot dynamics constraint: {e}")
-
+###################################################### NOT USED #############################################################
     def _obstacle_collision_constraints(self):
         for obs in self.world.obstacles:
             # for each robot
@@ -701,7 +768,8 @@ class SR_Impact_STL:
                             except Exception as e:
                                 print(f"Error in object-object collision constraint: {e}")                
 
-                                
+###################################################### NOT USED #############################################################
+
 
     def _stl_constraints(self):
         try:
@@ -795,6 +863,8 @@ class SR_Impact_STL:
         self.robots_hsol = [[self.robots_hvar[r][bz].X for bz in range(self.robots_nbzs[r])] for r in range(self.nrobots)]
         self.robots_dhsol = [[get_derivative_control_points_gurobi(self.robots_hsol[r][bz],1) for bz in range(self.robots_nbzs[r])] for r in range(self.nrobots)]
         self.robots_ddhsol = [[get_derivative_control_points_gurobi(self.robots_hsol[r][bz],2) for bz in range(self.robots_nbzs[r])] for r in range(self.nrobots)]
+        
+        #Not used anywhere, don't undersand why there even done (q_sol and dq_sol)
         self.robots_qsol = self.robots_rsol
         self.robots_dqsol = [[np.zeros_like(self.robots_drsol[r][bz]) for bz in range(self.robots_nbzs[r])] for r in range(self.nrobots)]
         for r in range(self.nrobots):
@@ -810,7 +880,10 @@ class SR_Impact_STL:
         self.robots_htraj = [[eval_bezier(self.robots_hsol[r][bz],self.N_eval) for bz in range(self.robots_nbzs[r])] for r in range(self.nrobots)]
         self.robots_dhtraj = [[eval_bezier(self.robots_dhsol[r][bz],self.N_eval) for bz in range(self.robots_nbzs[r])] for r in range(self.nrobots)]
         self.robots_ddhtraj = [[eval_bezier(self.robots_ddhsol[r][bz],self.N_eval) for bz in range(self.robots_nbzs[r])] for r in range(self.nrobots)]
+        
+        #Not used anywhere
         self.robots_qtraj = self.robots_rtraj
+        #Only used in plotting, but is commented out
         self.robots_dqtraj = [[np.zeros((self.world.dim,self.N_eval)) for bz in range(self.robots_nbzs[r])] for r in range(self.nrobots)]
         self.robots_ddqtraj = [[np.zeros((self.world.dim,self.N_eval)) for bz in range(self.robots_nbzs[r])] for r in range(self.nrobots)]
         for r in range(self.nrobots):
