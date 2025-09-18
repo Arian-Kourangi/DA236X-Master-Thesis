@@ -35,6 +35,11 @@ from World import World
 
 class SR_Impact_STL:
     def __init__(self,world: World):
+        """
+        Spatial Robustness Impact STL optimization class
+        world: World object containing the robots, objects, and STL specification
+
+        """
         # load the STL specification, with x0 and xf for all robots and objects
         # self.spec = world.spec
         self.world = world
@@ -76,6 +81,9 @@ class SR_Impact_STL:
 
         ##########################################
         # add continuous state and input variables
+        # for each robot and object, we have a list of bzs, each bz has dim x ncp variables
+        
+        #size = [nr_robots][nr_bzs][dim, ncp]
         self.robots_rvar = [[self.prog.addMVar((self.world.dim,self.robots_ncp[r]),
                              lb=-gp.GRB.INFINITY, ub=gp.GRB.INFINITY) for i in range(self.robots_nbzs[r])] for r in range(self.nrobots)]
         self.robots_hvar = [[self.prog.addMVar((1,self.robots_ncp[r]),
@@ -88,6 +96,7 @@ class SR_Impact_STL:
         self.prog.update()
 
         # Now obtain the control points of the derivatives as linear combinations of the control points of the original bzs
+        #size = [nr_robots][nr_bzs][dim, ncp]
         self.robots_drvar = [[get_derivative_control_points_gurobi(self.robots_rvar[r][i],1) for i in range(self.robots_nbzs[r])] for r in range(self.nrobots)]
         self.robots_ddrvar = [[get_derivative_control_points_gurobi(self.robots_rvar[r][i],2) for i in range(self.robots_nbzs[r])] for r in range(self.nrobots)]
         self.robots_dhvar = [[get_derivative_control_points_gurobi(self.robots_hvar[r][i],1) for i in range(self.robots_nbzs[r])] for r in range(self.nrobots)]
@@ -118,29 +127,12 @@ class SR_Impact_STL:
 
         # self._robot_robot_collision_constraints()
         # self._object_object_collision_constraints()
-
-        # custom constraints for the video
-        for r in range(self.nrobots):
-            if self.robots[r].name == "crackle":
-                # constrain all x points to be less than 2
-                for bz in range(self.robots_nbzs[r]):
-                    for cp in range(self.robots_ncp[r]):
-                        self.prog.addConstr(self.robots_rvar[r][bz][0,cp] <= 2, name=f"crackle_x_{bz}_{cp}")
-
-                    if bz == 1:
-                        self.prog.addConstr(self.robots_rvar[r][bz][0,-1] == 0.5)
-                        self.prog.addConstr(self.robots_rvar[r][bz][1,-1] == 0)
-            if self.robots[r].name == "pop":
-                # constrain all x points to be greater than 2
-                for bz in range(self.robots_nbzs[r]):
-                    for cp in range(self.robots_ncp[r]):
-                        self.prog.addConstr(self.robots_rvar[r][bz][0,cp] >= 2, name=f"pop_x_{bz}_{cp}")
-
         self._set_cost()
 
     
 
     def solve(self):
+        #Set the cost objective, depends on if we choose some weights in _set_cost
         self.prog.setObjective(self.cost_expression,gp.GRB.MINIMIZE)
         
         t0 = time.time()
@@ -275,6 +267,7 @@ class SR_Impact_STL:
     def _continuity_constraints(self):
         for r in range(self.nrobots):
             for bz in range(self.robots_nbzs[r]-1):
+                #size = [nr_robots][nr_bzs][dim, ncp]
                 self.prog.addConstrs((self.robots_rvar[r][bz][i,-1] == self.robots_rvar[r][bz+1][i,0] for i in range(self.world.dim)), name=f"continuity_{r}_{bz}")
                 self.prog.addConstr(self.robots_hvar[r][bz][0,-1] == self.robots_hvar[r][bz+1][0,0], name=f"continuity_{r}_{bz}_time")
 
@@ -286,6 +279,7 @@ class SR_Impact_STL:
     def _initial_final_position_constraints(self):
         for r in range(self.nrobots):
             try:
+                #size = [nr_robots][nr_bzs][dim, ncp]. ie for robot r, bz 0, dim i, cp 0 enforce it to be x0
                 self.prog.addConstrs((self.robots_rvar[r][0][i,0]==self.robots[r].x0[i] for i in range(self.world.dim)), name=f"initial_position_robot_{r}")
                 self.prog.addConstrs((self.robots_rvar[r][-1][i,-1]==self.robots[r].xf[i] for i in range(self.world.dim)), name=f"final_position_robot_{r}")
             except Exception as e:
