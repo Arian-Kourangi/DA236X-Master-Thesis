@@ -557,6 +557,9 @@ class SR_Impact_STL:
                     print(f"Error in {o} {bzo} zs_all == quicksum(zs): {e}")
 
                 # if zs_all == 0: continuity: tight constraints
+
+                ## NOTE: Here we enforce continuity OF VELOCITY if no robot bumps the object, but when there is a bump the constraints are relazed a lot
+                ## NOTE: Perhaps we should enforce coninuity at all times now since there are no intendeed jumps in object or robot pose.
                 try:
                     self.prog.addConstrs((self.objects_drvar[o][bzo+1][d,0] >= self.objects_drvar[o][bzo][d,-1] - self.bigM*zs_all for d in range(self.world.dim)),
                                          name=f"continuity_{o}_{bzo}_1")
