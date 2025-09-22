@@ -538,15 +538,15 @@ class SR_Impact_STL:
                                                  name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_4")
                             
                             # Constant rate of change in position(no turning)
-                            for cp in range (self.robots_ncp[r]-2):
-                                self.prog.addConstrs((self.robots_rvar[r][bzr+1][d,cp] - 2*self.robots_rvar[r][bzr+1][d,cp+1] + self.robots_rvar[r][bzr+1][d,cp+2] >= -self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
-                                                        name=f"collision_{r}_{bzr}_{o}_{bzo}_9_{cp}")
-                                self.prog.addConstrs((self.robots_rvar[r][bzr+1][d,cp] - 2*self.robots_rvar[r][bzr+1][d,cp+1] + self.robots_rvar[r][bzr+1][d,cp+2] <= self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
-                                                        name=f"collision_{r}_{bzr}_{o}_{bzo}_10_{cp}")
-                                #self.prog.addConstr((self.robots_hvar[r][bzr+1][0,cp] - 2*self.robots_hvar[r][bzr+1][0,cp+1] + self.robots_hvar[r][bzr+1][0,cp+2] >= -self.bigM*(1-zs[o][bzr,bzo])),
-                                #                        name=f"collision_{r}_{bzr}_{o}_{bzo}_11_{cp}")
-                                #self.prog.addConstr((self.robots_hvar[r][bzr+1][0,cp] - 2*self.robots_hvar[r][bzr+1][0,cp+1] + self.robots_hvar[r][bzr+1][0,cp+2] <= self.bigM*(1-zs[o][bzr,bzo])),
-                                #                        name=f"collision_{r}_{bzr}_{o}_{bzo}_12_{cp}")
+                            #for cp in range (self.robots_ncp[r]-2):
+                            #    self.prog.addConstrs((self.robots_rvar[r][bzr+1][d,cp] - 2*self.robots_rvar[r][bzr+1][d,cp+1] + self.robots_rvar[r][bzr+1][d,cp+2] >= -self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
+                            #                            name=f"collision_{r}_{bzr}_{o}_{bzo}_9_{cp}")
+                            #    self.prog.addConstrs((self.robots_rvar[r][bzr+1][d,cp] - 2*self.robots_rvar[r][bzr+1][d,cp+1] + self.robots_rvar[r][bzr+1][d,cp+2] <= self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
+                            #                            name=f"collision_{r}_{bzr}_{o}_{bzo}_10_{cp}")
+                            #    self.prog.addConstr((self.robots_hvar[r][bzr+1][0,cp] - 2*self.robots_hvar[r][bzr+1][0,cp+1] + self.robots_hvar[r][bzr+1][0,cp+2] >= -self.bigM*(1-zs[o][bzr,bzo])),
+                            #                            name=f"collision_{r}_{bzr}_{o}_{bzo}_11_{cp}")
+                            #    self.prog.addConstr((self.robots_hvar[r][bzr+1][0,cp] - 2*self.robots_hvar[r][bzr+1][0,cp+1] + self.robots_hvar[r][bzr+1][0,cp+2] <= self.bigM*(1-zs[o][bzr,bzo])),
+                            #                            name=f"collision_{r}_{bzr}_{o}_{bzo}_12_{cp}")
                                 
                             # Constante rate of change in velocity(constant acceleration)(one less cp than original bzr)
                             #for cp in range (self.robots_ncp[r]-3):
@@ -1019,9 +1019,9 @@ class SR_Impact_STL:
         fig = plt.figure(figsize=(20,10))
         gs = GridSpec(2,4, figure=fig)
         ax1 = fig.add_subplot(gs[0:2,0:2])
-        ax2 = fig.add_subplot(gs[0,2:4])
+        #ax2 = fig.add_subplot(gs[0,2:4])
         ax3 = fig.add_subplot(gs[1,2:4])
-        # ax4 = fig.add_subplot(gs[1,2])
+        ax4 = fig.add_subplot(gs[0,2:4])
         # ax5 = fig.add_subplot(gs[1,3])
 
         robot_ls = ['k-','k--','k:','k-.']
@@ -1113,21 +1113,21 @@ class SR_Impact_STL:
             axs[1,0].set_xlabel(r"Time [s]")
             axs[1,0].set_ylabel(r"Phase [-]")
 
-        # if True:
-        #     for r in range(self.nrobots):
-        #         for bz in range(self.robots_nbzs[r]):
-        #             ax4.plot(self.robots_htraj[r][bz][0,:],self.robots_dqtraj[r][bz][0,:],robot_ls[r],linewidth=lw)
-        #             ax4.plot(self.robots_htraj[r][bz][0,0],self.robots_dqtraj[r][bz][0,0],'ko',markersize=s)
-        #         ax4.plot(self.robots_htraj[r][-1][0,-1],self.robots_dqtraj[r][-1][0,-1],'ko',markersize=s)
-        #     for o in range(self.nobjects):
-        #         for bz in range(self.objects_nbzs[o]):
-        #             ax4.plot(self.objects_htraj[o][bz][0,:],self.objects_dqtraj[o][bz][0,:],object_ls[o],linewidth=lw)
-        #             ax4.plot(self.objects_htraj[o][bz][0,0],self.objects_dqtraj[o][bz][0,0],'ro',markersize=s)
-        #         ax4.plot(self.objects_htraj[o][-1][0,-1],self.objects_dqtraj[o][-1][0,-1],'ro',markersize=s)
-        #     # ax4.set_title("dx-t plane")
-        #     ax4.grid(True)
-        #     ax4.set_xlabel(r"Time [s]")
-        #     ax4.set_ylabel(r"y velocity [m/s]")
+        if True:
+            for r in range(self.nrobots):
+                for bz in range(self.robots_nbzs[r]):
+                    ax4.plot(self.robots_htraj[r][bz][0,:],self.robots_dqtraj[r][bz][1,:],robot_ls[r],linewidth=lw)
+                    ax4.plot(self.robots_htraj[r][bz][0,0],self.robots_dqtraj[r][bz][1,0],'ko',markersize=s)
+                ax4.plot(self.robots_htraj[r][-1][0,-1],self.robots_dqtraj[r][-1][1,-1],'ko',markersize=s)
+            for o in range(self.nobjects):
+                for bz in range(self.objects_nbzs[o]):
+                    ax4.plot(self.objects_htraj[o][bz][0,:],self.objects_dqtraj[o][bz][1,:],object_ls[o],linewidth=lw)
+                    ax4.plot(self.objects_htraj[o][bz][0,0],self.objects_dqtraj[o][bz][1,0],'ro',markersize=s)
+                ax4.plot(self.objects_htraj[o][-1][0,-1],self.objects_dqtraj[o][-1][1,-1],'ro',markersize=s)
+            # ax4.set_title("dx-t plane")
+            ax4.grid(True)
+            ax4.set_xlabel(r"Time [s]")
+            ax4.set_ylabel(r"y velocity [m/s]")
 
         # if True:
         #     for r in range(self.nrobots):

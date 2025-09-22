@@ -545,7 +545,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         world.areas = [area1]
 
     elif specification == "minimal_test_velocity_matching":
-        tf = 20
+        tf = 30
 
         world.spec = Spec(t0=0,tf=tf)
         
@@ -553,13 +553,13 @@ def spatial_specifications(world: Object ,specification: str) -> None:
                        x0=np.array([5,0]),
                        dx0=np.array([0,0]),
                        xf=np.array([5,9]),
-                       dxf=np.array([0,0]),nbz=3)
+                       dxf=np.array([0,0]),nbz=6)
         
         object1 = Object(name="pop",
                          x0=np.array([5,2]),
                          dx0=np.array([0,0.5]),
                          xf=np.array([5,6.5]),
-                         dxf=None,nbz=3)
+                         dxf=np.array([0,0]),nbz=6)
 
         world.dim = 2
         world.robots = [robot1]
