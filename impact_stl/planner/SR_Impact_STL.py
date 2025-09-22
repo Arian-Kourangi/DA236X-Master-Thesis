@@ -494,9 +494,9 @@ class SR_Impact_STL:
                                                  name=f"collision_{r}_{bzr}_{o}_{bzo}_4")
                             
                             #Adding velocity equality constraints for all dimensions
-                            self.prog.addConstr((self.robots_drvar[r][bzr][d,-1] >= self.objects_drvar[o][bzo][d,-1] - self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
+                            self.prog.addConstrs((self.robots_drvar[r][bzr][d,-1] >= self.objects_drvar[o][bzo][d,-1] - self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
                                                  name=f"collision_{r}_{bzr}_{o}_{bzo}_5")
-                            self.prog.addConstr((self.robots_drvar[r][bzr][d,-1] <= self.objects_drvar[o][bzo][d,-1] + self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
+                            self.prog.addConstrs((self.robots_drvar[r][bzr][d,-1] <= self.objects_drvar[o][bzo][d,-1] + self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
                                                  name=f"collision_{r}_{bzr}_{o}_{bzo}_6")
                             self.prog.addConstr(self.robots_dhvar[r][bzr][0,-1] >= self.objects_dhvar[o][bzo][0,-1] - self.bigM*(1-zs[o][bzr,bzo]),
                                                  name=f"collision_{r}_{bzr}_{o}_{bzo}_7")
@@ -536,6 +536,28 @@ class SR_Impact_STL:
                                                  name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_3")
                             self.prog.addConstr(self.robots_dhvar[r][bzr+1][0,-1]<= self.objects_dhvar[o][bzo+1][0,-1] +self.bigM*(1-zs[o][bzr,bzo]),
                                                  name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_4")
+                            
+                            # Constant rate of change in position(no turning)
+                            for cp in range (self.robots_ncp[r]-2):
+                                self.prog.addConstrs((self.robots_rvar[r][bzr+1][d,cp] - 2*self.robots_rvar[r][bzr+1][d,cp+1] + self.robots_rvar[r][bzr+1][d,cp+2] >= -self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
+                                                        name=f"collision_{r}_{bzr}_{o}_{bzo}_9_{cp}")
+                                self.prog.addConstrs((self.robots_rvar[r][bzr+1][d,cp] - 2*self.robots_rvar[r][bzr+1][d,cp+1] + self.robots_rvar[r][bzr+1][d,cp+2] <= self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
+                                                        name=f"collision_{r}_{bzr}_{o}_{bzo}_10_{cp}")
+                                #self.prog.addConstr((self.robots_hvar[r][bzr+1][0,cp] - 2*self.robots_hvar[r][bzr+1][0,cp+1] + self.robots_hvar[r][bzr+1][0,cp+2] >= -self.bigM*(1-zs[o][bzr,bzo])),
+                                #                        name=f"collision_{r}_{bzr}_{o}_{bzo}_11_{cp}")
+                                #self.prog.addConstr((self.robots_hvar[r][bzr+1][0,cp] - 2*self.robots_hvar[r][bzr+1][0,cp+1] + self.robots_hvar[r][bzr+1][0,cp+2] <= self.bigM*(1-zs[o][bzr,bzo])),
+                                #                        name=f"collision_{r}_{bzr}_{o}_{bzo}_12_{cp}")
+                                
+                            # Constante rate of change in velocity(constant acceleration)(one less cp than original bzr)
+                            #for cp in range (self.robots_ncp[r]-3):
+                            #    self.prog.addConstrs((self.robots_drvar[r][bzr+1][d,cp] - 2*self.robots_drvar[r][bzr+1][d,cp+1] + self.robots_drvar[r][bzr+1][d,cp+2] >= -self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
+                            #                            name=f"collision_{r}_{bzr}_{o}_{bzo}_9_{cp}")
+                            #    self.prog.addConstrs((self.robots_drvar[r][bzr+1][d,cp] - 2*self.robots_drvar[r][bzr+1][d,cp+1] + self.robots_drvar[r][bzr+1][d,cp+2] <= self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
+                            #                            name=f"collision_{r}_{bzr}_{o}_{bzo}_10_{cp}")
+                            #    self.prog.addConstr((self.robots_dhvar[r][bzr+1][0,cp] - 2*self.robots_dhvar[r][bzr+1][0,cp+1] + self.robots_dhvar[r][bzr+1][0,cp+2] >= -self.bigM*(1-zs[o][bzr,bzo])),
+                            #                            name=f"collision_{r}_{bzr}_{o}_{bzo}_11_{cp}")
+                            #    self.prog.addConstr((self.robots_dhvar[r][bzr+1][0,cp] - 2*self.robots_dhvar[r][bzr+1][0,cp+1] + self.robots_dhvar[r][bzr+1][0,cp+2] <= self.bigM*(1-zs[o][bzr,bzo])),
+                            #                            name=f"collision_{r}_{bzr}_{o}_{bzo}_12_{cp}")
                         except Exception as e:
                             print(f"Error in {o} {bzo} {r} {bzr} impact dynamics constraint: {e}")
 
