@@ -453,7 +453,9 @@ class SR_Impact_STL:
             for bzr in range(self.robots_nbzs[r]-1):
                 zs_sums = [self.prog.addVar(vtype=gp.GRB.BINARY) for o in range(self.nobjects)]
                 for o in range(self.nobjects):
+                    #This enforces that for each robot bezier, it can only bump with a single bezier from each object
                     self.prog.addConstr(zs_sums[o] == gp.quicksum([zs[o][bzr,bzo] for bzo in range(self.objects_nbzs[o]-1)]))
+                # this enforces that for each robot bezier, it can only bump with a single object
                 self.prog.addConstr(gp.quicksum(zs_sums)<=1)
             
             #? for each robot, two consecutive bzs can never both bump
