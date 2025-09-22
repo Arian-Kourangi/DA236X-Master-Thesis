@@ -544,6 +544,37 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         # Area's of interest
         world.areas = [area1]
 
+    elif specification == "minimal_test_velocity_matching":
+        tf = 20
+
+        world.spec = Spec(t0=0,tf=tf)
+        
+        robot1 = Robot(name="snap",
+                       x0=np.array([5,0]),
+                       dx0=np.array([0,0]),
+                       xf=np.array([5,9]),
+                       dxf=np.array([0,0]),nbz=3)
+        
+        object1 = Object(name="pop",
+                         x0=np.array([5,2]),
+                         dx0=np.array([0,0.5]),
+                         xf=np.array([5,6.5]),
+                         dxf=None,nbz=3)
+
+        world.dim = 2
+        world.robots = [robot1]
+        world.objects = [object1]
+
+        # World bounding box
+        world.x_lb = np.array([0,0])
+        world.x_ub = np.array([10,10])
+
+        # Obstacles
+        world.obstacles= []
+
+        # Area's of interest
+        world.areas = []
+
 def impact_specifications(world,specification):
     if specification == "throw_and_catch":
         tf = 80
