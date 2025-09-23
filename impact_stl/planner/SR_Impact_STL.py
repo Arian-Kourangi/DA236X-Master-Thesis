@@ -537,6 +537,21 @@ class SR_Impact_STL:
                             self.prog.addConstr(self.robots_dhvar[r][bzr+1][0,-1]<= self.objects_dhvar[o][bzo+1][0,-1] +self.bigM*(1-zs[o][bzr,bzo]),
                                                  name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_4")
                             
+                            # Push or brake constraint
+                            #push = self.prog.addVar(vtype=gp.GRB.BINARY)
+                            #for cp in range(self.robots_ncp[r]-2):
+                            #    self.prog.addConstrs((self.robots_drvar[r][bzr+1][d,cp]**2 - self.robots_drvar[r][bzr+1][d,cp+1]**2  >= -self.bigM*(1-push)*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
+                            #                         name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_6")
+                            #    self.prog.addConstrs((self.robots_drvar[r][bzr+1][d,cp]**2 - self.robots_drvar[r][bzr+1][d,cp+1]**2  <= self.bigM*(push)*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
+                            #                         name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_7")
+                            #    
+                            #    self.prog.addConstr(self.robots_dhvar[r][bzr+1][0,cp]**2 - self.robots_dhvar[r][bzr+1][0,cp+1]**2  >= -self.bigM*(1-push)*(1-zs[o][bzr,bzo]),
+                            #                         name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_8")
+                            #    self.prog.addConstr(self.robots_dhvar[r][bzr+1][0,cp]**2 - self.robots_dhvar[r][bzr+1][0,cp+1]**2  <= self.bigM*(push)*(1-zs[o][bzr,bzo]),
+                            #                         name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_9")
+
+
+
                             # Constant rate of change in position(no turning)
                             #for cp in range (self.robots_ncp[r]-2):
                             #    self.prog.addConstrs((self.robots_rvar[r][bzr+1][d,cp] - 2*self.robots_rvar[r][bzr+1][d,cp+1] + self.robots_rvar[r][bzr+1][d,cp+2] >= -self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
