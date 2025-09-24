@@ -290,7 +290,7 @@ class SR_Impact_STL:
 
         for o in range(self.nobjects):
             for bz in range(self.objects_nbzs[o]-1):
-                self.prog.addConstrs((self.objects_rvar[o][bz][i,-1] == self.objects_rvar[o][bz+1][i,0] for i in range(self.world.dim)), name=f"continuity_{o}_{bz}")
+                #self.prog.addConstrs((self.objects_rvar[o][bz][i,-1] == self.objects_rvar[o][bz+1][i,0] for i in range(self.world.dim)), name=f"continuity_{o}_{bz}")
                 self.prog.addConstr(self.objects_hvar[o][bz][0,-1] == self.objects_hvar[o][bz+1][0,0], name=f"continuity_{o}_{bz}_time")
              
     def _initial_final_position_constraints(self):
@@ -484,23 +484,23 @@ class SR_Impact_STL:
                             # NOTE: should be ahead in that dimensions in order for it to "slow it down"
                             
                             # position and time should be matched between robot and object, the zs binary variables flag if collision happens
-                            self.prog.addConstrs((self.robots_rvar[r][bzr][d,-1] >= self.objects_rvar[o][bzo][d,-1] - self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
+                            self.prog.addConstrs((self.robots_rvar[r][bzr][d,0] >= self.objects_rvar[o][bzo][d,0] - self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
                                                  name=f"collision_{r}_{bzr}_{o}_{bzo}_1")
-                            self.prog.addConstrs((self.robots_rvar[r][bzr][d,-1] <= self.objects_rvar[o][bzo][d,-1] + self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
+                            self.prog.addConstrs((self.robots_rvar[r][bzr][d,0] <= self.objects_rvar[o][bzo][d,0] + self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
                                                  name=f"collision_{r}_{bzr}_{o}_{bzo}_2")
-                            self.prog.addConstr(self.robots_hvar[r][bzr][0,-1] >= self.objects_hvar[o][bzo][0,-1] - self.bigM*(1-zs[o][bzr,bzo]),
+                            self.prog.addConstr(self.robots_hvar[r][bzr][0,0] >= self.objects_hvar[o][bzo][0,0] - self.bigM*(1-zs[o][bzr,bzo]),
                                                  name=f"collision_{r}_{bzr}_{o}_{bzo}_3")
-                            self.prog.addConstr(self.robots_hvar[r][bzr][0,-1] <= self.objects_hvar[o][bzo][0,-1] + self.bigM*(1-zs[o][bzr,bzo]),
+                            self.prog.addConstr(self.robots_hvar[r][bzr][0,0] <= self.objects_hvar[o][bzo][0,0] + self.bigM*(1-zs[o][bzr,bzo]),
                                                  name=f"collision_{r}_{bzr}_{o}_{bzo}_4")
                             
                             #Adding velocity equality constraints for all dimensions
-                            self.prog.addConstrs((self.robots_drvar[r][bzr][d,-1] >= self.objects_drvar[o][bzo][d,-1] - self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
+                            self.prog.addConstrs((self.robots_drvar[r][bzr][d,0] >= self.objects_drvar[o][bzo][d,0] - self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
                                                  name=f"collision_{r}_{bzr}_{o}_{bzo}_5")
-                            self.prog.addConstrs((self.robots_drvar[r][bzr][d,-1] <= self.objects_drvar[o][bzo][d,-1] + self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
+                            self.prog.addConstrs((self.robots_drvar[r][bzr][d,0] <= self.objects_drvar[o][bzo][d,0] + self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
                                                  name=f"collision_{r}_{bzr}_{o}_{bzo}_6")
-                            self.prog.addConstr(self.robots_dhvar[r][bzr][0,-1] >= self.objects_dhvar[o][bzo][0,-1] - self.bigM*(1-zs[o][bzr,bzo]),
+                            self.prog.addConstr(self.robots_dhvar[r][bzr][0,0] >= self.objects_dhvar[o][bzo][0,0] - self.bigM*(1-zs[o][bzr,bzo]),
                                                  name=f"collision_{r}_{bzr}_{o}_{bzo}_7")
-                            self.prog.addConstr(self.robots_dhvar[r][bzr][0,-1] <= self.objects_dhvar[o][bzo][0,-1] + self.bigM*(1-zs[o][bzr,bzo]),
+                            self.prog.addConstr(self.robots_dhvar[r][bzr][0,0] <= self.objects_dhvar[o][bzo][0,0] + self.bigM*(1-zs[o][bzr,bzo]),
                                                  name=f"collision_{r}_{bzr}_{o}_{bzo}_8")
                             
                             
@@ -521,20 +521,20 @@ class SR_Impact_STL:
                             self.prog.addConstr(self.robots_hvar[r][bzr+1][0,0]<= self.objects_hvar[o][bzo+1][0,0] + self.bigM*(1-zs[o][bzr,bzo]))
 
                             #Final Position
-                            self.prog.addConstrs(self.robots_rvar[r][bzr+1][d,-1]>= self.objects_rvar[o][bzo+1][d,-1] - self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim))
-                            self.prog.addConstrs(self.robots_rvar[r][bzr+1][d,-1]<= self.objects_rvar[o][bzo+1][d,-1] + self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim))
-                            self.prog.addConstr(self.robots_hvar[r][bzr+1][0,-1]>= self.objects_hvar[o][bzo+1][0,-1] - self.bigM*(1-zs[o][bzr,bzo]))
-                            self.prog.addConstr(self.robots_hvar[r][bzr+1][0,-1]<= self.objects_hvar[o][bzo+1][0,-1] + self.bigM*(1-zs[o][bzr,bzo]))   
+                            #self.prog.addConstrs(self.robots_rvar[r][bzr+1][d,-1]>= self.objects_rvar[o][bzo+1][d,-1] - self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim))
+                            #self.prog.addConstrs(self.robots_rvar[r][bzr+1][d,-1]<= self.objects_rvar[o][bzo+1][d,-1] + self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim))
+                            #self.prog.addConstr(self.robots_hvar[r][bzr+1][0,-1]>= self.objects_hvar[o][bzo+1][0,-1] - self.bigM*(1-zs[o][bzr,bzo]))
+                            #self.prog.addConstr(self.robots_hvar[r][bzr+1][0,-1]<= self.objects_hvar[o][bzo+1][0,-1] + self.bigM*(1-zs[o][bzr,bzo]))   
                             
                             # Couple the velocities after interations is started
                             
-                            self.prog.addConstrs((self.robots_drvar[r][bzr+1][d,-1]>= self.objects_drvar[o][bzo+1][d,-1] -self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
+                            self.prog.addConstrs((self.robots_drvar[r][bzr+1][d,0]>= self.objects_drvar[o][bzo+1][d,-1] -self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
                                                  name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_1")
-                            self.prog.addConstrs((self.robots_drvar[r][bzr+1][d,-1]<= self.objects_drvar[o][bzo+1][d,-1] +self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
+                            self.prog.addConstrs((self.robots_drvar[r][bzr+1][d,0]<= self.objects_drvar[o][bzo+1][d,-1] +self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
                                                  name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_2")
-                            self.prog.addConstr(self.robots_dhvar[r][bzr+1][0,-1]>= self.objects_dhvar[o][bzo+1][0,-1] -self.bigM*(1-zs[o][bzr,bzo]),
+                            self.prog.addConstr(self.robots_dhvar[r][bzr+1][0,0]>= self.objects_dhvar[o][bzo+1][0,-1] -self.bigM*(1-zs[o][bzr,bzo]),
                                                  name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_3")
-                            self.prog.addConstr(self.robots_dhvar[r][bzr+1][0,-1]<= self.objects_dhvar[o][bzo+1][0,-1] +self.bigM*(1-zs[o][bzr,bzo]),
+                            self.prog.addConstr(self.robots_dhvar[r][bzr+1][0,0]<= self.objects_dhvar[o][bzo+1][0,-1] +self.bigM*(1-zs[o][bzr,bzo]),
                                                  name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_4")
                             
                             # Push or brake constraint
@@ -609,6 +609,11 @@ class SR_Impact_STL:
                                          name=f"continuity_{o}_{bzo}_3")
                     self.prog.addConstr(self.objects_dhvar[o][bzo+1][0,0] <= self.objects_dhvar[o][bzo][0,-1] + self.bigM*zs_all,
                                          name=f"continuity_{o}_{bzo}_4")
+                    #Continuity for object position only when not interaction
+                    self.prog.addConstrs((self.objects_rvar[o][bzo+1][d,0] >= self.objects_rvar[o][bzo][d,-1] - self.bigM*zs_all for d in range(self.world.dim)),
+                                         name=f"continuity_{o}_{bzo}_1")
+                    self.prog.addConstrs((self.objects_rvar[o][bzo+1][d,0] <= self.objects_rvar[o][bzo][d,-1] + self.bigM*zs_all for d in range(self.world.dim)),
+                                         name=f"continuity_{o}_{bzo}_2")
                 except Exception as e:
                     print(f"Error in {o} {bzo} continuity constraint: {e}")
 
