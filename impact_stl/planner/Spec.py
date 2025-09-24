@@ -511,24 +511,24 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         world.spec = Spec(t0=0,tf=tf)
         #world.spec.add_pred(Pred(type='MU',preds=phi1),
         #                 name='pop')
-        
+        bz = 6
         robot1 = Robot(name="snap",
                        x0=np.array([5,0]),
                        dx0=np.array([0,0]),
                        xf=np.array([5,0]),
-                       dxf=np.array([0,0]),nbz=6)
+                       dxf=np.array([0,0]),nbz=bz)
         
         robot2 = Robot(name="crackle",
-                       x0=np.array([5,30]),
+                       x0=np.array([2,0]),
                        dx0=np.array([0,0]),
-                       xf=np.array([5,15]),
-                       dxf=np.array([0,0]),nbz=6)
+                       xf=np.array([5,30]),
+                       dxf=np.array([0,0]),nbz=bz)
         
         object1 = Object(name="pop",
                          x0=np.array([5,2]),
                          dx0=np.array([0,0]),
                          xf=np.array([5,15]),
-                         dxf=np.array([0,0]),nbz=6)
+                         dxf=np.array([0,0]),nbz=bz)
 
         world.dim = 2
         world.robots = [robot1,robot2]

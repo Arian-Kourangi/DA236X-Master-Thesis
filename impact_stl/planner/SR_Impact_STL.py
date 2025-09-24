@@ -467,6 +467,22 @@ class SR_Impact_STL:
                 except Exception as e:
                     print(f"Error in {r} {bzr} [1,0,1,0] constriant: {e}")
 
+            #Constrain for the object to never have two consequtive bzs both bumping with the same robot
+            for o in range(self.nobjects):
+                for bzo in range(self.objects_nbzs[o]-2):
+                    for bzr in range(self.robots_nbzs[r]-2):
+                        try:
+                            self.prog.addConstr(gp.quicksum([zs[o][bzr,bzo], zs[o][bzr+1,bzo+1]]) <= 1)
+                        except Exception as e:
+                            print(f"Error in {o} {bzo} {r} [1,1,0,0] constraint: {e}")
+
+            #Temporary constraint to enforce only one bump per robot and object
+            
+            #for o in range(self.nobjects):
+            #    try:
+            #        self.prog.addConstr(gp.quicksum([zs[o][bzr,bzo] for bzo in range(self.objects_nbzs[o]-1) for bzr in range(self.robots_nbzs[r]-1)]) <= 1)
+            #    except Exception as e:
+            #        print(f"Error in {o} {r} [1,0,0,1] constraint: {e}")
 
             for o in range(self.nobjects):
                 for bzr in range(self.robots_nbzs[r]-1):
@@ -541,17 +557,17 @@ class SR_Impact_STL:
                             ## Push or brake constraint only for y direction for now
                             zy_pos = self.prog.addVar(vtype=gp.GRB.BINARY)
                             zy_neg = self.prog.addVar(vtype=gp.GRB.BINARY)
-                            #zx_pos = self.prog.addVar(vtype=gp.GRB.BINARY)
-                            #zx_neg = self.prog.addVar(vtype=gp.GRB.BINARY)
-                            #zy_sum = zy_neg + zy_pos
-                            #zx_sum = zx_neg + zx_pos
-                            self.prog.addConstr(gp.quicksum([zy_pos, zy_neg]) == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_5")
+                            zx_pos = self.prog.addVar(vtype=gp.GRB.BINARY)
+                            zx_neg = self.prog.addVar(vtype=gp.GRB.BINARY)
+                            zy_sum = zy_neg + zy_pos
+                            zx_sum = zx_neg + zx_pos
+                            self.prog.addConstr(gp.quicksum([zy_pos, zy_neg,zx_pos, zx_neg]) == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_5")
                             #self.prog.addConstr(gp.quicksum([zx_pos, zx_neg]) == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_6")
                             for cp in range(self.robots_ncp[r]-2):
-                                self.prog.addConstr(self.robots_drvar[r][bzr][1,cp+1]-self.robots_drvar[r][bzr][1,cp] >= -self.bigM*(1-zy_pos), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_6")
-                                self.prog.addConstr(self.robots_drvar[r][bzr][1,cp+1]-self.robots_drvar[r][bzr][1,cp] <= self.bigM*(1-zy_neg), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_7")   
-                                #self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] >= -self.bigM*(1-zx_pos-zy_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_8")
-                                #self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] <= self.bigM*(1-zx_neg-zy_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_9") 
+                                self.prog.addConstr(self.robots_drvar[r][bzr][1,cp+1]-self.robots_drvar[r][bzr][1,cp] >= -self.bigM*(1-zy_pos-zx_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_6")
+                                self.prog.addConstr(self.robots_drvar[r][bzr][1,cp+1]-self.robots_drvar[r][bzr][1,cp] <= self.bigM*(1-zy_neg-zx_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_7")   
+                                self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] >= -self.bigM*(1-zx_pos-zy_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_8")
+                                self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] <= self.bigM*(1-zx_neg-zy_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_9") 
 
 
                             # Constant rate of change in position(no turning)
@@ -665,7 +681,24 @@ class SR_Impact_STL:
                 except Exception as e:
                     print(f"Error in {r} {bzr} continuity constraint: {e}")
         """
-    
+        #Constrain for object bz to not have more than one collision with any robot in a triplet 
+        for o in range(self.nobjects):
+            for bzo in range(self.objects_nbzs[o]-3):
+                id1 = bzo
+                id2 = bzo + 1
+                id3 = bzo + 2
+                #we wnt to check that these three consecutive bzs do not have more than one collision with any robot
+                zs_sums = [self.prog.addVar(vtype=gp.GRB.BINARY) for r in range(self.nrobots)]
+                for r in range(self.nrobots):
+                    try:
+                        self.prog.addConstr(zs_sums[r] == gp.quicksum([self.robots[r].zs[o][bzr,bzo] for bzr in range(self.robots_nbzs[r]-1) for bzo in [id1,id2,id3]]))
+                    except Exception as e:
+                        print(f"Error in {o} {bzo} {r} zs_sums[r] == quicksum(robots[r].zs[r][o][:,bzo]): {e}")
+                self.prog.addConstr(gp.quicksum(zs_sums) <= 1)
+
+
+
+
     def _robot_dynamics(self):
         # so apparently there are no objects, so all robots are just having smooth trajectories
         for r in range(self.nrobots):
