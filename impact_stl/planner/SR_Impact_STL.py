@@ -611,6 +611,7 @@ class SR_Impact_STL:
                                          name=f"continuity_{o}_{bzo}_3")
                     self.prog.addConstr(self.objects_dhvar[o][bzo+1][0,0] <= self.objects_dhvar[o][bzo][0,-1] + self.bigM*zs_all,
                                          name=f"continuity_{o}_{bzo}_4")
+                    
                     #Continuity for object position only when not interaction
                     self.prog.addConstrs((self.objects_rvar[o][bzo+1][d,0] >= self.objects_rvar[o][bzo][d,-1] - self.bigM*zs_all for d in range(self.world.dim)),
                                          name=f"continuity_{o}_{bzo}_1")
