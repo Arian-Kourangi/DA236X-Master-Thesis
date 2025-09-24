@@ -504,31 +504,31 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         world.areas = [area1,area2]
         world.obstacles = []
     elif specification == "minimal_test":
-        tf = 20
+        tf = 100
         area1 = Area(x_min=np.array([4.5,6]),x_max=np.array([5.5,7]))
         mu1 = Pred(type="MU",preds=area1,io="in")
         phi1 = Pred(type="F",I=[0,tf],preds=[mu1])
         world.spec = Spec(t0=0,tf=tf)
-        world.spec.add_pred(Pred(type='MU',preds=phi1),
-                         name='pop')
+        #world.spec.add_pred(Pred(type='MU',preds=phi1),
+        #                 name='pop')
         
         robot1 = Robot(name="snap",
                        x0=np.array([5,0]),
                        dx0=np.array([0,0]),
                        xf=np.array([5,0]),
-                       dxf=np.array([0,0]),nbz=3)
+                       dxf=np.array([0,0]),nbz=5)
         
         robot2 = Robot(name="crackle",
                        x0=np.array([5,9]),
                        dx0=np.array([0,0]),
                        xf=np.array([5,9]),
-                       dxf=np.array([0,0]),nbz=3)
+                       dxf=np.array([0,0]),nbz=5)
         
         object1 = Object(name="pop",
                          x0=np.array([5,2]),
                          dx0=np.array([0,0]),
                          xf=np.array([5,6.5]),
-                         dxf=np.array([0,0]),nbz=3)
+                         dxf=np.array([0,0]),nbz=5)
 
         world.dim = 2
         world.robots = [robot1,robot2]

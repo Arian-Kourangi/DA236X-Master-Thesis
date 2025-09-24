@@ -537,18 +537,14 @@ class SR_Impact_STL:
                             self.prog.addConstr(self.robots_dhvar[r][bzr+1][0,0]<= self.objects_dhvar[o][bzo+1][0,-1] +self.bigM*(1-zs[o][bzr,bzo]),
                                                  name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_4")
                             
-                            # Push or brake constraint
-                            #push = self.prog.addVar(vtype=gp.GRB.BINARY)
-                            #for cp in range(self.robots_ncp[r]-2):
-                            #    self.prog.addConstrs((self.robots_drvar[r][bzr+1][d,cp]**2 - self.robots_drvar[r][bzr+1][d,cp+1]**2  >= -self.bigM*(1-push)*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
-                            #                         name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_6")
-                            #    self.prog.addConstrs((self.robots_drvar[r][bzr+1][d,cp]**2 - self.robots_drvar[r][bzr+1][d,cp+1]**2  <= self.bigM*(push)*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
-                            #                         name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_7")
-                            #    
-                            #    self.prog.addConstr(self.robots_dhvar[r][bzr+1][0,cp]**2 - self.robots_dhvar[r][bzr+1][0,cp+1]**2  >= -self.bigM*(1-push)*(1-zs[o][bzr,bzo]),
-                            #                         name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_8")
-                            #    self.prog.addConstr(self.robots_dhvar[r][bzr+1][0,cp]**2 - self.robots_dhvar[r][bzr+1][0,cp+1]**2  <= self.bigM*(push)*(1-zs[o][bzr,bzo]),
-                            #                         name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_9")
+                            
+                            # Push or brake constraint only for y direction for now
+                            zy_pos = self.prog.addVar(vtype=gp.GRB.BINARY)
+                            zy_neg = self.prog.addVar(vtype=gp.GRB.BINARY)
+                            self.prog.addConstr(gp.quicksum([zy_pos, zy_neg]) == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_5")
+                            for cp in range(self.robots_ncp[r]-2):
+                                self.prog.addConstr(self.robots_drvar[r][bzr][1,cp+1]-self.robots_drvar[r][bzr][1,cp] >= -self.bigM*(1-zy_pos), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_6")
+                                self.prog.addConstr(self.robots_drvar[r][bzr][1,cp+1]-self.robots_drvar[r][bzr][1,cp] <= self.bigM*(1-zy_neg), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_7")   
 
 
 
