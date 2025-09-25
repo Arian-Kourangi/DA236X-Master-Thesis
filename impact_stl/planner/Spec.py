@@ -510,15 +510,15 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         world.spec = Spec(t0=0,tf=tf)
         #world.spec.add_pred(Pred(type='MU',preds=phi1),
         #                 name='pop')
-        bz = 6
+        bz = 5
         robot1 = Robot(name="snap",
-                       x0=np.array([15,0]),
+                       x0=np.array([17,0]),
                        dx0=np.array([0,0]),
-                       xf=np.array([15,0]),
+                       xf=None,
                        dxf=None,nbz=bz)
         
         robot2 = Robot(name="crackle",
-                       x0=np.array([3,4]),
+                       x0=np.array([4,5]),
                        dx0=np.array([0,0]),
                        xf=None,
                        dxf=None,nbz=bz)

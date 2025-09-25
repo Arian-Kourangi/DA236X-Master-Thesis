@@ -159,22 +159,6 @@ class SR_Impact_STL:
         The cost expression is added to the optimization problem in self.prog
 
         """
-        # # weights for throw_and_catch
-        # weight_L = 0
-        # weight_V = 0
-        # weight_A = 0.51 
-        # weight_absA = 0
-        # weight_rho = 100000 #100000
-        # weight_N_impacts = 10
-
-        # # weights for lab_test_2
-        # weight_L = 0
-        # weight_V = 0
-        # weight_A = 1000
-        # weight_absA = 0
-        # weight_rho = 1000 #100000
-        # weight_N_impacts = 1
-
         # weights for complex stl spec
         weight_L = 0
         weight_V = 0
@@ -468,13 +452,13 @@ class SR_Impact_STL:
                     print(f"Error in {r} {bzr} [1,0,1,0] constriant: {e}")
 
             #Constrain for the object to never have two consequtive bzs both bumping with the same robot
-            for o in range(self.nobjects):
-                for bzo in range(self.objects_nbzs[o]-2):
-                    for bzr in range(self.robots_nbzs[r]-2):
-                        try:
-                            self.prog.addConstr(gp.quicksum([zs[o][bzr,bzo], zs[o][bzr+1,bzo+1]]) <= 1)
-                        except Exception as e:
-                            print(f"Error in {o} {bzo} {r} [1,1,0,0] constraint: {e}")
+            #for o in range(self.nobjects):
+            #    for bzo in range(self.objects_nbzs[o]-2):
+            #        for bzr in range(self.robots_nbzs[r]-2):
+            #            try:
+            #                self.prog.addConstr(gp.quicksum([zs[o][bzr,bzo], zs[o][bzr+1,bzo+1]]) <= 1)
+            #            except Exception as e:
+            #                print(f"Error in {o} {bzo} {r} [1,1,0,0] constraint: {e}")
 
             #Temporary constraint to enforce only one bump per robot and object
             
@@ -487,18 +471,8 @@ class SR_Impact_STL:
             for o in range(self.nobjects):
                 for bzr in range(self.robots_nbzs[r]-1):
                     for bzo in range(self.objects_nbzs[o]-1):
-                        # if collision, then rvar[r][bzr][:,-1] == rvar[o][bzo][:,-1]
-                        # and after collision we get
-                        # - drvar[r][bzr+1][:,0] = (mr - mo)/(mr + mo)*drvar[r][bzr][:,-1] + 2*mo/(mr + mo)*drvar[o][bzo][:,-1]
-                        # - drvar[o][bzo+1][:,0] = 2*mr/(mr + mo)*drvar[r][bzr][:,-1] + (mo - mr)/(mr + mo)*drvar[o][bzo][:,-1]
-                        # otherwise, we add velocity continuity constraints
-
-                        # if collision
+                        # if below constraints are satisfied, then zs[o][bzr,bzo] can be 1, else it must be 0
                         try:
-                            # NOTE: Here we could perhaps enforce velocity should be the same in each dimension in order for it to be considered a collision.
-                            # NOTE: Idea, Somehow enforce that if the magnitude of the velocity in any dimension is to be decreased the robots position
-                            # NOTE: should be ahead in that dimensions in order for it to "slow it down"
-                            
                             # position and time should be matched between robot and object, the zs binary variables flag if collision happens
                             self.prog.addConstrs((self.robots_rvar[r][bzr][d,0] >= self.objects_rvar[o][bzo][d,0] - self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
                                                  name=f"collision_{r}_{bzr}_{o}_{bzo}_1")
@@ -536,10 +510,8 @@ class SR_Impact_STL:
 
                     
                         try:
-                            # NOTE: This should be replaced by some other control law, not just inelastic collision
-                            # NOTE: 
-                            
-                            # Intial  position and time match in the first cp of the curve after the interaction
+                            #After interaction curve, we enforce that the inital pose, velocity and time of the robot and object match for the next curve.
+                            #This way, we don't need to worry what happens during the interactions curve, just that before and after the interaction, the states match
                             
                             #Inital Position
                             self.prog.addConstrs(self.robots_rvar[r][bzr+1][d,0]>= self.objects_rvar[o][bzo+1][d,0] - self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim))
@@ -559,7 +531,7 @@ class SR_Impact_STL:
                                                  name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_4")
                             
 
-                            ## Push or brake constraint only for y direction for now
+                            ## Push or brake constraint only in one dir at a time
                             zy_pos = self.prog.addVar(vtype=gp.GRB.BINARY)
                             zy_neg = self.prog.addVar(vtype=gp.GRB.BINARY)
                             zx_pos = self.prog.addVar(vtype=gp.GRB.BINARY)
@@ -574,7 +546,7 @@ class SR_Impact_STL:
                                 self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] >= -self.bigM*(1-zx_pos-zy_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_8")
                                 self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] <= self.bigM*(1-zx_neg-zy_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_9") 
 
-
+                            #Placeholder constraints
                             # Constant rate of change in position(no turning)
                             #for cp in range (self.robots_ncp[r]-2):
                             #    self.prog.addConstrs((self.robots_rvar[r][bzr+1][d,cp] - 2*self.robots_rvar[r][bzr+1][d,cp+1] + self.robots_rvar[r][bzr+1][d,cp+2] >= -self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
@@ -584,17 +556,6 @@ class SR_Impact_STL:
                             #    self.prog.addConstr((self.robots_hvar[r][bzr+1][0,cp] - 2*self.robots_hvar[r][bzr+1][0,cp+1] + self.robots_hvar[r][bzr+1][0,cp+2] >= -self.bigM*(1-zs[o][bzr,bzo])),
                             #                            name=f"collision_{r}_{bzr}_{o}_{bzo}_11_{cp}")
                             #    self.prog.addConstr((self.robots_hvar[r][bzr+1][0,cp] - 2*self.robots_hvar[r][bzr+1][0,cp+1] + self.robots_hvar[r][bzr+1][0,cp+2] <= self.bigM*(1-zs[o][bzr,bzo])),
-                            #                            name=f"collision_{r}_{bzr}_{o}_{bzo}_12_{cp}")
-                                
-                            # Constante rate of change in velocity(constant acceleration)(one less cp than original bzr)
-                            #for cp in range (self.robots_ncp[r]-3):
-                            #    self.prog.addConstrs((self.robots_drvar[r][bzr+1][d,cp] - 2*self.robots_drvar[r][bzr+1][d,cp+1] + self.robots_drvar[r][bzr+1][d,cp+2] >= -self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
-                            #                            name=f"collision_{r}_{bzr}_{o}_{bzo}_9_{cp}")
-                            #    self.prog.addConstrs((self.robots_drvar[r][bzr+1][d,cp] - 2*self.robots_drvar[r][bzr+1][d,cp+1] + self.robots_drvar[r][bzr+1][d,cp+2] <= self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
-                            #                            name=f"collision_{r}_{bzr}_{o}_{bzo}_10_{cp}")
-                            #    self.prog.addConstr((self.robots_dhvar[r][bzr+1][0,cp] - 2*self.robots_dhvar[r][bzr+1][0,cp+1] + self.robots_dhvar[r][bzr+1][0,cp+2] >= -self.bigM*(1-zs[o][bzr,bzo])),
-                            #                            name=f"collision_{r}_{bzr}_{o}_{bzo}_11_{cp}")
-                            #    self.prog.addConstr((self.robots_dhvar[r][bzr+1][0,cp] - 2*self.robots_dhvar[r][bzr+1][0,cp+1] + self.robots_dhvar[r][bzr+1][0,cp+2] <= self.bigM*(1-zs[o][bzr,bzo])),
                             #                            name=f"collision_{r}_{bzr}_{o}_{bzo}_12_{cp}")
                         except Exception as e:
                             print(f"Error in {o} {bzo} {r} {bzr} impact dynamics constraint: {e}")
@@ -620,9 +581,6 @@ class SR_Impact_STL:
                     print(f"Error in {o} {bzo} zs_all == quicksum(zs): {e}")
 
                 # if zs_all == 0: continuity: tight constraints
-
-                ## NOTE: Here we enforce continuity OF VELOCITY if no robot bumps the object, but when there is a bump the constraints are relazed a lot
-                ## NOTE: Perhaps we should enforce coninuity at all times now since there are no intendeed jumps in object or robot pose.
                 try:
                     self.prog.addConstrs((self.objects_drvar[o][bzo+1][d,0] >= self.objects_drvar[o][bzo][d,-1] - self.bigM*zs_all for d in range(self.world.dim)),
                                          name=f"continuity_{o}_{bzo}_1")
@@ -652,13 +610,13 @@ class SR_Impact_STL:
                 except Exception as e:
                     print(f"Error in {r} {bz} robot dynamics constraint: {e}")
 
-        #Constrain for object bz to not have more than one collision with any robot in a triplet 
+        #Constrain for object bz to not have more than one collision with any robot in a row, ie it must have one free bz between two interactions
         for o in range(self.nobjects):
             for bzo in range(self.objects_nbzs[o]-2):
                 id1 = bzo
                 id2 = bzo + 1
                 #id3 = bzo + 2
-                #we wnt to check that these three consecutive bzs do not have more than one collision with any robot
+                #we wnt to check that these two consecutive bzs do not have more than one collision with any robot
                 zs_sums = [self.prog.addVar(vtype=gp.GRB.BINARY) for r in range(self.nrobots)]
                 for r in range(self.nrobots):
                     try:
@@ -666,8 +624,6 @@ class SR_Impact_STL:
                     except Exception as e:
                         print(f"Error in {o} {bzo} {r} zs_sums[r] == quicksum(robots[r].zs[r][o][:,bzo]): {e}")
                 self.prog.addConstr(gp.quicksum(zs_sums) <= 1)
-
-
 
     def _robot_dynamics(self):
         # so apparently there are no objects, so all robots are just having smooth trajectories
