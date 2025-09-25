@@ -612,15 +612,15 @@ class SR_Impact_STL:
 
         #Constrain for object bz to not have more than one collision with any robot in a row, ie it must have one free bz between two interactions
         for o in range(self.nobjects):
-            for bzo in range(self.objects_nbzs[o]-2):
+            for bzo in range(self.objects_nbzs[o]-3):
                 id1 = bzo
                 id2 = bzo + 1
-                #id3 = bzo + 2
+                id3 = bzo + 2
                 #we wnt to check that these two consecutive bzs do not have more than one collision with any robot
                 zs_sums = [self.prog.addVar(vtype=gp.GRB.BINARY) for r in range(self.nrobots)]
                 for r in range(self.nrobots):
                     try:
-                        self.prog.addConstr(zs_sums[r] == gp.quicksum([self.robots[r].zs[o][bzr,bzo] for bzr in range(self.robots_nbzs[r]-1) for bzo in [id1,id2]]))
+                        self.prog.addConstr(zs_sums[r] == gp.quicksum([self.robots[r].zs[o][bzr,bzo] for bzr in range(self.robots_nbzs[r]-1) for bzo in [id1,id2,id3]]))
                     except Exception as e:
                         print(f"Error in {o} {bzo} {r} zs_sums[r] == quicksum(robots[r].zs[r][o][:,bzo]): {e}")
                 self.prog.addConstr(gp.quicksum(zs_sums) <= 1)
@@ -701,7 +701,7 @@ class SR_Impact_STL:
                                 for cp1 in range(self.robots_ncp[r1]):
                                     for cp2 in range(self.robots_ncp[r2]):
                                         # x cp1's left of x cp2's
-                                        radius = 0.5
+                                        radius = 10
                                         try:
                                             c = self.robots_rvar[r1][bzr1][0,cp1] - self.robots_rvar[r2][bzr2][0,cp2] - radius
                                             self.prog.addConstr(c <= self.bigM*(1-z_space[0]) + self.bigM*(1-z_time))
