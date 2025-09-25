@@ -602,7 +602,7 @@ class SR_Impact_STL:
                 try:
                     self.prog.addConstrs((self.robots_drvar[r][bz+1][d,0] == self.robots_drvar[r][bz][d,-1] for d in range(self.world.dim)),
                                          name=f"robot_{r}_{bz}_1")
-                    self.prog.addConstrs((self.robots_dhvar[r][bz+1][0,0] == self.robots_dhvar[r][bz][0,-1] for d in range(self.world.dim)),
+                    self.prog.addConstrs((self.robots_dhvar[r][bz+1][0,0] == self.robots_dhvar[r][bz][0,-1]),
                                          name=f"robot_{r}_{bz}_2")
                 except Exception as e:
                     print(f"Error in {r} {bz} robot dynamics constraint: {e}")
