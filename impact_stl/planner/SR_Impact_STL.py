@@ -456,10 +456,11 @@ class SR_Impact_STL:
             # for the object to always have one free bezier between two interaction bezier with the same robot, but it reduces behviour that makes one robot 
             #both push and catch the object in seperate bezier segments.
             for o in range(self.nobjects):
-                for bzo in range(self.objects_nbzs[o]-3):
-                    for bzr in range(self.robots_nbzs[r]-3):
+                dx = 3
+                for bzo in range(self.objects_nbzs[o]-dx):
+                    for bzr in range(self.robots_nbzs[r]-dx):
                         try:
-                            self.prog.addConstr(gp.quicksum([zs[o][bzr,bzo], zs[o][bzr+1,bzo+1],zs[o][bzr+2,bzo+2]]) <= 1)
+                            self.prog.addConstr(gp.quicksum([zs[o][bzr+i,bzo+i] for i in range(dx)]) <= 1)
                         except Exception as e:
                             print(f"Error in {o} {bzo} {r} [1,1,0,0] constraint: {e}")
 
