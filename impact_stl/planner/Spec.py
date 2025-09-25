@@ -503,34 +503,29 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         world.areas = [area1,area2]
         world.obstacles = []
     elif specification == "minimal_test":
-        tf = 80
+        tf = 150
+
+        #just so I can mark the final location of the object, not actually used in an stl spec
         area1 = Area(x_min=np.array([24.5,24.5]),x_max=np.array([25.5,25.5]))
-        mu1 = Pred(type="MU",preds=area1,io="in")
-        phi1 = Pred(type="F",I=[0,tf],preds=[mu1])
+
+
+
+        obs1 = Area(x_min=np.array([10,10]),x_max=np.array([20,20]))
+        phi31 = Pred(type="NEG",preds=obs1) 
+        phi3 = Pred(type="G",I=[0,tf],preds=[phi31])
+        
         world.spec = Spec(t0=0,tf=tf)
-        #world.spec.add_pred(Pred(type='MU',preds=phi1),
-        #                 name='pop')
+        #world.spec.add_pred(phi3, name='crockle')
+        #world.spec.add_pred(phi3, name='snap')
+        
         bz = 10
         robot1 = Robot(name="snap",
-                       x0=np.array([25,25]),
+                       x0=np.array([0,0]),
                        dx0=np.array([0,0]),
                        xf=None,
                        dxf=None,nbz=bz)
-        
-        #robot2 = Robot(name="crackle",
-        #               x0=np.array([0,25]),
-        #               dx0=np.array([0,0]),
-        #               xf=None,
-        #               dxf=None,nbz=bz)
-        #
-        #robot3 = Robot(name="snop",
-        #               x0=np.array([25,25]),
-        #               dx0=np.array([0,0]),
-        #               xf=None,
-        #               dxf=None,nbz=bz)
-        
-        robot4 = Robot(name="crockle",
-                       x0=np.array([10,10]),
+        robot2 = Robot(name="crockle",
+                       x0=np.array([14,6]),
                        dx0=np.array([0,0]),
                        xf=None,
                        dxf=None,nbz=bz)
@@ -542,7 +537,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
                          dxf=np.array([0,0]),nbz=bz)
 
         world.dim = 2
-        world.robots = [robot1,robot4]
+        world.robots = [robot1,robot2]
         world.objects = [object1]
 
         # World bounding box

@@ -33,7 +33,7 @@ from utilities.sr_stl import quant_parse_operator, parse_time_robot_robot
 from utilities.beziers import get_derivative_control_points_gurobi, eval_bezier, value_bezier
 from World import World
 
-MOVE_DIAGONALLY = True
+MOVE_DIAGONALLY = False
 SAVE_SOLUTIONS = False
 class SR_Impact_STL:
     def __init__(self,world: World):
@@ -555,8 +555,6 @@ class SR_Impact_STL:
                             # After interaction curve, we enforce that the inital pose, velocity and time of the robot and object match for the next curve.
                             # This way, we don't need to worry what happens during the interactions curve, just that before and after the interaction, 
                             # the states match
-
-                            
                             # Inital Position and time
                             self.prog.addConstrs(self.robots_rvar[r][bzr+1][d,0]>= self.objects_rvar[o][bzo+1][d,0] - self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim))
                             self.prog.addConstrs(self.robots_rvar[r][bzr+1][d,0]<= self.objects_rvar[o][bzo+1][d,0] + self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim))
