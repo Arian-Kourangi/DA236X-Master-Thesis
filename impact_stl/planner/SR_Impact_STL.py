@@ -156,6 +156,7 @@ class SR_Impact_STL:
         weight_absA = 0
         weight_rho = 10000 #100000
         weight_N_impacts = 0
+        weight_n_impacts_robot = 1 #Cost for increasing number of impacts for each robot, encourages robots to distribute impacts evenly between them
         
         ### path length cost
         if weight_L > 0:
@@ -248,6 +249,19 @@ class SR_Impact_STL:
                 self.cost_expression += weight_N_impacts*z_sum
             except Exception as e:
                 print(f"Exception objN: {e}")
+
+        if weight_n_impacts_robot >0:
+            try:
+
+                for r in range(self.nrobots):
+                    z_sum_r = self.prog.addVar(vtype=gp.GRB.INTEGER)
+                    self.prog.addConstr(z_sum_r == gp.quicksum([self.robots[r].zs[o][bz,bzo]  
+                                                              for o in range(self.nobjects)
+                                                              for bz in range(self.robots_nbzs[r]-1) 
+                                                              for bzo in range(self.objects_nbzs[o]-1)]))
+                    self.cost_expression += weight_n_impacts_robot*(z_sum_r**2)
+            except Exception as e:
+                print(f"Exception objn_r: {e}")
 
     def _continuity_constraints(self):
         """
@@ -504,7 +518,7 @@ class SR_Impact_STL:
                     except Exception as e:
                         print(f"Error in {o} {bzo} {r} zs_sums[r] == quicksum(robots[r].zs[r][o][:,bzo]): {e}")
                 self.prog.addConstr(gp.quicksum(zs_sums) <= 1)
-
+    
     def _object_dynamics(self):
         for r in range(self.nrobots):
             zs = self.robots[r].zs #Tensor over objects, robot bzs, object bzs indicating if interaction happens

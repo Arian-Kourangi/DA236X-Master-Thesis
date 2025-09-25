@@ -503,7 +503,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         world.areas = [area1,area2]
         world.obstacles = []
     elif specification == "minimal_test":
-        tf = 150
+        tf = 30
 
         #just so I can mark the final location of the object, not actually used in an stl spec
         area1 = Area(x_min=np.array([24.5,24.5]),x_max=np.array([25.5,25.5]))
@@ -520,18 +520,18 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         
         bz = 10
         robot1 = Robot(name="snap",
-                       x0=np.array([0,0]),
+                       x0=np.array([10,0]),
                        dx0=np.array([0,0]),
                        xf=None,
                        dxf=None,nbz=bz)
         robot2 = Robot(name="crockle",
-                       x0=np.array([14,6]),
+                       x0=np.array([0,30]),
                        dx0=np.array([0,0]),
                        xf=None,
                        dxf=None,nbz=bz)
         
         object1 = Object(name="pop",
-                         x0=np.array([5,2]),
+                         x0=np.array([15,2]),
                          dx0=np.array([0,0]),
                          xf=np.array([25,25]),
                          dxf=np.array([0,0]),nbz=bz)
