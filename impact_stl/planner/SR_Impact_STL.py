@@ -507,14 +507,13 @@ class SR_Impact_STL:
         
         #Constrain for object bz to not have more than one collision with any robot in a row, ie it must have one free bz between two interactions
         for o in range(self.nobjects):
-            for bzo in range(self.objects_nbzs[o]-2):
-                id1 = bzo
-                id2 = bzo + 1
+            dx = 2
+            for bzo in range(self.objects_nbzs[o]-dx):
                 #we wnt to check that these two consecutive bzs do not have more than one collision with any robot
                 zs_sums = [self.prog.addVar(vtype=gp.GRB.BINARY) for r in range(self.nrobots)]
                 for r in range(self.nrobots):
                     try:
-                        self.prog.addConstr(zs_sums[r] == gp.quicksum([self.robots[r].zs[o][bzr,bzo_x] for bzr in range(self.robots_nbzs[r]-1) for bzo_x in [id1,id2]]))
+                        self.prog.addConstr(zs_sums[r] == gp.quicksum([self.robots[r].zs[o][bzr,bzo + s] for bzr in range(self.robots_nbzs[r]-1) for s in range (dx)]))
                     except Exception as e:
                         print(f"Error in {o} {bzo} {r} zs_sums[r] == quicksum(robots[r].zs[r][o][:,bzo]): {e}")
                 self.prog.addConstr(gp.quicksum(zs_sums) <= 1)
