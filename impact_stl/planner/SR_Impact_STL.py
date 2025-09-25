@@ -70,18 +70,6 @@ class SR_Impact_STL:
         self.objects_nbzs = np.array([obj.nbz for obj in self.objects])     # number bzs for each object, should be 4*k + 1
         self.objects_order = np.array([1 for obj in self.objects])          # order of 'wait', 'push', 'float', 'brake'
         self.objects_ncp   = self.objects_order + 1
-        # # now create objects_order which, for each robots, fills the nbz with the object_order
-        # self.objects_order = [np.zeros(self.objects_nbzs[o],dtype=int) for o in range(len(self.objects))]
-        # # now fil the 4*k+1 elements with the object_order
-        # for o in range(len(self.objects)):
-        #     for i in range(4):
-        #         self.objects_order[o][i::4] = int(self.object_order[i])
-        #     self.objects_order[o][-1] = 1
-        # self.objects_ncp   = [self.objects_order[o]+1 for o in range(self.nobjects)]
-
-        ##########################################
-        # add continuous state and input variables
-        # for each robot and object, we have a list of bzs, each bz has dim x ncp variables
         
         #size = [nr_robots][nr_bzs][dim, ncp]
         self.robots_rvar = [[self.prog.addMVar((self.world.dim,self.robots_ncp[r]),
@@ -96,6 +84,7 @@ class SR_Impact_STL:
         self.prog.update()
 
         # Now obtain the control points of the derivatives as linear combinations of the control points of the original bzs
+        
         #size = [nr_robots][nr_bzs][dim, ncp]
         self.robots_drvar = [[get_derivative_control_points_gurobi(self.robots_rvar[r][i],1) for i in range(self.robots_nbzs[r])] for r in range(self.nrobots)]
         self.robots_ddrvar = [[get_derivative_control_points_gurobi(self.robots_rvar[r][i],2) for i in range(self.robots_nbzs[r])] for r in range(self.nrobots)]
@@ -124,7 +113,7 @@ class SR_Impact_STL:
 
         self._stl_constraints()
         #self._robot_robot_collision_constraints()
-        # self._object_object_collision_constraints()
+        #self._object_object_collision_constraints()
         self._set_cost()
 
     
@@ -264,12 +253,20 @@ class SR_Impact_STL:
         Enforce continuity between consecutive bezier curves for all robots and objects
 
         """
+
+        ###### ROBORT CONTINUITY ######
+
         for r in range(self.nrobots):
             for bz in range(self.robots_nbzs[r]-1):
-                #size = [nr_robots][nr_bzs][dim, ncp]
-                self.prog.addConstrs((self.robots_rvar[r][bz][i,-1] == self.robots_rvar[r][bz+1][i,0] for i in range(self.world.dim)), name=f"continuity_{r}_{bz}")
+                #Position
+                self.prog.addConstrs((self.robots_rvar[r][bz][d,-1] == self.robots_rvar[r][bz+1][d,0] for d in range(self.world.dim)), name=f"continuity_{r}_{bz}")
+                #Time
                 self.prog.addConstr(self.robots_hvar[r][bz][0,-1] == self.robots_hvar[r][bz+1][0,0], name=f"continuity_{r}_{bz}_time")
+                #Velocity
+                self.prog.addConstrs((self.robots_drvar[r][bz][d,-1] == self.robots_drvar[r][bz+1][d,0]  for d in range(self.world.dim)),name=f"continuity__{r}_{bz}_1")
+                self.prog.addConstr((self.robots_dhvar[r][bz][0,-1]) == self.robots_dhvar[r][bz+1][0,0], name=f"continuity__{r}_{bz}_2")
 
+        ###### OBJECT CONTINUITY ######
         for o in range(self.nobjects):
             for bz in range(self.objects_nbzs[o]-1):
                 #This is removed to allow discrete jumps of position after an interaction curve, 
@@ -587,17 +584,6 @@ class SR_Impact_STL:
                                          name=f"continuity_{o}_{bzo}_2")
                 except Exception as e:
                     print(f"Error in {o} {bzo} continuity constraint: {e}")
-
-        #Always enforce continuity for robots between bezier segments
-        for r in range(self.nrobots):
-            for bz in range (self.robots_nbzs[r]-1):
-                try:
-                    self.prog.addConstrs((self.robots_drvar[r][bz+1][d,0] == self.robots_drvar[r][bz][d,-1] for d in range(self.world.dim)),
-                                         name=f"robot_{r}_{bz}_1")
-                    self.prog.addConstr((self.robots_dhvar[r][bz+1][0,0] == self.robots_dhvar[r][bz][0,-1]),
-                                         name=f"robot_{r}_{bz}_2")
-                except Exception as e:
-                    print(f"Error in {r} {bz} robot dynamics constraint: {e}")
 
         #Constrain for object bz to not have more than one collision with any robot in a row, ie it must have one free bz between two interactions
         for o in range(self.nobjects):
