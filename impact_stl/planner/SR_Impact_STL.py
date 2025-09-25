@@ -33,6 +33,7 @@ from utilities.sr_stl import quant_parse_operator, parse_time_robot_robot
 from utilities.beziers import get_derivative_control_points_gurobi, eval_bezier, value_bezier
 from World import World
 
+MOVE_DIAGONALLY = True
 class SR_Impact_STL:
     def __init__(self,world: World):
         """
@@ -575,36 +576,35 @@ class SR_Impact_STL:
                         ############################### ADDITIONAL CONSTRAINTS TO LIMIT BEHAVIOURS #########################################
                             # Additional constraints to limit the possible behaviours during the interaction curve
 
-                            # Constrain "force" to only be applied in one direction at a time for a interaction curve. This limits one robot from both pushing and stopping
-                            # an object in the same curve. As well as trying to push in x direction whilst stopping in y direction.
-                            # This does not constrain diagonals movement, only diagonal pushing. Diagonal movement of the object can still be achieved, it just happens
-                            # over two interaction curves, one for each dimension.
+                            # Constrain force to only be applied in positive or negative direction for each dimension. This way,
+                            # the robot can move diagonally, but it cannot both push the object on the diagonal and slow it down in the same interaction curve.
+                            # It can however stop it in another interaction curve.
                             zy_pos = self.prog.addVar(vtype=gp.GRB.BINARY)
                             zy_neg = self.prog.addVar(vtype=gp.GRB.BINARY)
                             zx_pos = self.prog.addVar(vtype=gp.GRB.BINARY)
                             zx_neg = self.prog.addVar(vtype=gp.GRB.BINARY)
-                            zy_sum = zy_neg + zy_pos
-                            zx_sum = zx_neg + zx_pos
-                            self.prog.addConstr(gp.quicksum([zy_pos, zy_neg,zx_pos, zx_neg]) == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_5")
-                            #self.prog.addConstr(gp.quicksum([zx_pos, zx_neg]) == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_6")
-                            for cp in range(self.robots_ncp[r]-2):
-                                self.prog.addConstr(self.robots_drvar[r][bzr][1,cp+1]-self.robots_drvar[r][bzr][1,cp] >= -self.bigM*(1-zy_pos-zx_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_6")
-                                self.prog.addConstr(self.robots_drvar[r][bzr][1,cp+1]-self.robots_drvar[r][bzr][1,cp] <= self.bigM*(1-zy_neg-zx_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_7")   
-                                self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] >= -self.bigM*(1-zx_pos-zy_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_8")
-                                self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] <= self.bigM*(1-zx_neg-zy_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_9") 
 
-                            # Diagonal movement is combersum, so in addition to the above contraint. 
-                            # We limit velocity in one dimension to be zero if the other dimension has velocity.
-                            # This means that diagonal movement cannot happen, since we can only move along one dimension at a time. 
-                            # Before moving the object in the other dimension, it first has to be brought to a stop.
-                            z_vel_x = self.prog.addVar(vtype=gp.GRB.BINARY)
-                            z_vel_y = self.prog.addVar(vtype=gp.GRB.BINARY)
-                            self.prog.addConstr(z_vel_x + z_vel_y == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_10")
-                            for cp in range(self.robots_ncp[r]-1):
-                                self.prog.addConstr(self.robots_drvar[r][bzr][0,cp] <= self.bigM*(1-z_vel_x), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_11")
-                                self.prog.addConstr(self.robots_drvar[r][bzr][0,cp] >= -self.bigM*(1-z_vel_x), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_12")
-                                self.prog.addConstr(self.robots_drvar[r][bzr][1,cp] <= self.bigM*(1-z_vel_y), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_13")
-                                self.prog.addConstr(self.robots_drvar[r][bzr][1,cp] >= -self.bigM*(1-z_vel_y), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_14")
+                            self.prog.addConstr(gp.quicksum([zy_pos, zy_neg]) == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_5")
+                            self.prog.addConstr(gp.quicksum([zx_pos, zx_neg]) == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_6")
+                            for cp in range(self.robots_ncp[r]-2):
+                                self.prog.addConstr(self.robots_drvar[r][bzr][1,cp+1]-self.robots_drvar[r][bzr][1,cp] >= -self.bigM*(1-zy_pos), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_6")
+                                self.prog.addConstr(self.robots_drvar[r][bzr][1,cp+1]-self.robots_drvar[r][bzr][1,cp] <= self.bigM*(1-zy_neg), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_7")   
+                                self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] >= -self.bigM*(1-zx_pos), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_8")
+                                self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] <= self.bigM*(1-zx_neg), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_9") 
+                            
+                            if not MOVE_DIAGONALLY:
+                                # Diagonal movement is combersum, so in addition to the above contraint. 
+                                # We limit velocity in one dimension to be zero if the other dimension has velocity.
+                                # This means that diagonal movement cannot happen, since we can only move along one dimension at a time. 
+                                # Before moving the object in the other dimension, it first has to be brought to a stop.
+                                z_vel_x = self.prog.addVar(vtype=gp.GRB.BINARY)
+                                z_vel_y = self.prog.addVar(vtype=gp.GRB.BINARY)
+                                self.prog.addConstr(z_vel_x + z_vel_y == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_10")
+                                for cp in range(self.robots_ncp[r]-1):
+                                    self.prog.addConstr(self.robots_drvar[r][bzr][0,cp] <= self.bigM*(1-z_vel_x), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_11")
+                                    self.prog.addConstr(self.robots_drvar[r][bzr][0,cp] >= -self.bigM*(1-z_vel_x), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_12")
+                                    self.prog.addConstr(self.robots_drvar[r][bzr][1,cp] <= self.bigM*(1-z_vel_y), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_13")
+                                    self.prog.addConstr(self.robots_drvar[r][bzr][1,cp] >= -self.bigM*(1-z_vel_y), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_14")
                         except Exception as e:
                             print(f"Error in {o} {bzo} {r} {bzr} interaction dynamics constraint: {e}")
 
