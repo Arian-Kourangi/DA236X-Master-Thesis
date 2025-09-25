@@ -531,7 +531,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
                        dxf=None,nbz=bz)
         
         object1 = Object(name="pop",
-                         x0=np.array([15,2]),
+                         x0=np.array([4,17]),
                          dx0=np.array([0,0]),
                          xf=np.array([25,25]),
                          dxf=np.array([0,0]),nbz=bz)

@@ -152,11 +152,11 @@ class SR_Impact_STL:
         # weights for complex stl spec
         weight_L = 0
         weight_V = 0
-        weight_A = 0.001
+        weight_A = 0.1
         weight_absA = 0
         weight_rho = 10000 #100000
         weight_N_impacts = 0
-        weight_n_impacts_robot = 100 #Cost for increasing number of impacts for each robot, encourages robots to distribute impacts evenly between them
+        weight_n_impacts_robot = 0 #Cost for increasing number of impacts for each robot, encourages robots to distribute impacts evenly between them
         
         ### path length cost
         if weight_L > 0:
@@ -496,28 +496,50 @@ class SR_Impact_STL:
             # Constrain for the object to not have consecutive interactions with a single robot. This is is a bit redundant because of the constraint
             # for the object to always have one free curve between two interaction curves , but it reduces behviour that makes one robot 
             # both push and catch the object in seperate bezier segments.
+        #    for o in range(self.nobjects):
+        #        dx = 3
+        #        for bzo in range(self.objects_nbzs[o]-dx):
+        #            for bzr in range(self.robots_nbzs[r]-dx):
+        #                try:
+        #                    self.prog.addConstr(gp.quicksum([zs[o][bzr+i,bzo+i] for i in range(dx)]) <= 1)
+        #                except Exception as e:
+        #                    print(f"Error in {o} {bzo} {r} [1,1,0,0] constraint: {e}")
+        #
+        ##Constrain for object bz to not have more than one collision with any robot in a row, ie it must have one free bz between two interactions
+        #for o in range(self.nobjects):
+        #    dx = 2
+        #    for bzo in range(self.objects_nbzs[o]-dx):
+        #        #we wnt to check that these two consecutive bzs do not have more than one collision with any robot
+        #        zs_sums = [self.prog.addVar(vtype=gp.GRB.BINARY) for r in range(self.nrobots)]
+        #        for r in range(self.nrobots):
+        #            try:
+        #                self.prog.addConstr(zs_sums[r] == gp.quicksum([self.robots[r].zs[o][bzr,bzo + s] for bzr in range(self.robots_nbzs[r]-1) for s in range (dx)]))
+        #            except Exception as e:
+        #                print(f"Error in {o} {bzo} {r} zs_sums[r] == quicksum(robots[r].zs[r][o][:,bzo]): {e}")
+        #        self.prog.addConstr(gp.quicksum(zs_sums) <= 1)
+
+        #Constraint that prevents one object from interacting with the same robot without first interacting
+        # with a different robot. ie object cannot be pushed and then caught by the same robot in different bezier segments
+        Y = {}
+
+        for r in range(self.nrobots):
             for o in range(self.nobjects):
-                dx = 3
-                for bzo in range(self.objects_nbzs[o]-dx):
-                    for bzr in range(self.robots_nbzs[r]-dx):
-                        try:
-                            self.prog.addConstr(gp.quicksum([zs[o][bzr+i,bzo+i] for i in range(dx)]) <= 1)
-                        except Exception as e:
-                            print(f"Error in {o} {bzo} {r} [1,1,0,0] constraint: {e}")
-        
-        #Constrain for object bz to not have more than one collision with any robot in a row, ie it must have one free bz between two interactions
+                for bzo in range(self.objects_nbzs[o]-1):
+                    Y[r,o,bzo] = self.prog.addVar(vtype=gp.GRB.BINARY)
+                    # Checking if this bzo interacts with robot r at all
+                    self.prog.addConstr(Y[r,o,bzo] == gp.quicksum([self.robots[r].zs[o][bzr,bzo] for bzr in range(self.robots_nbzs[r]-1)]))
+
         for o in range(self.nobjects):
-            dx = 2
-            for bzo in range(self.objects_nbzs[o]-dx):
-                #we wnt to check that these two consecutive bzs do not have more than one collision with any robot
-                zs_sums = [self.prog.addVar(vtype=gp.GRB.BINARY) for r in range(self.nrobots)]
-                for r in range(self.nrobots):
-                    try:
-                        self.prog.addConstr(zs_sums[r] == gp.quicksum([self.robots[r].zs[o][bzr,bzo + s] for bzr in range(self.robots_nbzs[r]-1) for s in range (dx)]))
-                    except Exception as e:
-                        print(f"Error in {o} {bzo} {r} zs_sums[r] == quicksum(robots[r].zs[r][o][:,bzo]): {e}")
-                self.prog.addConstr(gp.quicksum(zs_sums) <= 1)
-    
+            for bzo1 in range(self.objects_nbzs[o]-1):
+                for bzo2 in range(self.objects_nbzs[o]-1):
+                    if bzo2 > bzo1:
+                        for r in range(self.nrobots):
+                            #Checking that if bzo1 and bzo2 both interact with robot r, then there must be at least one interaction with a different robot in between
+                            self.prog.addConstr(
+                                Y[r,o,bzo1] + Y[r,o,bzo2] <=
+                                1 + gp.quicksum([Y[rr,o,bzo] for rr in range(self.nrobots) if rr != r for bzo in range(bzo1+1,bzo2)])
+                            )
+
     def _object_dynamics(self):
         for r in range(self.nrobots):
             zs = self.robots[r].zs #Tensor over objects, robot bzs, object bzs indicating if interaction happens
