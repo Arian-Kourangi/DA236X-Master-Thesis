@@ -34,6 +34,7 @@ from utilities.beziers import get_derivative_control_points_gurobi, eval_bezier,
 from World import World
 
 MOVE_DIAGONALLY = True
+SAVE_SOLUTIONS = False
 class SR_Impact_STL:
     def __init__(self,world: World):
         """
@@ -815,7 +816,6 @@ class SR_Impact_STL:
                         self.objects[o].ids[bzo] = 'post'
                         self.objects[o].other_names[bzo] = self.robots[r].name
 
-
     def evaluate(self):
         self.solve_status = self.prog.status
         self.obj_value = self.prog.ObjVal
@@ -920,20 +920,21 @@ class SR_Impact_STL:
                     #                                    self.objects_drtraj[o][bz][i,:]*self.objects_ddhtraj[o][bz][0,:])/(self.objects_dhtraj[o][bz][0,:]**2)
 
         # now save all the results of the robots to a .csv file
-        from utilities.read_write_plan import plan_to_csv
-        for r in range(self.nrobots):
-            # append a row of zeros to robots_rsol for the theta dimension which we don't plan for
-            robots_rsol = [np.vstack((self.robots_rsol[r][bz],np.zeros((1,self.robots_ncp[r])))) for bz in range(self.robots_nbzs[r])]
-            plan_to_csv(robots_rsol,self.robots_hsol[r],self.robots[r].ids,self.robots[r].other_names,
-                        scenario_name=self.world.specification,
-                        robot_name=self.robots[r].name,
-                        path='/home/arian/repos/thesis/impact_stl/planner/plans')
-        for o in range(self.nobjects):
-            objects_rsol = [np.vstack((self.objects_rsol[o][bz],np.zeros((1,self.objects_ncp[o])))) for bz in range(self.objects_nbzs[o])]
-            plan_to_csv(objects_rsol,self.objects_hsol[o],self.objects[o].ids,self.objects[o].other_names,
-                        scenario_name=self.world.specification,
-                        robot_name=self.objects[o].name,
-                        path='/home/arian/repos/thesis/impact_stl/planner/plans')
+        if SAVE_SOLUTIONS:
+            from utilities.read_write_plan import plan_to_csv
+            for r in range(self.nrobots):
+                # append a row of zeros to robots_rsol for the theta dimension which we don't plan for
+                robots_rsol = [np.vstack((self.robots_rsol[r][bz],np.zeros((1,self.robots_ncp[r])))) for bz in range(self.robots_nbzs[r])]
+                plan_to_csv(robots_rsol,self.robots_hsol[r],self.robots[r].ids,self.robots[r].other_names,
+                            scenario_name=self.world.specification,
+                            robot_name=self.robots[r].name,
+                            path='/home/arian/repos/thesis/impact_stl/planner/plans')
+            for o in range(self.nobjects):
+                objects_rsol = [np.vstack((self.objects_rsol[o][bz],np.zeros((1,self.objects_ncp[o])))) for bz in range(self.objects_nbzs[o])]
+                plan_to_csv(objects_rsol,self.objects_hsol[o],self.objects[o].ids,self.objects[o].other_names,
+                            scenario_name=self.world.specification,
+                            robot_name=self.objects[o].name,
+                            path='/home/arian/repos/thesis/impact_stl/planner/plans')
             
     def evaluate_t(self,t):
         t_array_robots = [np.array([self.robots_hsol[r][bzr][0,0] for bzr in range(self.robots_nbzs[r])]) for r in range(self.nrobots)]
