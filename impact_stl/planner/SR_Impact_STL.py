@@ -443,14 +443,6 @@ class SR_Impact_STL:
                     self.prog.addConstr(zs_sums[o] == gp.quicksum([zs[o][bzr,bzo] for bzo in range(self.objects_nbzs[o]-1)]))
                 # this enforces that for each robot bezier, it can only bump with a single object
                 self.prog.addConstr(gp.quicksum(zs_sums)<=1)
-            
-            #? for each robot, two consecutive bzs can never both bump
-            #? so we constrain that gp.quicksum([zs[o][bzr,:] for o in range(self.nobjects)]) <= 1
-            for bzr in range(self.robots_nbzs[r]-1):
-                try:
-                    self.prog.addConstr(gp.quicksum([zs[o][bzr,bzo] for o in range(self.nobjects) for bzo in range(self.objects_nbzs[o]-1)]) <= 1)
-                except Exception as e:
-                    print(f"Error in {r} {bzr} [1,0,1,0] constriant: {e}")
 
             #Constrain for the object to not have consecutive interactions with a single robot. This is is a bit redundant because of the constraint
             # for the object to always have one free bezier between two interaction bezier with the same robot, but it reduces behviour that makes one robot 
