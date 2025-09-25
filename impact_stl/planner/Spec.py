@@ -503,22 +503,34 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         world.areas = [area1,area2]
         world.obstacles = []
     elif specification == "minimal_test":
-        tf = 50
-        area1 = Area(x_min=np.array([14.5,14.5]),x_max=np.array([15.5,15.5]))
+        tf = 80
+        area1 = Area(x_min=np.array([24.5,24.5]),x_max=np.array([25.5,25.5]))
         mu1 = Pred(type="MU",preds=area1,io="in")
         phi1 = Pred(type="F",I=[0,tf],preds=[mu1])
         world.spec = Spec(t0=0,tf=tf)
         #world.spec.add_pred(Pred(type='MU',preds=phi1),
         #                 name='pop')
-        bz = 6
+        bz = 10
         robot1 = Robot(name="snap",
                        x0=np.array([5,0]),
                        dx0=np.array([0,0]),
                        xf=None,
                        dxf=None,nbz=bz)
         
-        robot2 = Robot(name="crackle",
-                       x0=np.array([0,5]),
+        #robot2 = Robot(name="crackle",
+        #               x0=np.array([0,25]),
+        #               dx0=np.array([0,0]),
+        #               xf=None,
+        #               dxf=None,nbz=bz)
+        #
+        #robot3 = Robot(name="snop",
+        #               x0=np.array([25,25]),
+        #               dx0=np.array([0,0]),
+        #               xf=None,
+        #               dxf=None,nbz=bz)
+        
+        robot4 = Robot(name="crockle",
+                       x0=np.array([5,30]),
                        dx0=np.array([0,0]),
                        xf=None,
                        dxf=None,nbz=bz)
@@ -526,11 +538,11 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         object1 = Object(name="pop",
                          x0=np.array([5,2]),
                          dx0=np.array([0,0]),
-                         xf=np.array([15,15]),
-                         dxf=None,nbz=bz)
+                         xf=np.array([25,25]),
+                         dxf=np.array([0,0]),nbz=bz)
 
         world.dim = 2
-        world.robots = [robot1,robot2]
+        world.robots = [robot1,robot4]
         world.objects = [object1]
 
         # World bounding box

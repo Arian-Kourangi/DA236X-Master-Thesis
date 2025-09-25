@@ -272,6 +272,7 @@ class SR_Impact_STL:
 
         for o in range(self.nobjects):
             for bz in range(self.objects_nbzs[o]-1):
+                #This is removed to allow discrete jumps of position after an interaction curve, 
                 #self.prog.addConstrs((self.objects_rvar[o][bz][i,-1] == self.objects_rvar[o][bz+1][i,0] for i in range(self.world.dim)), name=f"continuity_{o}_{bz}")
                 self.prog.addConstr(self.objects_hvar[o][bz][0,-1] == self.objects_hvar[o][bz+1][0,0], name=f"continuity_{o}_{bz}_time")
              
@@ -451,22 +452,16 @@ class SR_Impact_STL:
                 except Exception as e:
                     print(f"Error in {r} {bzr} [1,0,1,0] constriant: {e}")
 
-            #Constrain for the object to never have two consequtive bzs both bumping with the same robot
-            #for o in range(self.nobjects):
-            #    for bzo in range(self.objects_nbzs[o]-2):
-            #        for bzr in range(self.robots_nbzs[r]-2):
-            #            try:
-            #                self.prog.addConstr(gp.quicksum([zs[o][bzr,bzo], zs[o][bzr+1,bzo+1]]) <= 1)
-            #            except Exception as e:
-            #                print(f"Error in {o} {bzo} {r} [1,1,0,0] constraint: {e}")
-
-            #Temporary constraint to enforce only one bump per robot and object
-            
-            #for o in range(self.nobjects):
-            #    try:
-            #        self.prog.addConstr(gp.quicksum([zs[o][bzr,bzo] for bzo in range(self.objects_nbzs[o]-1) for bzr in range(self.robots_nbzs[r]-1)]) <= 1)
-            #    except Exception as e:
-            #        print(f"Error in {o} {r} [1,0,0,1] constraint: {e}")
+            #Constrain for the object to not have consecutive interactions with a single robot. This is is a bit redundant because of the constraint
+            # for the object to always have one free bezier between two interaction bezier with the same robot, but it reduces behviour that makes one robot 
+            #both push and catch the object in seperate bezier segments.
+            for o in range(self.nobjects):
+                for bzo in range(self.objects_nbzs[o]-3):
+                    for bzr in range(self.robots_nbzs[r]-3):
+                        try:
+                            self.prog.addConstr(gp.quicksum([zs[o][bzr,bzo], zs[o][bzr+1,bzo+1],zs[o][bzr+2,bzo+2]]) <= 1)
+                        except Exception as e:
+                            print(f"Error in {o} {bzo} {r} [1,1,0,0] constraint: {e}")
 
             for o in range(self.nobjects):
                 for bzr in range(self.robots_nbzs[r]-1):
@@ -531,7 +526,10 @@ class SR_Impact_STL:
                                                  name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_4")
                             
 
-                            ## Push or brake constraint only in one dir at a time
+                            ## Push or brake constraint only in one dir at a time, prohibits one bzr to both push and brake the object, and makes sure we only push in one direction at a time
+                            ## Is a bit redundant since veloicyt is constrained to be non-zero in only one direction below, but this is for possible diagonal interations
+
+                            #This does not constrain diagonals, only that a diagional speed has to be made using two different push interactions (one per dimension)
                             zy_pos = self.prog.addVar(vtype=gp.GRB.BINARY)
                             zy_neg = self.prog.addVar(vtype=gp.GRB.BINARY)
                             zx_pos = self.prog.addVar(vtype=gp.GRB.BINARY)
@@ -546,17 +544,15 @@ class SR_Impact_STL:
                                 self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] >= -self.bigM*(1-zx_pos-zy_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_8")
                                 self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] <= self.bigM*(1-zx_neg-zy_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_9") 
 
-                            #Placeholder constraints
-                            # Constant rate of change in position(no turning)
-                            #for cp in range (self.robots_ncp[r]-2):
-                            #    self.prog.addConstrs((self.robots_rvar[r][bzr+1][d,cp] - 2*self.robots_rvar[r][bzr+1][d,cp+1] + self.robots_rvar[r][bzr+1][d,cp+2] >= -self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
-                            #                            name=f"collision_{r}_{bzr}_{o}_{bzo}_9_{cp}")
-                            #    self.prog.addConstrs((self.robots_rvar[r][bzr+1][d,cp] - 2*self.robots_rvar[r][bzr+1][d,cp+1] + self.robots_rvar[r][bzr+1][d,cp+2] <= self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
-                            #                            name=f"collision_{r}_{bzr}_{o}_{bzo}_10_{cp}")
-                            #    self.prog.addConstr((self.robots_hvar[r][bzr+1][0,cp] - 2*self.robots_hvar[r][bzr+1][0,cp+1] + self.robots_hvar[r][bzr+1][0,cp+2] >= -self.bigM*(1-zs[o][bzr,bzo])),
-                            #                            name=f"collision_{r}_{bzr}_{o}_{bzo}_11_{cp}")
-                            #    self.prog.addConstr((self.robots_hvar[r][bzr+1][0,cp] - 2*self.robots_hvar[r][bzr+1][0,cp+1] + self.robots_hvar[r][bzr+1][0,cp+2] <= self.bigM*(1-zs[o][bzr,bzo])),
-                            #                            name=f"collision_{r}_{bzr}_{o}_{bzo}_12_{cp}")
+                            #Constrain to only have velocity in one direction at a time during interaction(so we only move with one axis at a time)
+                            z_vel_x = self.prog.addVar(vtype=gp.GRB.BINARY)
+                            z_vel_y = self.prog.addVar(vtype=gp.GRB.BINARY)
+                            self.prog.addConstr(z_vel_x + z_vel_y == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_10")
+                            for cp in range(self.robots_ncp[r]-1):
+                                self.prog.addConstr(self.robots_drvar[r][bzr][0,cp] <= self.bigM*(1-z_vel_x), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_11")
+                                self.prog.addConstr(self.robots_drvar[r][bzr][0,cp] >= -self.bigM*(1-z_vel_x), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_12")
+                                self.prog.addConstr(self.robots_drvar[r][bzr][1,cp] <= self.bigM*(1-z_vel_y), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_13")
+                                self.prog.addConstr(self.robots_drvar[r][bzr][1,cp] >= -self.bigM*(1-z_vel_y), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_14")
                         except Exception as e:
                             print(f"Error in {o} {bzo} {r} {bzr} impact dynamics constraint: {e}")
 
@@ -591,7 +587,7 @@ class SR_Impact_STL:
                     self.prog.addConstr(self.objects_dhvar[o][bzo+1][0,0] <= self.objects_dhvar[o][bzo][0,-1] + self.bigM*zs_all,
                                          name=f"continuity_{o}_{bzo}_4")
                     
-                    #Continuity for object position only when not interaction
+                    #Continuity for object position only when not interaction, if interaction happens, we allow discrete jump in position
                     self.prog.addConstrs((self.objects_rvar[o][bzo+1][d,0] >= self.objects_rvar[o][bzo][d,-1] - self.bigM*zs_all for d in range(self.world.dim)),
                                          name=f"continuity_{o}_{bzo}_1")
                     self.prog.addConstrs((self.objects_rvar[o][bzo+1][d,0] <= self.objects_rvar[o][bzo][d,-1] + self.bigM*zs_all for d in range(self.world.dim)),
@@ -612,15 +608,15 @@ class SR_Impact_STL:
 
         #Constrain for object bz to not have more than one collision with any robot in a row, ie it must have one free bz between two interactions
         for o in range(self.nobjects):
-            for bzo in range(self.objects_nbzs[o]-3):
+            for bzo in range(self.objects_nbzs[o]-2):
                 id1 = bzo
                 id2 = bzo + 1
-                id3 = bzo + 2
+                #id3 = bzo + 2
                 #we wnt to check that these two consecutive bzs do not have more than one collision with any robot
                 zs_sums = [self.prog.addVar(vtype=gp.GRB.BINARY) for r in range(self.nrobots)]
                 for r in range(self.nrobots):
                     try:
-                        self.prog.addConstr(zs_sums[r] == gp.quicksum([self.robots[r].zs[o][bzr,bzo] for bzr in range(self.robots_nbzs[r]-1) for bzo in [id1,id2,id3]]))
+                        self.prog.addConstr(zs_sums[r] == gp.quicksum([self.robots[r].zs[o][bzr,bzo_x] for bzr in range(self.robots_nbzs[r]-1) for bzo_x in [id1,id2]]))
                     except Exception as e:
                         print(f"Error in {o} {bzo} {r} zs_sums[r] == quicksum(robots[r].zs[r][o][:,bzo]): {e}")
                 self.prog.addConstr(gp.quicksum(zs_sums) <= 1)
