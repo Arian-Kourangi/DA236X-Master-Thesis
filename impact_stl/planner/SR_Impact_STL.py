@@ -122,10 +122,8 @@ class SR_Impact_STL:
         else:
             self._robot_dynamics()
 
-        # self._obstacle_collision_constraints()    # can now do this as an STL spec!!
         self._stl_constraints()
-
-        # self._robot_robot_collision_constraints()
+        #self._robot_robot_collision_constraints()
         # self._object_object_collision_constraints()
         self._set_cost()
 
@@ -302,7 +300,8 @@ class SR_Impact_STL:
             try:
                 #size = [nr_robots][nr_bzs][dim, ncp]. ie for robot r, bz 0, dim i, cp 0 enforce it to be x0
                 self.prog.addConstrs((self.robots_rvar[r][0][i,0]==self.robots[r].x0[i] for i in range(self.world.dim)), name=f"initial_position_robot_{r}")
-                self.prog.addConstrs((self.robots_rvar[r][-1][i,-1]==self.robots[r].xf[i] for i in range(self.world.dim)), name=f"final_position_robot_{r}")
+                if self.robots[r].xf is not None:
+                    self.prog.addConstrs((self.robots_rvar[r][-1][i,-1]==self.robots[r].xf[i] for i in range(self.world.dim)), name=f"final_position_robot_{r}")
             except Exception as e:
                 print(f"Error in {r} _initial_final_position_constraints: {e}")
 
@@ -323,7 +322,8 @@ class SR_Impact_STL:
             try:
                 for i in range(self.world.dim):
                     self.prog.addConstr(self.robots_drvar[r][0][i,0]==self.robots_dhvar[r][0][0,0]*self.robots[r].dx0[i], name=f"initial_velocity_{r}_{i}")
-                    self.prog.addConstr(self.robots_drvar[r][-1][i,-1]==self.robots_dhvar[r][-1][0,-1]*self.robots[r].dxf[i], name=f"final_velocity_{r}_{i}")
+                    if self.robots[r].dxf is not None:
+                        self.prog.addConstr(self.robots_drvar[r][-1][i,-1]==self.robots_dhvar[r][-1][0,-1]*self.robots[r].dxf[i], name=f"final_velocity_{r}_{i}")
             except Exception as e:
                 print(f"Error in {r} _initial_final_velocity_constraints: {e}")
 
@@ -519,6 +519,17 @@ class SR_Impact_STL:
                             self.prog.addConstr(self.robots_dhvar[r][bzr][0,0] <= self.objects_dhvar[o][bzo][0,0] + self.bigM*(1-zs[o][bzr,bzo]),
                                                  name=f"collision_{r}_{bzr}_{o}_{bzo}_8")
                             
+                            # To ensure smoother transition, we also enforce the velocity of the previous cp to be within some bounds
+                            eps = 0.1
+                            if bzr > 0:
+                                self.prog.addConstrs((self.robots_drvar[r][bzr-1][d,-1] >= self.objects_drvar[o][bzo][d,0] - self.bigM*(1-zs[o][bzr,bzo]) - eps for d in range(self.world.dim)),
+                                                     name=f"collision_{r}_{bzr}_{o}_{bzo}_9")
+                                self.prog.addConstrs((self.robots_drvar[r][bzr-1][d,-1] <= self.objects_drvar[o][bzo][d,0] + self.bigM*(1-zs[o][bzr,bzo]) + eps for d in range(self.world.dim)),
+                                                     name=f"collision_{r}_{bzr}_{o}_{bzo}_10")
+                                self.prog.addConstr(self.robots_dhvar[r][bzr-1][0,-1] >= self.objects_dhvar[o][bzo][0,0] - self.bigM*(1-zs[o][bzr,bzo]) - eps,
+                                                     name=f"collision_{r}_{bzr}_{o}_{bzo}_11")
+                                self.prog.addConstr(self.robots_dhvar[r][bzr-1][0,-1] <= self.objects_dhvar[o][bzo][0,0] + self.bigM*(1-zs[o][bzr,bzo]) + eps,
+                                                     name=f"collision_{r}_{bzr}_{o}_{bzo}_12")
                             
                         except Exception as e:
                             print(f"Error in {o} {bzo} {r} {bzr} if collision constraint: {e}")
@@ -528,21 +539,15 @@ class SR_Impact_STL:
                             # NOTE: This should be replaced by some other control law, not just inelastic collision
                             # NOTE: 
                             
-                            # Intial and Final position and time match in the bz following the "interaction start"
+                            # Intial  position and time match in the first cp of the curve after the interaction
                             
                             #Inital Position
                             self.prog.addConstrs(self.robots_rvar[r][bzr+1][d,0]>= self.objects_rvar[o][bzo+1][d,0] - self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim))
                             self.prog.addConstrs(self.robots_rvar[r][bzr+1][d,0]<= self.objects_rvar[o][bzo+1][d,0] + self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim))
                             self.prog.addConstr(self.robots_hvar[r][bzr+1][0,0]>= self.objects_hvar[o][bzo+1][0,0] - self.bigM*(1-zs[o][bzr,bzo]))
                             self.prog.addConstr(self.robots_hvar[r][bzr+1][0,0]<= self.objects_hvar[o][bzo+1][0,0] + self.bigM*(1-zs[o][bzr,bzo]))
-
-                            #Final Position
-                            #self.prog.addConstrs(self.robots_rvar[r][bzr+1][d,-1]>= self.objects_rvar[o][bzo+1][d,-1] - self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim))
-                            #self.prog.addConstrs(self.robots_rvar[r][bzr+1][d,-1]<= self.objects_rvar[o][bzo+1][d,-1] + self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim))
-                            #self.prog.addConstr(self.robots_hvar[r][bzr+1][0,-1]>= self.objects_hvar[o][bzo+1][0,-1] - self.bigM*(1-zs[o][bzr,bzo]))
-                            #self.prog.addConstr(self.robots_hvar[r][bzr+1][0,-1]<= self.objects_hvar[o][bzo+1][0,-1] + self.bigM*(1-zs[o][bzr,bzo]))   
                             
-                            # Couple the velocities after interations is started
+                            #Same goes for the velocity after the interaction
                             
                             self.prog.addConstrs((self.robots_drvar[r][bzr+1][d,0]>= self.objects_drvar[o][bzo+1][d,-1] -self.bigM*(1-zs[o][bzr,bzo]) for d in range(self.world.dim)),
                                                  name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_1")
@@ -647,55 +652,20 @@ class SR_Impact_STL:
                 except Exception as e:
                     print(f"Error in {r} {bz} robot dynamics constraint: {e}")
 
-        """
-        # for the robot, we enforce continuity, only if zs[r][o][bzr,bzo] == 0 for all bzo 
-        for r in range(self.nrobots):
-            for bzr in range(self.robots_nbzs[r]-1):
-                zs = [self.prog.addVar(vtype=gp.GRB.BINARY) for o in range(self.nobjects)]
-                # zs[o] == max(self.robots[r].zs[r][o][:,bzo])
-                for o in range(self.nobjects):
-                    try:
-                        self.prog.addConstr(zs[o] == gp.max_([self.robots[r].zs[o][bzr,bzo] for bzo in range(self.objects_nbzs[o]-1)]),
-                                            name=f"zs_{r}_{bzr}_{o}")
-                    except Exception as e:
-                        print(f"Error in {r} {bzr} {o} zs[o] == max(robots[r].zs[r][o][:,bzo]): {e}")
-                
-                # if all zs are 0, then we enforce continuity
-                zs_all = self.prog.addVar(vtype=gp.GRB.BINARY)
-                try:
-                    self.prog.addConstr(zs_all == gp.quicksum([zs[o] for o in range(self.nobjects)]),
-                                        name=f"zs_all_{r}_{bzr}")
-                except Exception as e:
-                    print(f"Error in {r} {bzr} zs_all == quicksum(zs): {e}")
-
-                # if zs_all == 0: continuity: tight constraints
-                try:
-                    self.prog.addConstrs((self.robots_drvar[r][bzr+1][d,0] >= self.robots_drvar[r][bzr][d,-1] - self.bigM*zs_all for d in range(self.world.dim)),
-                                         name=f"continuity_{r}_{bzr}_1")
-                    self.prog.addConstrs((self.robots_drvar[r][bzr+1][d,0] <= self.robots_drvar[r][bzr][d,-1] + self.bigM*zs_all for d in range(self.world.dim)),
-                                         name=f"continuity_{r}_{bzr}_2")
-                    self.prog.addConstr(self.robots_dhvar[r][bzr+1][0,0] >= self.robots_dhvar[r][bzr][0,-1] - self.bigM*zs_all,
-                                         name=f"continuity_{r}_{bzr}_3")
-                    self.prog.addConstr(self.robots_dhvar[r][bzr+1][0,0] <= self.robots_dhvar[r][bzr][0,-1] + self.bigM*zs_all,
-                                         name=f"continuity_{r}_{bzr}_4")
-                except Exception as e:
-                    print(f"Error in {r} {bzr} continuity constraint: {e}")
-        """
         #Constrain for object bz to not have more than one collision with any robot in a triplet 
         for o in range(self.nobjects):
-            for bzo in range(self.objects_nbzs[o]-3):
+            for bzo in range(self.objects_nbzs[o]-2):
                 id1 = bzo
                 id2 = bzo + 1
-                id3 = bzo + 2
+                #id3 = bzo + 2
                 #we wnt to check that these three consecutive bzs do not have more than one collision with any robot
                 zs_sums = [self.prog.addVar(vtype=gp.GRB.BINARY) for r in range(self.nrobots)]
                 for r in range(self.nrobots):
                     try:
-                        self.prog.addConstr(zs_sums[r] == gp.quicksum([self.robots[r].zs[o][bzr,bzo] for bzr in range(self.robots_nbzs[r]-1) for bzo in [id1,id2,id3]]))
+                        self.prog.addConstr(zs_sums[r] == gp.quicksum([self.robots[r].zs[o][bzr,bzo] for bzr in range(self.robots_nbzs[r]-1) for bzo in [id1,id2]]))
                     except Exception as e:
                         print(f"Error in {o} {bzo} {r} zs_sums[r] == quicksum(robots[r].zs[r][o][:,bzo]): {e}")
                 self.prog.addConstr(gp.quicksum(zs_sums) <= 1)
-
 
 
 

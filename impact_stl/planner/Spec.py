@@ -26,8 +26,7 @@ class Robot():
         """
         assert x0 is not None, "Robot must have an initial position"
         assert dx0 is not None, "Robot must have an initial velocity"
-        assert xf is not None, "Robot must have a final position"
-        assert dxf is not None, "Robot must have a final velocity"
+
         
         self.name = name
         self.mass = 16.8
@@ -504,8 +503,8 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         world.areas = [area1,area2]
         world.obstacles = []
     elif specification == "minimal_test":
-        tf = 20
-        area1 = Area(x_min=np.array([4.5,14.5]),x_max=np.array([5.5,15.5]))
+        tf = 30
+        area1 = Area(x_min=np.array([14.5,14.5]),x_max=np.array([15.5,15.5]))
         mu1 = Pred(type="MU",preds=area1,io="in")
         phi1 = Pred(type="F",I=[0,tf],preds=[mu1])
         world.spec = Spec(t0=0,tf=tf)
@@ -513,21 +512,21 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         #                 name='pop')
         bz = 6
         robot1 = Robot(name="snap",
-                       x0=np.array([5,0]),
+                       x0=np.array([15,0]),
                        dx0=np.array([0,0]),
-                       xf=np.array([5,0]),
-                       dxf=np.array([0,0]),nbz=bz)
+                       xf=np.array([15,0]),
+                       dxf=None,nbz=bz)
         
         robot2 = Robot(name="crackle",
-                       x0=np.array([2,0]),
+                       x0=np.array([3,4]),
                        dx0=np.array([0,0]),
-                       xf=np.array([5,30]),
-                       dxf=np.array([0,0]),nbz=bz)
+                       xf=None,
+                       dxf=None,nbz=bz)
         
         object1 = Object(name="pop",
-                         x0=np.array([5,2]),
+                         x0=np.array([15,2]),
                          dx0=np.array([0,0]),
-                         xf=np.array([5,15]),
+                         xf=np.array([15,15]),
                          dxf=np.array([0,0]),nbz=bz)
 
         world.dim = 2
@@ -536,7 +535,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
 
         # World bounding box
         world.x_lb = np.array([0,0])
-        world.x_ub = np.array([10,30])
+        world.x_ub = np.array([30,30])
 
         # Obstacles
         world.obstacles= []
