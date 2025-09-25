@@ -99,7 +99,6 @@ class SR_Impact_STL:
         self.cost_expression = 0*self.robots_rvar[0][0][0,0]
         self.rho_phi = self.prog.addVar(lb=0,ub=self.bigM,vtype=gp.GRB.CONTINUOUS)
 
-        self._continuity_constraints()
         self._initial_final_position_constraints()
         self._initial_final_velocity_constraints()
         self._initial_final_time_constraints()
@@ -110,6 +109,8 @@ class SR_Impact_STL:
             self._object_dynamics()
         else:
             self._robot_dynamics()
+    
+        self._continuity_constraints()
 
         self._stl_constraints()
         #self._robot_robot_collision_constraints()
@@ -257,22 +258,61 @@ class SR_Impact_STL:
         ###### ROBORT CONTINUITY ######
 
         for r in range(self.nrobots):
-            for bz in range(self.robots_nbzs[r]-1):
+            for bzr in range(self.robots_nbzs[r]-1):
                 #Position
-                self.prog.addConstrs((self.robots_rvar[r][bz][d,-1] == self.robots_rvar[r][bz+1][d,0] for d in range(self.world.dim)), name=f"continuity_{r}_{bz}")
+                self.prog.addConstrs((self.robots_rvar[r][bzr][d,-1] == self.robots_rvar[r][bzr+1][d,0] for d in range(self.world.dim)), name=f"continuity_{r}_{bzr}")
                 #Time
-                self.prog.addConstr(self.robots_hvar[r][bz][0,-1] == self.robots_hvar[r][bz+1][0,0], name=f"continuity_{r}_{bz}_time")
+                self.prog.addConstr(self.robots_hvar[r][bzr][0,-1] == self.robots_hvar[r][bzr+1][0,0], name=f"continuity_{r}_{bzr}_time")
                 #Velocity
-                self.prog.addConstrs((self.robots_drvar[r][bz][d,-1] == self.robots_drvar[r][bz+1][d,0]  for d in range(self.world.dim)),name=f"continuity__{r}_{bz}_1")
-                self.prog.addConstr((self.robots_dhvar[r][bz][0,-1]) == self.robots_dhvar[r][bz+1][0,0], name=f"continuity__{r}_{bz}_2")
+                self.prog.addConstrs((self.robots_drvar[r][bzr][d,-1] == self.robots_drvar[r][bzr+1][d,0]  for d in range(self.world.dim)),name=f"continuity__{r}_{bzr}_1")
+                self.prog.addConstr((self.robots_dhvar[r][bzr][0,-1]) == self.robots_dhvar[r][bzr+1][0,0], name=f"continuity__{r}_{bzr}_2")
 
         ###### OBJECT CONTINUITY ######
-        for o in range(self.nobjects):
-            for bz in range(self.objects_nbzs[o]-1):
-                #This is removed to allow discrete jumps of position after an interaction curve, 
-                #self.prog.addConstrs((self.objects_rvar[o][bz][i,-1] == self.objects_rvar[o][bz+1][i,0] for i in range(self.world.dim)), name=f"continuity_{o}_{bz}")
-                self.prog.addConstr(self.objects_hvar[o][bz][0,-1] == self.objects_hvar[o][bz+1][0,0], name=f"continuity_{o}_{bz}_time")
              
+        for o in range(self.nobjects):
+            for bzo in range(self.objects_nbzs[o]-1):
+
+                # Enforce time continuity always
+                self.prog.addConstr(self.objects_hvar[o][bzo][0,-1] == self.objects_hvar[o][bzo+1][0,0], name=f"continuity_{o}_{bzo}_time")
+
+                # Only enforce time and velocity continuity if no robot is interacting with the object
+                # for the object, we enforce continuity, only if r.zs[r][o][bzr,bzo] == 0 for all r
+
+                zs = [self.prog.addVar(vtype=gp.GRB.BINARY) for r in range(self.nrobots)]
+                for r in range(self.nrobots):
+                    try:
+                        self.prog.addConstr(zs[r] == gp.max_([self.robots[r].zs[o][bzr,bzo] for bzr in range(self.robots_nbzs[r]-1)]),
+                                            name=f"zs_{o}_{bzo}_{r}")
+                    except Exception as e:
+                        print(f"Error in {o} {bzo} {r} zs[r] == max(robots[r].zs[r][o][:,bzo]): {e}")
+                
+                # if all zs are 0, then we enforce continuity
+                zs_all = self.prog.addVar(vtype=gp.GRB.BINARY)
+                try:
+                    self.prog.addConstr(zs_all == gp.quicksum([zs[r] for r in range(self.nrobots)]),
+                                        name=f"zs_all_{o}_{bzo}")
+                except Exception as e:
+                    print(f"Error in {o} {bzo} zs_all == quicksum(zs): {e}")
+
+                # if zs_all == 0: continuity: tight constraints
+                try:
+                    self.prog.addConstrs((self.objects_drvar[o][bzo+1][d,0] >= self.objects_drvar[o][bzo][d,-1] - self.bigM*zs_all for d in range(self.world.dim)),
+                                         name=f"continuity_{o}_{bzo}_1")
+                    self.prog.addConstrs((self.objects_drvar[o][bzo+1][d,0] <= self.objects_drvar[o][bzo][d,-1] + self.bigM*zs_all for d in range(self.world.dim)),
+                                         name=f"continuity_{o}_{bzo}_2")
+                    self.prog.addConstr(self.objects_dhvar[o][bzo+1][0,0] >= self.objects_dhvar[o][bzo][0,-1] - self.bigM*zs_all,
+                                         name=f"continuity_{o}_{bzo}_3")
+                    self.prog.addConstr(self.objects_dhvar[o][bzo+1][0,0] <= self.objects_dhvar[o][bzo][0,-1] + self.bigM*zs_all,
+                                         name=f"continuity_{o}_{bzo}_4")
+                    
+                    #Continuity for object position only when not interaction, if interaction happens, we allow discrete jump in position
+                    self.prog.addConstrs((self.objects_rvar[o][bzo+1][d,0] >= self.objects_rvar[o][bzo][d,-1] - self.bigM*zs_all for d in range(self.world.dim)),
+                                         name=f"continuity_{o}_{bzo}_1")
+                    self.prog.addConstrs((self.objects_rvar[o][bzo+1][d,0] <= self.objects_rvar[o][bzo][d,-1] + self.bigM*zs_all for d in range(self.world.dim)),
+                                         name=f"continuity_{o}_{bzo}_2")
+                except Exception as e:
+                    print(f"Error in {o} {bzo} continuity constraint: {e}")
+
     def _initial_final_position_constraints(self):
 
         """
@@ -514,8 +554,7 @@ class SR_Impact_STL:
                                                  name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_3")
                             self.prog.addConstr(self.robots_dhvar[r][bzr+1][0,0]<= self.objects_dhvar[o][bzo+1][0,-1] +self.bigM*(1-zs[o][bzr,bzo]),
                                                  name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_4")
-                            
-
+                        
                             ## Push or brake constraint only in one dir at a time, prohibits one bzr to both push and brake the object, and makes sure we only push in one direction at a time
                             ## Is a bit redundant since veloicyt is constrained to be non-zero in only one direction below, but this is for possible diagonal interations
 
@@ -545,45 +584,6 @@ class SR_Impact_STL:
                                 self.prog.addConstr(self.robots_drvar[r][bzr][1,cp] >= -self.bigM*(1-z_vel_y), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_14")
                         except Exception as e:
                             print(f"Error in {o} {bzo} {r} {bzr} impact dynamics constraint: {e}")
-
-        # for the object, we enforce continuity, only if zs[r][o][bzr,bzo] == 0 for all r
-        for o in range(self.nobjects):
-            for bzo in range(self.objects_nbzs[o]-1):
-                zs = [self.prog.addVar(vtype=gp.GRB.BINARY) for r in range(self.nrobots)]
-                # zs[r] == max(self.robots[r].zs[r][o][:,bzo])
-                for r in range(self.nrobots):
-                    try:
-                        self.prog.addConstr(zs[r] == gp.max_([self.robots[r].zs[o][bzr,bzo] for bzr in range(self.robots_nbzs[r]-1)]),
-                                            name=f"zs_{o}_{bzo}_{r}")
-                    except Exception as e:
-                        print(f"Error in {o} {bzo} {r} zs[r] == max(robots[r].zs[r][o][:,bzo]): {e}")
-                
-                # if all zs are 0, then we enforce continuity
-                zs_all = self.prog.addVar(vtype=gp.GRB.BINARY)
-                try:
-                    self.prog.addConstr(zs_all == gp.quicksum([zs[r] for r in range(self.nrobots)]),
-                                        name=f"zs_all_{o}_{bzo}")
-                except Exception as e:
-                    print(f"Error in {o} {bzo} zs_all == quicksum(zs): {e}")
-
-                # if zs_all == 0: continuity: tight constraints
-                try:
-                    self.prog.addConstrs((self.objects_drvar[o][bzo+1][d,0] >= self.objects_drvar[o][bzo][d,-1] - self.bigM*zs_all for d in range(self.world.dim)),
-                                         name=f"continuity_{o}_{bzo}_1")
-                    self.prog.addConstrs((self.objects_drvar[o][bzo+1][d,0] <= self.objects_drvar[o][bzo][d,-1] + self.bigM*zs_all for d in range(self.world.dim)),
-                                         name=f"continuity_{o}_{bzo}_2")
-                    self.prog.addConstr(self.objects_dhvar[o][bzo+1][0,0] >= self.objects_dhvar[o][bzo][0,-1] - self.bigM*zs_all,
-                                         name=f"continuity_{o}_{bzo}_3")
-                    self.prog.addConstr(self.objects_dhvar[o][bzo+1][0,0] <= self.objects_dhvar[o][bzo][0,-1] + self.bigM*zs_all,
-                                         name=f"continuity_{o}_{bzo}_4")
-                    
-                    #Continuity for object position only when not interaction, if interaction happens, we allow discrete jump in position
-                    self.prog.addConstrs((self.objects_rvar[o][bzo+1][d,0] >= self.objects_rvar[o][bzo][d,-1] - self.bigM*zs_all for d in range(self.world.dim)),
-                                         name=f"continuity_{o}_{bzo}_1")
-                    self.prog.addConstrs((self.objects_rvar[o][bzo+1][d,0] <= self.objects_rvar[o][bzo][d,-1] + self.bigM*zs_all for d in range(self.world.dim)),
-                                         name=f"continuity_{o}_{bzo}_2")
-                except Exception as e:
-                    print(f"Error in {o} {bzo} continuity constraint: {e}")
 
         #Constrain for object bz to not have more than one collision with any robot in a row, ie it must have one free bz between two interactions
         for o in range(self.nobjects):
