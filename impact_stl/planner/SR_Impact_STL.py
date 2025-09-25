@@ -152,11 +152,11 @@ class SR_Impact_STL:
         # weights for complex stl spec
         weight_L = 0
         weight_V = 0
-        weight_A = 0.1
+        weight_A = 0.001
         weight_absA = 0
         weight_rho = 10000 #100000
         weight_N_impacts = 0
-        weight_n_impacts_robot = 1 #Cost for increasing number of impacts for each robot, encourages robots to distribute impacts evenly between them
+        weight_n_impacts_robot = 100 #Cost for increasing number of impacts for each robot, encourages robots to distribute impacts evenly between them
         
         ### path length cost
         if weight_L > 0:
