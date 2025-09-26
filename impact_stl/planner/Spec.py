@@ -49,7 +49,7 @@ class Robot():
 
 class Object():
     def __init__(self, name: str, x0: np.ndarray, dx0: np.ndarray, xf: np.ndarray, dxf: np.ndarray, nbz: int=10, t0: int=0, tf: int=100,
-                 dq_lb: np.ndarray=np.array([-2,-2]), dq_ub:np.ndarray=np.array([2,2])):
+                 dq_lb: np.ndarray=np.array([-1,-1]), dq_ub:np.ndarray=np.array([1,1])):
         """
         Object must have a initial velocity and position, but not necessarily a final position or velocity.
         Args:
@@ -503,7 +503,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         world.areas = [area1,area2]
         world.obstacles = []
     elif specification == "minimal_test":
-        tf = 30
+        tf = 60
 
         #just so I can mark the final location of the object, not actually used in an stl spec
         area1 = Area(x_min=np.array([24.5,24.5]),x_max=np.array([25.5,25.5]))
@@ -525,13 +525,13 @@ def spatial_specifications(world: Object ,specification: str) -> None:
                        xf=None,
                        dxf=None,nbz=bz)
         robot2 = Robot(name="crockle",
-                       x0=np.array([0,30]),
+                       x0=np.array([0,10]),
                        dx0=np.array([0,0]),
                        xf=None,
                        dxf=None,nbz=bz)
         
         object1 = Object(name="pop",
-                         x0=np.array([4,17]),
+                         x0=np.array([4,5]),
                          dx0=np.array([0,0]),
                          xf=np.array([25,25]),
                          dxf=np.array([0,0]),nbz=bz)

@@ -122,7 +122,7 @@ class SR_Impact_STL:
     def solve(self):
         #Set the cost objective, depends on if we choose some weights in _set_cost
         self.prog.setObjective(self.cost_expression,gp.GRB.MINIMIZE)
-        
+        self.prog.setParam('MIPGap', 0.01)  # Sets tolerance to 1%
         t0 = time.time()
         self.prog.optimize()
         print(f"Optimization took {time.time()-t0} seconds")
@@ -520,25 +520,25 @@ class SR_Impact_STL:
 
         #Constraint that prevents one object from interacting with the same robot without first interacting
         # with a different robot. ie object cannot be pushed and then caught by the same robot in different bezier segments
-        Y = {}
-
-        for r in range(self.nrobots):
-            for o in range(self.nobjects):
-                for bzo in range(self.objects_nbzs[o]-1):
-                    Y[r,o,bzo] = self.prog.addVar(vtype=gp.GRB.BINARY)
-                    # Checking if this bzo interacts with robot r at all
-                    self.prog.addConstr(Y[r,o,bzo] == gp.quicksum([self.robots[r].zs[o][bzr,bzo] for bzr in range(self.robots_nbzs[r]-1)]))
-
-        for o in range(self.nobjects):
-            for bzo1 in range(self.objects_nbzs[o]-1):
-                for bzo2 in range(self.objects_nbzs[o]-1):
-                    if bzo2 > bzo1:
-                        for r in range(self.nrobots):
-                            #Checking that if bzo1 and bzo2 both interact with robot r, then there must be at least one interaction with a different robot in between
-                            self.prog.addConstr(
-                                Y[r,o,bzo1] + Y[r,o,bzo2] <=
-                                1 + gp.quicksum([Y[rr,o,bzo] for rr in range(self.nrobots) if rr != r for bzo in range(bzo1+1,bzo2)])
-                            )
+        #Y = {}
+#
+        #for r in range(self.nrobots):
+        #    for o in range(self.nobjects):
+        #        for bzo in range(self.objects_nbzs[o]-1):
+        #            Y[r,o,bzo] = self.prog.addVar(vtype=gp.GRB.BINARY)
+        #            # Checking if this bzo interacts with robot r at all
+        #            self.prog.addConstr(Y[r,o,bzo] == gp.quicksum([self.robots[r].zs[o][bzr,bzo] for bzr in range(self.robots_nbzs[r]-1)]))
+#
+        #for o in range(self.nobjects):
+        #    for bzo1 in range(self.objects_nbzs[o]-1):
+        #        for bzo2 in range(self.objects_nbzs[o]-1):
+        #            if bzo2 > bzo1:
+        #                for r in range(self.nrobots):
+        #                    #Checking that if bzo1 and bzo2 both interact with robot r, then there must be at least one interaction with a different robot in between
+        #                    self.prog.addConstr(
+        #                        Y[r,o,bzo1] + Y[r,o,bzo2] <=
+        #                        1 + gp.quicksum([Y[rr,o,bzo] for rr in range(self.nrobots) if rr != r for bzo in range(bzo1+1,bzo2)])
+        #                    )
 
     def _object_dynamics(self):
         for r in range(self.nrobots):
@@ -610,21 +610,25 @@ class SR_Impact_STL:
                         ############################### ADDITIONAL CONSTRAINTS TO LIMIT BEHAVIOURS #########################################
                             # Additional constraints to limit the possible behaviours during the interaction curve
 
-                            # Constrain force to only be applied in positive or negative direction for each dimension. This way,
-                            # the robot can move diagonally, but it cannot both push the object on the diagonal and slow it down in the same interaction curve.
-                            # It can however stop it in another interaction curve.
+                            # Constrain "force" to only be applied in one direction at a time for an interaction curve. This limits one robot from both pushing and stopping
+                            # an object in the same curve (but not over two different curves). As well as trying to push in x direction whilst stopping in y direction.
+                            # This does not constrain diagonals movement, only diagonal pushing. Diagonal movement of the object can still be achieved, it just happens
+                            # over two interaction curves, one for each dimension.
                             zy_pos = self.prog.addVar(vtype=gp.GRB.BINARY)
                             zy_neg = self.prog.addVar(vtype=gp.GRB.BINARY)
                             zx_pos = self.prog.addVar(vtype=gp.GRB.BINARY)
                             zx_neg = self.prog.addVar(vtype=gp.GRB.BINARY)
-
-                            self.prog.addConstr(gp.quicksum([zy_pos, zy_neg]) == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_5")
-                            self.prog.addConstr(gp.quicksum([zx_pos, zx_neg]) == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_6")
+                            
+                            zy_sum = zy_neg + zy_pos
+                            zx_sum = zx_neg + zx_pos
+                            self.prog.addConstr(gp.quicksum([zy_pos, zy_neg,zx_pos,zx_neg]) == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_5")
+                            #self.prog.addConstr(gp.quicksum([zy_pos, zy_neg]) == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_5")
+                            #self.prog.addConstr(gp.quicksum([zx_pos, zx_neg]) == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_6")
                             for cp in range(self.robots_ncp[r]-2):
-                                self.prog.addConstr(self.robots_drvar[r][bzr][1,cp+1]-self.robots_drvar[r][bzr][1,cp] >= -self.bigM*(1-zy_pos), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_6")
-                                self.prog.addConstr(self.robots_drvar[r][bzr][1,cp+1]-self.robots_drvar[r][bzr][1,cp] <= self.bigM*(1-zy_neg), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_7")   
-                                self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] >= -self.bigM*(1-zx_pos), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_8")
-                                self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] <= self.bigM*(1-zx_neg), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_9") 
+                                self.prog.addConstr(self.robots_drvar[r][bzr][1,cp+1]-self.robots_drvar[r][bzr][1,cp] >= -self.bigM*(1-zy_pos-zx_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_6")
+                                self.prog.addConstr(self.robots_drvar[r][bzr][1,cp+1]-self.robots_drvar[r][bzr][1,cp] <= self.bigM*(1-zy_neg-zx_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_7")   
+                                self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] >= -self.bigM*(1-zx_pos-zy_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_8")
+                                self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] <= self.bigM*(1-zx_neg-zy_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_9") 
                             
                             if not MOVE_DIAGONALLY:
                                 # Diagonal movement is combersum, so in addition to the above contraint. 
