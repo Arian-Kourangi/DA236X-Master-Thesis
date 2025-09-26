@@ -36,6 +36,7 @@ from World import World
 MOVE_DIAGONALLY = True
 PUSH_DIAGONALLY = False
 ALLOW_CONSECUTIVE = False
+ROBOT_ROBOT_COL_AVOIDANCE = True
 
 SAVE_SOLUTIONS = False
 class SR_Impact_STL:
@@ -116,7 +117,8 @@ class SR_Impact_STL:
         self._continuity_constraints()
 
         self._stl_constraints()
-        self._robot_robot_collision_constraints()
+        if ROBOT_ROBOT_COL_AVOIDANCE:
+            self._robot_robot_collision_constraints()
         #self._object_object_collision_constraints()
         self._set_cost()
 
