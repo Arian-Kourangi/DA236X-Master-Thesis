@@ -33,7 +33,10 @@ from utilities.sr_stl import quant_parse_operator, parse_time_robot_robot
 from utilities.beziers import get_derivative_control_points_gurobi, eval_bezier, value_bezier
 from World import World
 
-MOVE_DIAGONALLY = False
+MOVE_DIAGONALLY = True
+PUSH_DIAGONALLY = False
+ALLOW_CONSECUTIVE = False
+
 SAVE_SOLUTIONS = False
 class SR_Impact_STL:
     def __init__(self,world: World):
@@ -505,40 +508,41 @@ class SR_Impact_STL:
         #                except Exception as e:
         #                    print(f"Error in {o} {bzo} {r} [1,1,0,0] constraint: {e}")
         #
-        ##Constrain for object bz to not have more than one collision with any robot in a row, ie it must have one free bz between two interactions
-        #for o in range(self.nobjects):
-        #    dx = 2
-        #    for bzo in range(self.objects_nbzs[o]-dx):
-        #        #we wnt to check that these two consecutive bzs do not have more than one collision with any robot
-        #        zs_sums = [self.prog.addVar(vtype=gp.GRB.BINARY) for r in range(self.nrobots)]
-        #        for r in range(self.nrobots):
-        #            try:
-        #                self.prog.addConstr(zs_sums[r] == gp.quicksum([self.robots[r].zs[o][bzr,bzo + s] for bzr in range(self.robots_nbzs[r]-1) for s in range (dx)]))
-        #            except Exception as e:
-        #                print(f"Error in {o} {bzo} {r} zs_sums[r] == quicksum(robots[r].zs[r][o][:,bzo]): {e}")
-        #        self.prog.addConstr(gp.quicksum(zs_sums) <= 1)
 
-        #Constraint that prevents one object from interacting with the same robot without first interacting
-        # with a different robot. ie object cannot be pushed and then caught by the same robot in different bezier segments
-        #Y = {}
-#
-        #for r in range(self.nrobots):
-        #    for o in range(self.nobjects):
-        #        for bzo in range(self.objects_nbzs[o]-1):
-        #            Y[r,o,bzo] = self.prog.addVar(vtype=gp.GRB.BINARY)
-        #            # Checking if this bzo interacts with robot r at all
-        #            self.prog.addConstr(Y[r,o,bzo] == gp.quicksum([self.robots[r].zs[o][bzr,bzo] for bzr in range(self.robots_nbzs[r]-1)]))
-#
-        #for o in range(self.nobjects):
-        #    for bzo1 in range(self.objects_nbzs[o]-1):
-        #        for bzo2 in range(self.objects_nbzs[o]-1):
-        #            if bzo2 > bzo1:
-        #                for r in range(self.nrobots):
-        #                    #Checking that if bzo1 and bzo2 both interact with robot r, then there must be at least one interaction with a different robot in between
-        #                    self.prog.addConstr(
-        #                        Y[r,o,bzo1] + Y[r,o,bzo2] <=
-        #                        1 + gp.quicksum([Y[rr,o,bzo] for rr in range(self.nrobots) if rr != r for bzo in range(bzo1+1,bzo2)])
-        #                    )
+        #Constrain for object bz to not have more than one collision with any robot in a row, ie it must have one free bz between two interactions
+        for o in range(self.nobjects):
+            dx = 2
+            for bzo in range(self.objects_nbzs[o]-dx):
+                #we wnt to check that these two consecutive bzs do not have more than one collision with any robot
+                zs_sums = [self.prog.addVar(vtype=gp.GRB.BINARY) for r in range(self.nrobots)]
+                for r in range(self.nrobots):
+                    try:
+                        self.prog.addConstr(zs_sums[r] == gp.quicksum([self.robots[r].zs[o][bzr,bzo + s] for bzr in range(self.robots_nbzs[r]-1) for s in range (dx)]))
+                    except Exception as e:
+                        print(f"Error in {o} {bzo} {r} zs_sums[r] == quicksum(robots[r].zs[r][o][:,bzo]): {e}")
+                self.prog.addConstr(gp.quicksum(zs_sums) <= 1)
+
+        if not ALLOW_CONSECUTIVE:
+            #Constraint that prevents one object from interacting with the same robot without first interacting
+            # with a different robot. ie object cannot be pushed and then caught by the same robot in different bezier segments or vice versa.
+            Y = {}
+            for r in range(self.nrobots):
+                for o in range(self.nobjects):
+                    for bzo in range(self.objects_nbzs[o]-1):
+                        Y[r,o,bzo] = self.prog.addVar(vtype=gp.GRB.BINARY)
+                        # Checking if this bzo interacts with robot r at all
+                        self.prog.addConstr(Y[r,o,bzo] == gp.quicksum([self.robots[r].zs[o][bzr,bzo] for bzr in range(self.robots_nbzs[r]-1)]))
+
+            for o in range(self.nobjects):
+                for bzo1 in range(self.objects_nbzs[o]-1):
+                    for bzo2 in range(self.objects_nbzs[o]-1):
+                        if bzo2 > bzo1:
+                            for r in range(self.nrobots):
+                                #Checking that if bzo1 and bzo2 both interact with robot r, then there must be at least one interaction with a different robot in between
+                                self.prog.addConstr(
+                                    Y[r,o,bzo1] + Y[r,o,bzo2] <=
+                                    1 + gp.quicksum([Y[rr,o,bzo] for rr in range(self.nrobots) if rr != r for bzo in range(bzo1+1,bzo2)])
+                                )
 
     def _object_dynamics(self):
         for r in range(self.nrobots):
@@ -618,18 +622,26 @@ class SR_Impact_STL:
                             zy_neg = self.prog.addVar(vtype=gp.GRB.BINARY)
                             zx_pos = self.prog.addVar(vtype=gp.GRB.BINARY)
                             zx_neg = self.prog.addVar(vtype=gp.GRB.BINARY)
-                            
-                            zy_sum = zy_neg + zy_pos
-                            zx_sum = zx_neg + zx_pos
-                            self.prog.addConstr(gp.quicksum([zy_pos, zy_neg,zx_pos,zx_neg]) == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_5")
-                            #self.prog.addConstr(gp.quicksum([zy_pos, zy_neg]) == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_5")
-                            #self.prog.addConstr(gp.quicksum([zx_pos, zx_neg]) == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_6")
-                            for cp in range(self.robots_ncp[r]-2):
-                                self.prog.addConstr(self.robots_drvar[r][bzr][1,cp+1]-self.robots_drvar[r][bzr][1,cp] >= -self.bigM*(1-zy_pos-zx_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_6")
-                                self.prog.addConstr(self.robots_drvar[r][bzr][1,cp+1]-self.robots_drvar[r][bzr][1,cp] <= self.bigM*(1-zy_neg-zx_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_7")   
-                                self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] >= -self.bigM*(1-zx_pos-zy_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_8")
-                                self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] <= self.bigM*(1-zx_neg-zy_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_9") 
-                            
+                            #Cannot push diagonally, only push in one dimension and direction at a time
+                            if not PUSH_DIAGONALLY:
+                                zy_sum = zy_neg + zy_pos
+                                zx_sum = zx_neg + zx_pos
+                                self.prog.addConstr(gp.quicksum([zy_pos, zy_neg,zx_pos,zx_neg]) == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_5")
+                                for cp in range(self.robots_ncp[r]-2):
+                                    self.prog.addConstr(self.robots_drvar[r][bzr][1,cp+1]-self.robots_drvar[r][bzr][1,cp] >= -self.bigM*(1-zy_pos-zx_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_6")
+                                    self.prog.addConstr(self.robots_drvar[r][bzr][1,cp+1]-self.robots_drvar[r][bzr][1,cp] <= self.bigM*(1-zy_neg-zx_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_7")   
+                                    self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] >= -self.bigM*(1-zx_pos-zy_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_8")
+                                    self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] <= self.bigM*(1-zx_neg-zy_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_9") 
+                            if PUSH_DIAGONALLY:
+                                #We can push in both x and y but only choose one direction for each dimension
+                                self.prog.addConstr(gp.quicksum([zy_pos, zy_neg]) == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_5")
+                                self.prog.addConstr(gp.quicksum([zx_pos, zx_neg]) == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_6")
+                                for cp in range(self.robots_ncp[r]-2):
+                                    self.prog.addConstr(self.robots_drvar[r][bzr][1,cp+1]-self.robots_drvar[r][bzr][1,cp] >= -self.bigM*(1-zy_pos), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_6")
+                                    self.prog.addConstr(self.robots_drvar[r][bzr][1,cp+1]-self.robots_drvar[r][bzr][1,cp] <= self.bigM*(1-zy_neg), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_7")   
+                                    self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] >= -self.bigM*(1-zx_pos), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_8")
+                                    self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] <= self.bigM*(1-zx_neg), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_9") 
+
                             if not MOVE_DIAGONALLY:
                                 # Diagonal movement is combersum, so in addition to the above contraint. 
                                 # We limit velocity in one dimension to be zero if the other dimension has velocity.
