@@ -116,7 +116,7 @@ class SR_Impact_STL:
         self._continuity_constraints()
 
         self._stl_constraints()
-        #self._robot_robot_collision_constraints()
+        self._robot_robot_collision_constraints()
         #self._object_object_collision_constraints()
         self._set_cost()
 
@@ -155,7 +155,7 @@ class SR_Impact_STL:
         # weights for complex stl spec
         weight_L = 0
         weight_V = 0
-        weight_A = 0.1
+        weight_A = 2
         weight_absA = 0
         weight_rho = 10000 #100000
         weight_N_impacts = 0
@@ -707,7 +707,7 @@ class SR_Impact_STL:
         self.z_spaces = []
         for r1 in range(self.nrobots):
             for r2 in range(self.nrobots):
-                if r1 is not r2 and (r1,r2) not in checked_pairs and (r2,r1) not in checked_pairs:
+                if r1 != r2 and (r1,r2) not in checked_pairs and (r2,r1) not in checked_pairs:
                     checked_pairs.append((r1,r2))
                     # loop through all beziers and if they intersect in time,
                     # add a constraint that they should not intersect in space
@@ -723,7 +723,7 @@ class SR_Impact_STL:
                                 for cp1 in range(self.robots_ncp[r1]):
                                     for cp2 in range(self.robots_ncp[r2]):
                                         # x cp1's left of x cp2's
-                                        radius = 10
+                                        radius = 1
                                         try:
                                             c = self.robots_rvar[r1][bzr1][0,cp1] - self.robots_rvar[r2][bzr2][0,cp2] - radius
                                             self.prog.addConstr(c <= self.bigM*(1-z_space[0]) + self.bigM*(1-z_time))

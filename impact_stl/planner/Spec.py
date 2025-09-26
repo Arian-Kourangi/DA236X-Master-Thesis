@@ -520,18 +520,18 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         
         bz = 10
         robot1 = Robot(name="snap",
-                       x0=np.array([10,0]),
+                       x0=np.array([2,4]),
                        dx0=np.array([0,0]),
                        xf=None,
                        dxf=None,nbz=bz)
         robot2 = Robot(name="crockle",
-                       x0=np.array([0,10]),
+                       x0=np.array([7,2]),
                        dx0=np.array([0,0]),
                        xf=None,
                        dxf=None,nbz=bz)
         
         object1 = Object(name="pop",
-                         x0=np.array([4,5]),
+                         x0=np.array([3,3]),
                          dx0=np.array([0,0]),
                          xf=np.array([25,25]),
                          dxf=np.array([0,0]),nbz=bz)
