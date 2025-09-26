@@ -6,7 +6,7 @@ from utilities.zonotopes import zonotope
 class Robot():
     # Robot class
     def __init__(self,name: str ,x0: np.ndarray ,dx0:np.ndarray ,xf: np.ndarray,dxf: np.ndarray,nbz: int =10,
-                 dq_lb: np.ndarray = np.array([-2,-2]), dq_ub: np.ndarray = np.array([2,2])):
+                 dq_lb: np.ndarray = np.array([-1.5,-1.5]), dq_ub: np.ndarray = np.array([1.5,1.5])):
         """
         The robot is controlled by a sequence of bezier curves, each with its own
         lower and upper bound on velocity.
@@ -503,7 +503,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         world.areas = [area1,area2]
         world.obstacles = []
     elif specification == "minimal_test":
-        tf = 60
+        tf = 100
 
         #just so I can mark the final location of the object, not actually used in an stl spec
         area1 = Area(x_min=np.array([24.5,24.5]),x_max=np.array([25.5,25.5]))
@@ -518,7 +518,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         #world.spec.add_pred(phi3, name='crockle')
         #world.spec.add_pred(phi3, name='snap')
         
-        bz = 10
+        bz = 12
         robot1 = Robot(name="snap",
                        x0=np.array([2,4]),
                        dx0=np.array([0,0]),
@@ -531,7 +531,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
                        dxf=None,nbz=bz)
         
         object1 = Object(name="pop",
-                         x0=np.array([3,3]),
+                         x0=np.array([17,4]),
                          dx0=np.array([0,0]),
                          xf=np.array([25,25]),
                          dxf=np.array([0,0]),nbz=bz)

@@ -155,7 +155,7 @@ class SR_Impact_STL:
         # weights for complex stl spec
         weight_L = 0
         weight_V = 0
-        weight_A = 2
+        weight_A = 5
         weight_absA = 0
         weight_rho = 10000 #100000
         weight_N_impacts = 0
