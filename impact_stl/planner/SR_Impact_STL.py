@@ -1162,6 +1162,11 @@ class SR_Impact_STL:
             rad = 0.2
             circle = plt.Circle(c,rad,fill=False,color='k')
             self.ax_anim.add_patch(circle)
+            self.ax_anim.text(
+            c[0], c[1] + 0.25,  # slightly above the circle
+            self.robots[r].name,
+            color='k', fontsize=12, ha='center', va='bottom', weight='bold',
+            bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', boxstyle='round,pad=0.2'))
             # plot trajectory 
             for bz in range(self.robots_nbzs[r]):
                 self.ax_anim.plot(self.robots_rtraj[r][bz][0,:],self.robots_rtraj[r][bz][1,:],'k')
