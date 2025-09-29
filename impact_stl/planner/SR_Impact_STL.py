@@ -35,7 +35,7 @@ from World import World
 
 MOVE_DIAGONALLY = True
 PUSH_DIAGONALLY = False
-ALLOW_CONSECUTIVE = True
+ALLOW_CONSECUTIVE = False
 ROBOT_ROBOT_COL_AVOIDANCE = False
 
 SAVE_SOLUTIONS = False
@@ -157,11 +157,11 @@ class SR_Impact_STL:
         # weights for complex stl spec
         weight_L = 0
         weight_V = 0
-        weight_A = 0.001
+        weight_A = 0.01
         weight_absA = 0
-        weight_rho = 10000 #100000
+        weight_rho = 1000 #100000
         weight_N_impacts = 0
-        weight_n_impacts_robot = 2 #Cost for increasing number of impacts for each robot, encourages robots to distribute impacts evenly between them
+        weight_n_impacts_robot = 0 #Cost for increasing number of impacts for each robot, encourages robots to distribute impacts evenly between them
         
         ### path length cost
         if weight_L > 0:
