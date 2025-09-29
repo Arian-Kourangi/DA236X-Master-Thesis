@@ -157,11 +157,11 @@ class SR_Impact_STL:
         # weights for complex stl spec
         weight_L = 0
         weight_V = 0
-        weight_A = 5
+        weight_A = 0.001
         weight_absA = 0
         weight_rho = 10000 #100000
         weight_N_impacts = 0
-        weight_n_impacts_robot = 0 #Cost for increasing number of impacts for each robot, encourages robots to distribute impacts evenly between them
+        weight_n_impacts_robot = 2 #Cost for increasing number of impacts for each robot, encourages robots to distribute impacts evenly between them
         
         ### path length cost
         if weight_L > 0:
@@ -487,7 +487,8 @@ class SR_Impact_STL:
             #size = [nobjects][nr_bzs_robot-1][nr_bzs_object-1]
             zs = [self.prog.addMVar((self.robots_nbzs[r]-1,self.objects_nbzs[o]-1),vtype=gp.GRB.BINARY) for o in range(self.nobjects)]
             self.robots[r].zs = zs
-
+            zs_dir = [self.prog.addMVar((self.robots_nbzs[r]-1,self.objects_nbzs[o]-1,4),vtype=gp.GRB.BINARY) for o in range(self.nobjects)]
+            self.robots[r].zs_dir = zs_dir
             #? for each robot bezier, we can only bump with one object bezier
             #? we can only bump with one object per robot bezier (is this implicitly constrained?)
             for bzr in range(self.robots_nbzs[r]-1):
@@ -620,10 +621,10 @@ class SR_Impact_STL:
                             # an object in the same curve (but not over two different curves). As well as trying to push in x direction whilst stopping in y direction.
                             # This does not constrain diagonals movement, only diagonal pushing. Diagonal movement of the object can still be achieved, it just happens
                             # over two interaction curves, one for each dimension.
-                            zy_pos = self.prog.addVar(vtype=gp.GRB.BINARY)
-                            zy_neg = self.prog.addVar(vtype=gp.GRB.BINARY)
-                            zx_pos = self.prog.addVar(vtype=gp.GRB.BINARY)
-                            zx_neg = self.prog.addVar(vtype=gp.GRB.BINARY)
+                            zy_pos =self.robots[r].zs_dir[o][bzr,bzo,0]  #self.prog.addVar(vtype=gp.GRB.BINARY)
+                            zy_neg =self.robots[r].zs_dir[o][bzr,bzo,1]  #self.prog.addVar(vtype=gp.GRB.BINARY)
+                            zx_pos =self.robots[r].zs_dir[o][bzr,bzo,2]  #self.prog.addVar(vtype=gp.GRB.BINARY)
+                            zx_neg =self.robots[r].zs_dir[o][bzr,bzo,3]  #self.prog.addVar(vtype=gp.GRB.BINARY)
                             #Cannot push diagonally, only push in one dimension and direction at a time
                             if not PUSH_DIAGONALLY:
                                 zy_sum = zy_neg + zy_pos
