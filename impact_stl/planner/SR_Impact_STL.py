@@ -157,9 +157,9 @@ class SR_Impact_STL:
         # weights for complex stl spec
         weight_L = 0
         weight_V = 0
-        weight_A = 0.01
+        weight_A = 0.1
         weight_absA = 0
-        weight_rho = 1000 #100000
+        weight_rho = 10000 #100000
         weight_N_impacts = 0
         weight_n_impacts_robot = 0 #Cost for increasing number of impacts for each robot, encourages robots to distribute impacts evenly between them
         

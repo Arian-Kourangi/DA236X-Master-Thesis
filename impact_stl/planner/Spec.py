@@ -6,7 +6,7 @@ from utilities.zonotopes import zonotope
 class Robot():
     # Robot class
     def __init__(self,name: str ,x0: np.ndarray ,dx0:np.ndarray ,xf: np.ndarray,dxf: np.ndarray,nbz: int =10,
-                 dq_lb: np.ndarray = np.array([-1.5,-1.5]), dq_ub: np.ndarray = np.array([1.5,1.5])):
+                 dq_lb: np.ndarray = np.array([-3,-3]), dq_ub: np.ndarray = np.array([3,3])):
         """
         The robot is controlled by a sequence of bezier curves, each with its own
         lower and upper bound on velocity.
@@ -49,7 +49,7 @@ class Robot():
 
 class Object():
     def __init__(self, name: str, x0: np.ndarray, dx0: np.ndarray, xf: np.ndarray, dxf: np.ndarray, nbz: int=10, t0: int=0, tf: int=100,
-                 dq_lb: np.ndarray=np.array([-1,-1]), dq_ub:np.ndarray=np.array([1,1])):
+                 dq_lb: np.ndarray=np.array([-3,-3]), dq_ub:np.ndarray=np.array([3,3])):
         """
         Object must have a initial velocity and position, but not necessarily a final position or velocity.
         Args:
@@ -275,22 +275,23 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         world.areas = [area1,area2]
 
     elif specification == "minimal_test":
-        tf = 100
+        tf = 120
 
         #just so I can mark the final location of the object, not actually used in an stl spec
-        area1 = Area(x_min=np.array([24.5,24.5]),x_max=np.array([25.5,25.5]))
+        area1 = Area(x_min=np.array([4.5,24.5]),x_max=np.array([5.5,25.5]))
 
 
 
-        obs1 = Area(x_min=np.array([10,10]),x_max=np.array([20,20]))
+        obs1 = Area(x_min=np.array([3,15]),x_max=np.array([8,20]))
         phi31 = Pred(type="NEG",preds=obs1) 
         phi3 = Pred(type="G",I=[0,tf],preds=[phi31])
         
         world.spec = Spec(t0=0,tf=tf)
-        #world.spec.add_pred(phi3, name='crockle')
-        #world.spec.add_pred(phi3, name='snap')
+        world.spec.add_pred(phi3, name='crockle')
+        world.spec.add_pred(phi3, name='snap')
+        world.spec.add_pred(phi3, name='pop')
         
-        bz = 12
+        bz = 15
         robot1 = Robot(name="snap",
                        x0=np.array([1,4]),
                        dx0=np.array([0,0]),
@@ -303,9 +304,9 @@ def spatial_specifications(world: Object ,specification: str) -> None:
                        dxf=None,nbz=bz)
         
         object1 = Object(name="pop",
-                         x0=np.array([6,4]),
+                         x0=np.array([3,3]),
                          dx0=np.array([0,0]),
-                         xf=np.array([25,25]),
+                         xf=np.array([5,25]),
                          dxf=np.array([0,0]),nbz=bz)
 
         world.dim = 2
@@ -317,7 +318,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         world.x_ub = np.array([30,30])
 
         # Obstacles
-        world.obstacles= []
+        world.obstacles= [obs1]
 
         # Area's of interest
         world.areas = [area1]
