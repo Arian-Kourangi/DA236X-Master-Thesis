@@ -6,7 +6,7 @@ from utilities.zonotopes import zonotope
 class Robot():
     # Robot class
     def __init__(self,name: str ,x0: np.ndarray ,dx0:np.ndarray ,xf: np.ndarray,dxf: np.ndarray,nbz: int =10,
-                 dq_lb: np.ndarray = np.array([-3,-3]), dq_ub: np.ndarray = np.array([3,3])):
+                 dq_lb: np.ndarray = np.array([-5,-5]), dq_ub: np.ndarray = np.array([5,5])):
         """
         The robot is controlled by a sequence of bezier curves, each with its own
         lower and upper bound on velocity.
@@ -49,7 +49,7 @@ class Robot():
 
 class Object():
     def __init__(self, name: str, x0: np.ndarray, dx0: np.ndarray, xf: np.ndarray, dxf: np.ndarray, nbz: int=10, t0: int=0, tf: int=100,
-                 dq_lb: np.ndarray=np.array([-3,-3]), dq_ub:np.ndarray=np.array([3,3])):
+                 dq_lb: np.ndarray=np.array([-5,-5]), dq_ub:np.ndarray=np.array([5,5])):
         """
         Object must have a initial velocity and position, but not necessarily a final position or velocity.
         Args:
@@ -275,7 +275,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         world.areas = [area1,area2]
 
     elif specification == "minimal_test":
-        tf = 120
+        tf = 80
 
         #just so I can mark the final location of the object, not actually used in an stl spec
         area1 = Area(x_min=np.array([4.5,24.5]),x_max=np.array([5.5,25.5]))
