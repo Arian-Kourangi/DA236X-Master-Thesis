@@ -657,6 +657,10 @@ class SR_Impact_STL:
                             zy_neg =self.robots[r].zs_dir[o][bzr,bzo,1]  #self.prog.addVar(vtype=gp.GRB.BINARY)
                             zx_pos =self.robots[r].zs_dir[o][bzr,bzo,2]  #self.prog.addVar(vtype=gp.GRB.BINARY)
                             zx_neg =self.robots[r].zs_dir[o][bzr,bzo,3]  #self.prog.addVar(vtype=gp.GRB.BINARY)
+                            push = self.prog.addVar(vtype=gp.GRB.BINARY)
+                            brake = self.prog.addVar(vtype=gp.GRB.BINARY)
+                            
+                            self.prog.addConstr(push + brake == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_0")
                             #Cannot push diagonally, only push in one dimension and direction at a time
                             if not PUSH_DIAGONALLY:
                                 zy_sum = zy_neg + zy_pos
@@ -667,6 +671,14 @@ class SR_Impact_STL:
                                     self.prog.addConstr(self.robots_drvar[r][bzr][1,cp+1]-self.robots_drvar[r][bzr][1,cp] <= self.bigM*(1-zy_neg-zx_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_7")   
                                     self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] >= -self.bigM*(1-zx_pos-zy_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_8")
                                     self.prog.addConstr(self.robots_drvar[r][bzr][0,cp+1]-self.robots_drvar[r][bzr][0,cp] <= self.bigM*(1-zx_neg-zy_sum), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_9") 
+                                    
+                                    
+                                    self.prog.addConstr(self.robots_dhvar[r][bzr][0,cp+1]-self.robots_dhvar[r][bzr][0,cp] <= self.bigM*(1-push), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_6")
+                                    self.prog.addConstr(self.robots_dhvar[r][bzr][0,cp+1]-self.robots_dhvar[r][bzr][0,cp] >= -self.bigM*(1-brake), name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_7")   
+                                                     
+                            
+                            
+                            
                             if PUSH_DIAGONALLY:
                                 #We can push in both x and y but only choose one direction for each dimension
                                 self.prog.addConstr(gp.quicksum([zy_pos, zy_neg]) == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_5")
