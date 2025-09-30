@@ -36,6 +36,8 @@ from World import World
 MOVE_DIAGONALLY = True
 PUSH_DIAGONALLY = False
 ALLOW_CONSECUTIVE = False
+#Allow consecutive interactions but in diff dimensions
+ALLOW_CONS_XY = False
 ROBOT_ROBOT_COL_AVOIDANCE = False
 
 SAVE_SOLUTIONS = False
@@ -53,8 +55,6 @@ class SR_Impact_STL:
         self.objects = world.objects
 
         # restitution coefficient
-        self.e = 0.47 # we used 0.47 for the experiments pingpong
-
         self.bigM = 1e4
         self.dh_lb = 1e-1
         self.dh_ub = 1e3
@@ -157,7 +157,7 @@ class SR_Impact_STL:
         # weights for complex stl spec
         weight_L = 0
         weight_V = 0
-        weight_A = 0.1
+        weight_A = 0.1 # 0.01
         weight_absA = 0
         weight_rho = 10000 #100000
         weight_N_impacts = 0
@@ -528,25 +528,57 @@ class SR_Impact_STL:
         if not ALLOW_CONSECUTIVE:
             #Constraint that prevents one object from interacting with the same robot without first interacting
             # with a different robot. ie object cannot be pushed and then caught by the same robot in different bezier segments or vice versa.
-            Y = {}
-            for r in range(self.nrobots):
+            
+            # Strictest constraint, don't allow any consecutive interactions between the same robot and object
+            if not ALLOW_CONS_XY:
+                Y = {}
+                for r in range(self.nrobots):
+                    for o in range(self.nobjects):
+                        for bzo in range(self.objects_nbzs[o]-1):
+                            Y[r,o,bzo] = self.prog.addVar(vtype=gp.GRB.BINARY)
+                            # Checking if this bzo interacts with robot r at all
+                            self.prog.addConstr(Y[r,o,bzo] == gp.quicksum([self.robots[r].zs[o][bzr,bzo] for bzr in range(self.robots_nbzs[r]-1)]))
+
                 for o in range(self.nobjects):
-                    for bzo in range(self.objects_nbzs[o]-1):
-                        Y[r,o,bzo] = self.prog.addVar(vtype=gp.GRB.BINARY)
-                        # Checking if this bzo interacts with robot r at all
-                        self.prog.addConstr(Y[r,o,bzo] == gp.quicksum([self.robots[r].zs[o][bzr,bzo] for bzr in range(self.robots_nbzs[r]-1)]))
+                    for bzo1 in range(self.objects_nbzs[o]-1):
+                        for bzo2 in range(self.objects_nbzs[o]-1):
+                            if bzo2 > bzo1:
+                                for r in range(self.nrobots):
+                                    #Checking that if bzo1 and bzo2 both interact with robot r, then there must be at least one interaction with a different robot in between
+                                    self.prog.addConstr(
+                                        Y[r,o,bzo1] + Y[r,o,bzo2] <=
+                                        1 + gp.quicksum([Y[rr,o,bzo] for rr in range(self.nrobots) if rr != r for bzo in range(bzo1+1,bzo2)])
+                                    )
+            elif ALLOW_CONS_XY:
+                # Less strict, allow consecutive interactions in different dimensions
+                Yy = {}  # y-dimension
+                Yx = {}  # x-dimension
+                for r in range(self.nrobots):
+                    for o in range(self.nobjects):
+                        for bzo in range(self.objects_nbzs[o]-1):
+                            Yy[r,o,bzo] = self.prog.addVar(vtype=gp.GRB.BINARY)
+                            Yx[r,o,bzo] = self.prog.addVar(vtype=gp.GRB.BINARY)
+                            self.prog.addConstr(Yy[r,o,bzo] == gp.quicksum([self.robots[r].zs_dir[o][bzr,bzo,0] + self.robots[r].zs_dir[o][bzr,bzo,1] for bzr in range(self.robots_nbzs[r]-1)]))
+                            self.prog.addConstr(Yx[r,o,bzo] == gp.quicksum([self.robots[r].zs_dir[o][bzr,bzo,2] + self.robots[r].zs_dir[o][bzr,bzo,3] for bzr in range(self.robots_nbzs[r]-1)]))
+                
+                for o in range(self.nobjects):
+                    for bzo1 in range(self.objects_nbzs[o]-1):
+                        for bzo2 in range(self.objects_nbzs[o]-1):
+                            if bzo2 > bzo1:
+                                for r in range(self.nrobots):
+                                    # y-dimension
+                                    self.prog.addConstr(
+                                        gp.quicksum([Yy[r,o,bzo1], Yy[r,o,bzo2]]) <=
+                                        1 + gp.quicksum([Yy[rr,o,bzo] for rr in range(self.nrobots) if rr != r for bzo in range(bzo1+1, bzo2)])
+                                    )
+                                    # x-dimension
+                                    self.prog.addConstr(
+                                        gp.quicksum([Yx[r,o,bzo1], Yx[r,o,bzo2]]) <=
+                                        1 + gp.quicksum([Yx[rr,o,bzo] for rr in range(self.nrobots) if rr != r for bzo in range(bzo1+1, bzo2)])
+                                    )
 
-            for o in range(self.nobjects):
-                for bzo1 in range(self.objects_nbzs[o]-1):
-                    for bzo2 in range(self.objects_nbzs[o]-1):
-                        if bzo2 > bzo1:
-                            for r in range(self.nrobots):
-                                #Checking that if bzo1 and bzo2 both interact with robot r, then there must be at least one interaction with a different robot in between
-                                self.prog.addConstr(
-                                    Y[r,o,bzo1] + Y[r,o,bzo2] <=
-                                    1 + gp.quicksum([Y[rr,o,bzo] for rr in range(self.nrobots) if rr != r for bzo in range(bzo1+1,bzo2)])
-                                )
 
+    
     def _object_dynamics(self):
         for r in range(self.nrobots):
             zs = self.robots[r].zs #Tensor over objects, robot bzs, object bzs indicating if interaction happens
