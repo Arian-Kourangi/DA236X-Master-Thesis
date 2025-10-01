@@ -336,9 +336,9 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         phi3 = Pred(type="G",I=[0,tf],preds=[phi31])
         
         world.spec = Spec(t0=0,tf=tf)
-        #world.spec.add_pred(phi3, name='crockle')
-        #world.spec.add_pred(phi3, name='snap')
-        #world.spec.add_pred(phi3, name='pop')
+        world.spec.add_pred(phi3, name='crockle')
+        world.spec.add_pred(phi3, name='snap')
+        world.spec.add_pred(phi3, name='pop')
         
         bz = 8
         robot1 = Robot(name="snap",
