@@ -905,21 +905,28 @@ class SR_Impact_STL:
 
     def write_ids_and_names(self):
         # for the robots
+        dir_list = [' +y',' -y',' +x',' -x']
         for r in range(self.nrobots):
             for o in range(self.nobjects):
                 zs_sol = self.robots[r].zs[o].X
+                zs_dir_sol = self.robots[r].zs_dir[o].X
                 print(f"Robot {r} Object {o} zs: \n{zs_sol}")
                 for bzr in range(self.robots[r].nbz-1):
                     if any(zs_sol[bzr,:] == 1):
-                        self.robots[r].ids[bzr] = 'inter'
+                        #Getting bzo for interaction
+                        bzo = np.where(zs_sol[bzr,:] == 1)[0][0]
+                        #Getting the direction binary for the interaction
+                        dir = np.where(zs_dir_sol[bzr,bzo,:] == 1)[0][0]
+                        self.robots[r].ids[bzr] = 'inter' + dir_list[dir]
                         self.robots[r].other_names[bzr] = self.objects[o].name
-                    if bzr > 0 and any(zs_sol[bzr-1,:] == 1):
-                        self.robots[r].ids[bzr] = 'post'
-                        self.robots[r].other_names[bzr] = self.objects[o].name
-                    if bzr < self.robots[r].nbz-2 and any(zs_sol[bzr+1,:] == 1):
-                        self.robots[r].ids[bzr] = 'pre'
-                        self.robots[r].other_names[bzr] = self.objects[o].name
+                        if bzr < self.robots[r].nbz-2:
+                            self.robots[r].ids[bzr+1] = 'post' + dir_list[dir]
+                            self.robots[r].other_names[bzr+1] = self.objects[o].name
+                        if bzr > 0:
+                            self.robots[r].ids[bzr-1] = 'pre' + dir_list[dir]
+                            self.robots[r].other_names[bzr-1] = self.objects[o].name
         # for the objects
+        # NOTE: Should maybe update this to also include direction of interaction
         for o in range(self.nobjects):
             for r in range(self.nrobots):
                 zs_sol = self.robots[r].zs[o].X
@@ -1100,15 +1107,16 @@ class SR_Impact_STL:
         # X position vs time
         for o in range(self.nobjects):
             for bz in range(self.objects_nbzs[o]):
-                #Turn of plotting of object if there is an interaction
-                if self.objects[o].ids[bz] != 'inter':
+                #Only plot object if there is no interaction
+                if 'inter' not in self.objects[o].ids[bz]:
                     ax1.plot(self.objects_htraj[o][bz][0,:],self.objects_rtraj[o][bz][0,:],object_ls[o],linewidth=lw)
                     ax1.plot(self.objects_htraj[o][bz][0,0],self.objects_rtraj[o][bz][0,0],'ro',markersize=s)
             ax1.plot(self.objects_htraj[o][-1][0,-1],self.objects_rtraj[o][-1][0,-1],'ro',markersize=s)
         for r in range(self.nrobots):
             for bz in range(self.robots_nbzs[r]):
+
                 #If there is an interaction, plot the robot trajectory in blue
-                if self.robots[r].ids[bz] == 'inter':
+                if 'inter' in self.robots[r].ids[bz] and 'x' in self.robots[r].ids[bz]:
                     ax1.plot(self.robots_htraj[r][bz][0,:],self.robots_rtraj[r][bz][0,:],'b',linewidth=lw)
                     ax1.plot(self.robots_htraj[r][bz][0,0],self.robots_rtraj[r][bz][0,0],'bo',markersize=s)
                 else:
@@ -1123,15 +1131,15 @@ class SR_Impact_STL:
         # Y position vs time
         for o in range(self.nobjects):
             for bz in range(self.objects_nbzs[o]):
-                #Turn of plotting of object if there is an interaction
-                if self.objects[o].ids[bz] != 'inter':    
+                #Only plot object if there is no interaction
+                if 'inter' not in self.objects[o].ids[bz]:    
                     ax2.plot(self.objects_htraj[o][bz][0,:],self.objects_rtraj[o][bz][1,:],object_ls[o],linewidth=lw)
                     ax2.plot(self.objects_htraj[o][bz][0,0],self.objects_rtraj[o][bz][1,0],'ro',markersize=s)
             ax2.plot(self.objects_htraj[o][-1][0,-1],self.objects_rtraj[o][-1][1,-1],'ro',markersize=s)
         for r in range(self.nrobots):
             for bz in range(self.robots_nbzs[r]):
                 #If there is an interaction, plot the robot trajectory in blue
-                if self.robots[r].ids[bz] == 'inter':
+                if 'inter' in self.robots[r].ids[bz] and 'y' in self.robots[r].ids[bz]:
                     ax2.plot(self.robots_htraj[r][bz][0,:],self.robots_rtraj[r][bz][1,:],'b',linewidth=lw)
                     ax2.plot(self.robots_htraj[r][bz][0,0],self.robots_rtraj[r][bz][1,0],'bo',markersize=s)
                 else:
@@ -1143,10 +1151,11 @@ class SR_Impact_STL:
         ax2.set_xlabel(r"Time [s]")
         ax2.set_ylabel(r"y position [m]")
 
-        # X velocity vs time
+        #X velocity vs time
         for o in range(self.nobjects):
             for bz in range(self.objects_nbzs[o]):
-                if self.objects[o].ids[bz] != 'inter':
+                #Only plot object if there is no interaction
+                if 'inter' not in self.objects[o].ids[bz]:
                     ax3.plot(self.objects_htraj[o][bz][0,:],self.objects_dqtraj[o][bz][0,:],object_ls[o],linewidth=lw)
                     ax3.plot(self.objects_htraj[o][bz][0,0],self.objects_dqtraj[o][bz][0,0],'ro',markersize=s)
             ax3.plot(self.objects_htraj[o][-1][0,-1],self.objects_dqtraj[o][-1][0,-1],'ro',markersize=s)
@@ -1154,7 +1163,7 @@ class SR_Impact_STL:
         for r in range(self.nrobots):
             for bz in range(self.robots_nbzs[r]):
                 #If there is an interaction, plot the robot trajectory in blue
-                if self.robots[r].ids[bz] == 'inter':
+                if 'inter' in self.robots[r].ids[bz] and 'x' in self.robots[r].ids[bz]:
                     ax3.plot(self.robots_htraj[r][bz][0,:],self.robots_dqtraj[r][bz][0,:],'b',linewidth=lw)
                     ax3.plot(self.robots_htraj[r][bz][0,0],self.robots_dqtraj[r][bz][0,0],'bo',markersize=s)
                 else:
@@ -1169,8 +1178,8 @@ class SR_Impact_STL:
         # Y velocity vs time
         for o in range(self.nobjects):
             for bz in range(self.objects_nbzs[o]):
-                #Turn of plotting of object if there is an interaction
-                if self.objects[o].ids[bz] != 'inter':
+                #Only plot object if there is no interaction
+                if 'inter' not in self.objects[o].ids[bz]:
                     ax4.plot(self.objects_htraj[o][bz][0,:],self.objects_dqtraj[o][bz][1,:],object_ls[o],linewidth=lw)
                     ax4.plot(self.objects_htraj[o][bz][0,0],self.objects_dqtraj[o][bz][1,0],'ro',markersize=s)
             ax4.plot(self.objects_htraj[o][-1][0,-1],self.objects_dqtraj[o][-1][1,-1],'ro',markersize=s)
@@ -1178,7 +1187,7 @@ class SR_Impact_STL:
         for r in range(self.nrobots):
             for bz in range(self.robots_nbzs[r]):
                 #If there is an interaction, plot the robot trajectory in blue
-                if self.robots[r].ids[bz] == 'inter':
+                if 'inter' in self.robots[r].ids[bz] and 'y' in self.robots[r].ids[bz]:
                     ax4.plot(self.robots_htraj[r][bz][0,:],self.robots_dqtraj[r][bz][1,:],'b',linewidth=lw)
                     ax4.plot(self.robots_htraj[r][bz][0,0],self.robots_dqtraj[r][bz][1,0],'bo',markersize=s)
                 else:
@@ -1249,8 +1258,8 @@ class SR_Impact_STL:
             bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', boxstyle='round,pad=0.2'))
             # plot trajectory 
             for bz in range(self.robots_nbzs[r]):
-                #Only plot the traj if
-                if self.robots[r].ids[bz] == 'inter':
+                #Only plot the traj if interaction
+                if 'inter' in self.robots[r].ids[bz]:
                     self.ax_anim.plot(self.robots_rtraj[r][bz][0,:],self.robots_rtraj[r][bz][1,:],'b', linewidth=2)
         for o in range(self.nobjects):
             # plot circle
@@ -1261,7 +1270,8 @@ class SR_Impact_STL:
             self.ax_anim.add_patch(circle)
             # plot trajectory
             for bz in range(self.objects_nbzs[o]):
-                if self.objects[o].ids[bz] != 'inter':
+                #Only plot object if there is no interaction
+                if 'inter' not in self.objects[o].ids[bz]:
                     self.ax_anim.plot(self.objects_rtraj[o][bz][0,:],self.objects_rtraj[o][bz][1,:],'r',linewidth=2)
         self.ax_anim.set_title("x-y plane")
         self.ax_anim.set_xlabel("x [m]")
