@@ -373,25 +373,34 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         world.areas = [area1]
 
 
-    elif specification == "minimal_test_velocity_matching":
+    elif specification == "minimal_test_throw_and_catch":
         tf = 30
 
         world.spec = Spec(t0=0,tf=tf)
+        bz = 6
         
         robot1 = Robot(name="snap",
                        x0=np.array([5,0]),
                        dx0=np.array([0,0]),
-                       xf=np.array([5,9]),
-                       dxf=np.array([0,0]),nbz=6)
+                       xf=np.array([5,0]),
+                       dxf=np.array([0,0]),nbz=bz, dq_lb=np.array([-2,-2]),dq_ub=np.array([2,2]))
+        
+        robot2 = Robot(name="crackle",
+                       x0=np.array([5,10]),
+                       dx0=np.array([0,0]),
+                       xf=np.array([5,10]),
+                       dxf=np.array([0,0]),nbz=bz, dq_lb=np.array([-2,-2]),dq_ub=np.array([2,2]))
         
         object1 = Object(name="pop",
                          x0=np.array([5,2]),
-                         dx0=np.array([0,0.5]),
-                         xf=np.array([5,6.5]),
-                         dxf=np.array([0,0]),nbz=6)
+                         dx0=np.array([0,0]),
+                         xf=np.array([5,8]),
+                         dxf=np.array([0,0]),nbz=bz, dq_lb=np.array([-2,-2]),dq_ub=np.array([2,2]))
+        
+        area1 = Area(x_min=np.array([4.5,7.5]),x_max=np.array([5.5,8.5]))
 
         world.dim = 2
-        world.robots = [robot1]
+        world.robots = [robot1,robot2]
         world.objects = [object1]
 
         # World bounding box
@@ -402,4 +411,4 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         world.obstacles= []
 
         # Area's of interest
-        world.areas = []
+        world.areas = [area1]
