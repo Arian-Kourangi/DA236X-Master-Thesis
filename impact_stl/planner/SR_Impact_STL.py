@@ -34,13 +34,22 @@ from utilities.beziers import get_derivative_control_points_gurobi, eval_bezier,
 from World import World
 
 MOVE_DIAGONALLY = True
+
+#Must be false if MOVE_DIAGONALLY is false
 PUSH_DIAGONALLY = False
+
+#Must be false if ALLOW_CONS_XY is true
 ALLOW_CONSECUTIVE = False
+
 #Allow consecutive interactions but in diff dimensions
-ALLOW_CONS_XY = False
+ALLOW_CONS_XY = False #This causes some slowdown compared to just ALLOW_CONSECUTIVE = False
+
+#Test collision avoidance between robots
 ROBOT_ROBOT_COL_AVOIDANCE = False
 
+#Save CSVs of solutions
 SAVE_SOLUTIONS = False
+
 class SR_Impact_STL:
     def __init__(self,world: World):
         """
@@ -668,7 +677,7 @@ class SR_Impact_STL:
                                 zx_sum = zx_neg + zx_pos
 
                                 #Here we constrain the selection of dimension and direction based on if theres an interaction or not
-                                self.prog.addConstr(gp.quicksum([zy_pos, zy_neg,zx_pos,zx_neg]) == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_5")
+                                self.prog.addConstr(gp.quicksum([zy_pos, zy_neg, zx_pos, zx_neg]) == zs[o][bzr,bzo], name=f"impact_dynamics_{r}_{bzr}_{o}_{bzo}_5")
                                 
                                 #For each cp, make sure that the change in velocity is monotonic in the selected direction, ie if pushing in +y, dy must increase or stay the same
                                 #The zy_sum and zx_sum ensure that when one direciton is chosen, the other dimensions is constrained to have constant velocity ie no change in the velocity between cps
