@@ -911,10 +911,13 @@ class SR_Impact_STL:
                 print(f"Robot {r} Object {o} zs: \n{zs_sol}")
                 for bzr in range(self.robots[r].nbz-1):
                     if any(zs_sol[bzr,:] == 1):
-                        self.robots[r].ids[bzr] = 'pre'
+                        self.robots[r].ids[bzr] = 'inter'
                         self.robots[r].other_names[bzr] = self.objects[o].name
                     if bzr > 0 and any(zs_sol[bzr-1,:] == 1):
                         self.robots[r].ids[bzr] = 'post'
+                        self.robots[r].other_names[bzr] = self.objects[o].name
+                    if bzr < self.robots[r].nbz-2 and any(zs_sol[bzr+1,:] == 1):
+                        self.robots[r].ids[bzr] = 'pre'
                         self.robots[r].other_names[bzr] = self.objects[o].name
         # for the objects
         for o in range(self.nobjects):
@@ -923,10 +926,13 @@ class SR_Impact_STL:
                 print(f"Object {o} Robot {r} zs: \n{zs_sol}")
                 for bzo in range(self.objects[o].nbz-1):
                     if any(zs_sol[:,bzo] == 1):
-                        self.objects[o].ids[bzo] = 'pre'
+                        self.objects[o].ids[bzo] = 'inter'
                         self.objects[o].other_names[bzo] = self.robots[r].name
                     if bzo > 0 and any(zs_sol[:,bzo-1] == 1):
                         self.objects[o].ids[bzo] = 'post'
+                        self.objects[o].other_names[bzo] = self.robots[r].name
+                    if bzo < self.objects[o].nbz-2 and any(zs_sol[:,bzo+1] == 1):
+                        self.objects[o].ids[bzo] = 'pre'
                         self.objects[o].other_names[bzo] = self.robots[r].name
 
     def evaluate(self):
@@ -1074,151 +1080,145 @@ class SR_Impact_STL:
 
 
     def plot(self):
-        # old layout for fig 4\
-        fig, axs = plt.subplots(2,3,figsize=(15,10))
-        ax1 = axs[0,0]
-        ax2 = axs[0,1]
-        ax3 = axs[0,2]
-        ax4 = axs[1,0]
-        ax5 = axs[1,1]
-        ax6 = axs[1,2]
+
+
 
         # new layout for results figures
         fig = plt.figure(figsize=(20,10))
         gs = GridSpec(2,4, figure=fig)
-        ax1 = fig.add_subplot(gs[0:2,0:2])
-        #ax2 = fig.add_subplot(gs[0,2:4])
-        ax3 = fig.add_subplot(gs[1,2:4])
-        ax4 = fig.add_subplot(gs[0,2:4])
+        ax1 = fig.add_subplot(gs[0,0:2])
+        ax2 = fig.add_subplot(gs[0,2:4])
+        ax3 = fig.add_subplot(gs[1,0:2])
+        ax4 = fig.add_subplot(gs[1,2:4])
         # ax5 = fig.add_subplot(gs[1,3])
 
         robot_ls = ['k-','k--','k:','k-.']
         object_ls = ['r-','r--','r:','r-.']
         lw = 4
         s = 15
-        if True:
-            self.world.plot(ax1)
-            for r in range(self.nrobots):
-                for bz in range(self.robots_nbzs[r]):
-                    ax1.plot(self.robots_rtraj[r][bz][0,:],self.robots_rtraj[r][bz][1,:],robot_ls[r],linewidth=lw)
-                    ax1.plot(self.robots_rtraj[r][bz][0,0],self.robots_rtraj[r][bz][1,0],'ko',markersize=s)
-                ax1.plot(self.robots_rtraj[r][-1][0,-1],self.robots_rtraj[r][-1][1,-1],'ko',markersize=s)
-            for o in range(self.nobjects):
-                for bz in range(self.objects_nbzs[o]):
-                    ax1.plot(self.objects_rtraj[o][bz][0,:],self.objects_rtraj[o][bz][1,:],object_ls[o],linewidth=lw)
-                    ax1.plot(self.objects_rtraj[o][bz][0,0],self.objects_rtraj[o][bz][1,0],'ro',markersize=s)
-                ax1.plot(self.objects_rtraj[o][-1][0,-1],self.objects_rtraj[o][-1][1,-1],'ro',markersize=s)
-            # ax1.set_title("x-y plane")
-            # ax1.set_xlim(0.25,4.0)
-            # ax1.set_ylim(-1.25,1.75)
-            # ax1.set_xticks(np.arange(0.5, 4, 0.5))
-            # ax1.set_yticks(np.arange(-1.0, 2.0, 0.5))
-            ax1.set_xlabel(r"x position [m]")
-            ax1.set_ylabel(r"y position [m]")
-            ax1.grid(True)
-            ax1.set_aspect('equal', 'box')
-        # if True:
-        #     # self.world.plot(ax1)
-        #     for r in range(self.nrobots):
-        #         for bz in range(self.robots_nbzs[r]):
-        #             ax1.plot(-self.robots_rtraj[r][bz][1,:],self.robots_rtraj[r][bz][0,:],robot_ls[r])
-        #             ax1.plot(-self.robots_rtraj[r][bz][1,0],self.robots_rtraj[r][bz][0,0],'ko')
-        #         ax1.plot(-self.robots_rtraj[r][-1][1,-1],self.robots_rtraj[r][-1][0,-1],'ko')
-        #     for o in range(self.nobjects):
-        #         for bz in range(self.objects_nbzs[o]):
-        #             ax1.plot(-self.objects_rtraj[o][bz][1,:],self.objects_rtraj[o][bz][0,:],'r')
-        #             ax1.plot(-self.objects_rtraj[o][bz][1,0],self.objects_rtraj[o][bz][0,0],'ro')
-        #         ax1.plot(-self.objects_rtraj[o][-1][1,-1],self.objects_rtraj[o][-1][0,-1],'ro')
-        #     # ax1.set_title("x-y plane")
-        #     ax1.set_xlim(-0.5,1.0)
-        #     ax1.set_ylim(0,3.5)
-        #     ax1.set_xlabel(r"x position [m]")
-        #     ax1.set_ylabel(r"y position [m]")
-        #     ax1.grid(True)
-        #     ax1.set_aspect('equal', 'box')
 
-        if True:
-            for r in range(self.nrobots):
-                for bz in range(self.robots_nbzs[r]):
-                    ax2.plot(self.robots_htraj[r][bz][0,:],self.robots_rtraj[r][bz][0,:],robot_ls[r],linewidth=lw)
-                    ax2.plot(self.robots_htraj[r][bz][0,0],self.robots_rtraj[r][bz][0,0],'ko',markersize=s)
-                ax2.plot(self.robots_htraj[r][-1][0,-1],self.robots_rtraj[r][-1][0,-1],'ko',markersize=s)
-            for o in range(self.nobjects):
-                for bz in range(self.objects_nbzs[o]):
-                    ax2.plot(self.objects_htraj[o][bz][0,:],self.objects_rtraj[o][bz][0,:],object_ls[o],linewidth=lw)
-                    ax2.plot(self.objects_htraj[o][bz][0,0],self.objects_rtraj[o][bz][0,0],'ro',markersize=s)
-                ax2.plot(self.objects_htraj[o][-1][0,-1],self.objects_rtraj[o][-1][0,-1],'ro',markersize=s)
-            # ax2.set_title("x-t plane")
-            ax2.grid(True)
-            ax2.set_xlabel(r"Time [s]")
-            ax2.set_ylabel(r"x position [m]")
+        # X position vs time
+        for o in range(self.nobjects):
+            for bz in range(self.objects_nbzs[o]):
+                #Turn of plotting of object if there is an interaction
+                if self.objects[o].ids[bz] != 'inter':
+                    ax1.plot(self.objects_htraj[o][bz][0,:],self.objects_rtraj[o][bz][0,:],object_ls[o],linewidth=lw)
+                    ax1.plot(self.objects_htraj[o][bz][0,0],self.objects_rtraj[o][bz][0,0],'ro',markersize=s)
+            ax1.plot(self.objects_htraj[o][-1][0,-1],self.objects_rtraj[o][-1][0,-1],'ro',markersize=s)
+        for r in range(self.nrobots):
+            for bz in range(self.robots_nbzs[r]):
+                #If there is an interaction, plot the robot trajectory in blue
+                if self.robots[r].ids[bz] == 'inter':
+                    ax1.plot(self.robots_htraj[r][bz][0,:],self.robots_rtraj[r][bz][0,:],'b',linewidth=lw)
+                    ax1.plot(self.robots_htraj[r][bz][0,0],self.robots_rtraj[r][bz][0,0],'bo',markersize=s)
+                else:
+                    ax1.plot(self.robots_htraj[r][bz][0,:],self.robots_rtraj[r][bz][0,:],robot_ls[r],linewidth=lw)
+                    ax1.plot(self.robots_htraj[r][bz][0,0],self.robots_rtraj[r][bz][0,0],'ko',markersize=s)
+            ax1.plot(self.robots_htraj[r][-1][0,-1],self.robots_rtraj[r][-1][0,-1],'ko',markersize=s)
+        # ax2.set_title("x-t plane")
+        ax1.grid(True)
+        ax1.set_xlabel(r"Time [s]")
+        ax1.set_ylabel(r"x position [m]")
 
-        if True:
-            for r in range(self.nrobots):
-                for bz in range(self.robots_nbzs[r]):
-                    ax3.plot(self.robots_htraj[r][bz][0,:],self.robots_rtraj[r][bz][1,:],robot_ls[r],linewidth=lw)
-                    ax3.plot(self.robots_htraj[r][bz][0,0],self.robots_rtraj[r][bz][1,0],'ko',markersize=s)
-                ax3.plot(self.robots_htraj[r][-1][0,-1],self.robots_rtraj[r][-1][1,-1],'ko',markersize=s)
-            for o in range(self.nobjects):
-                for bz in range(self.objects_nbzs[o]):
-                    ax3.plot(self.objects_htraj[o][bz][0,:],self.objects_rtraj[o][bz][1,:],object_ls[o],linewidth=lw)
-                    ax3.plot(self.objects_htraj[o][bz][0,0],self.objects_rtraj[o][bz][1,0],'ro',markersize=s)
-                ax3.plot(self.objects_htraj[o][-1][0,-1],self.objects_rtraj[o][-1][1,-1],'ro',markersize=s)
-            # ax3.set_title("y-t plane")
-            ax3.grid(True)
-            ax3.set_xlabel(r"Time [s]")
-            ax3.set_ylabel(r"y position [m]")
+        # Y position vs time
+        for o in range(self.nobjects):
+            for bz in range(self.objects_nbzs[o]):
+                #Turn of plotting of object if there is an interaction
+                if self.objects[o].ids[bz] != 'inter':    
+                    ax2.plot(self.objects_htraj[o][bz][0,:],self.objects_rtraj[o][bz][1,:],object_ls[o],linewidth=lw)
+                    ax2.plot(self.objects_htraj[o][bz][0,0],self.objects_rtraj[o][bz][1,0],'ro',markersize=s)
+            ax2.plot(self.objects_htraj[o][-1][0,-1],self.objects_rtraj[o][-1][1,-1],'ro',markersize=s)
+        for r in range(self.nrobots):
+            for bz in range(self.robots_nbzs[r]):
+                #If there is an interaction, plot the robot trajectory in blue
+                if self.robots[r].ids[bz] == 'inter':
+                    ax2.plot(self.robots_htraj[r][bz][0,:],self.robots_rtraj[r][bz][1,:],'b',linewidth=lw)
+                    ax2.plot(self.robots_htraj[r][bz][0,0],self.robots_rtraj[r][bz][1,0],'bo',markersize=s)
+                else:
+                    ax2.plot(self.robots_htraj[r][bz][0,:],self.robots_rtraj[r][bz][1,:],robot_ls[r],linewidth=lw)
+                    ax2.plot(self.robots_htraj[r][bz][0,0],self.robots_rtraj[r][bz][1,0],'ko',markersize=s)
+            ax2.plot(self.robots_htraj[r][-1][0,-1],self.robots_rtraj[r][-1][1,-1],'ko',markersize=s)
+        # ax3.set_title("y-t plane")
+        ax2.grid(True)
+        ax2.set_xlabel(r"Time [s]")
+        ax2.set_ylabel(r"y position [m]")
 
-        if False:
-            # plot h_values for robots and objects
-            for r in range(self.nrobots):
-                for bz in range(self.robots_nbzs[r]):
-                    axs[1,0].plot(self.robots_htraj[r][bz][0,:],robot_ls[r])
-            for o in range(self.nobjects):
-                for bz in range(self.objects_nbzs[o]):
-                    axs[1,0].plot(self.objects_htraj[o][bz][0,:],'r')
-            # axs[1,0].set_title("h-t plane")
-            axs[1,0].set_xlabel(r"Time [s]")
-            axs[1,0].set_ylabel(r"Phase [-]")
+        # X velocity vs time
+        for o in range(self.nobjects):
+            for bz in range(self.objects_nbzs[o]):
+                if self.objects[o].ids[bz] != 'inter':
+                    ax3.plot(self.objects_htraj[o][bz][0,:],self.objects_dqtraj[o][bz][0,:],object_ls[o],linewidth=lw)
+                    ax3.plot(self.objects_htraj[o][bz][0,0],self.objects_dqtraj[o][bz][0,0],'ro',markersize=s)
+            ax3.plot(self.objects_htraj[o][-1][0,-1],self.objects_dqtraj[o][-1][0,-1],'ro',markersize=s)
+        
+        for r in range(self.nrobots):
+            for bz in range(self.robots_nbzs[r]):
+                #If there is an interaction, plot the robot trajectory in blue
+                if self.robots[r].ids[bz] == 'inter':
+                    ax3.plot(self.robots_htraj[r][bz][0,:],self.robots_dqtraj[r][bz][0,:],'b',linewidth=lw)
+                    ax3.plot(self.robots_htraj[r][bz][0,0],self.robots_dqtraj[r][bz][0,0],'bo',markersize=s)
+                else:
+                    ax3.plot(self.robots_htraj[r][bz][0,:],self.robots_dqtraj[r][bz][0,:],robot_ls[r],linewidth=lw)
+                    ax3.plot(self.robots_htraj[r][bz][0,0],self.robots_dqtraj[r][bz][0,0],'ko',markersize=s)
+            ax3.plot(self.robots_htraj[r][-1][0,-1],self.robots_dqtraj[r][-1][0,-1],'ko',markersize=s)
+        # ax4.set_title("dx-t plane")
+        ax3.grid(True)
+        ax3.set_xlabel(r"Time [s]")
+        ax3.set_ylabel(r"x velocity [m/s]")
 
-        if True:
-            for r in range(self.nrobots):
-                for bz in range(self.robots_nbzs[r]):
-                    ax4.plot(self.robots_htraj[r][bz][0,:],self.robots_dqtraj[r][bz][1,:],robot_ls[r],linewidth=lw)
-                    ax4.plot(self.robots_htraj[r][bz][0,0],self.robots_dqtraj[r][bz][1,0],'ko',markersize=s)
-                ax4.plot(self.robots_htraj[r][-1][0,-1],self.robots_dqtraj[r][-1][1,-1],'ko',markersize=s)
-            for o in range(self.nobjects):
-                for bz in range(self.objects_nbzs[o]):
+        # Y velocity vs time
+        for o in range(self.nobjects):
+            for bz in range(self.objects_nbzs[o]):
+                #Turn of plotting of object if there is an interaction
+                if self.objects[o].ids[bz] != 'inter':
                     ax4.plot(self.objects_htraj[o][bz][0,:],self.objects_dqtraj[o][bz][1,:],object_ls[o],linewidth=lw)
                     ax4.plot(self.objects_htraj[o][bz][0,0],self.objects_dqtraj[o][bz][1,0],'ro',markersize=s)
-                ax4.plot(self.objects_htraj[o][-1][0,-1],self.objects_dqtraj[o][-1][1,-1],'ro',markersize=s)
-            # ax4.set_title("dx-t plane")
-            ax4.grid(True)
-            ax4.set_xlabel(r"Time [s]")
-            ax4.set_ylabel(r"y velocity [m/s]")
+            ax4.plot(self.objects_htraj[o][-1][0,-1],self.objects_dqtraj[o][-1][1,-1],'ro',markersize=s)
 
-        # if True:
-        #     for r in range(self.nrobots):
-        #         for bz in range(self.robots_nbzs[r]):
-        #             ax5.plot(self.robots_htraj[r][bz][0,:],self.robots_dqtraj[r][bz][1,:],robot_ls[r],linewidth=lw)
-        #             ax5.plot(self.robots_htraj[r][bz][0,0],self.robots_dqtraj[r][bz][1,0],'ko',markersize=s)
-        #         ax5.plot(self.robots_htraj[r][-1][0,-1],self.robots_dqtraj[r][-1][1,-1],'ko',markersize=s)
-        #     for o in range(self.nobjects):
-        #         for bz in range(self.objects_nbzs[o]):
-        #             ax5.plot(self.objects_htraj[o][bz][0,:],self.objects_dqtraj[o][bz][1,:],object_ls[o],linewidth=lw)
-        #             ax5.plot(self.objects_htraj[o][bz][0,0],self.objects_dqtraj[o][bz][1,0],'ro',markersize=s)
-        #         ax5.plot(self.objects_htraj[o][-1][0,-1],self.objects_dqtraj[o][-1][1,-1],'ro',markersize=s)
-        #     # ax5.set_title("dy-t plane")
-        #     ax5.grid(True)
-        #     ax5.set_xlabel(r"Time [s]")
-        #     ax5.set_ylabel(r"x velocity [m/s]")
-        
+        for r in range(self.nrobots):
+            for bz in range(self.robots_nbzs[r]):
+                #If there is an interaction, plot the robot trajectory in blue
+                if self.robots[r].ids[bz] == 'inter':
+                    ax4.plot(self.robots_htraj[r][bz][0,:],self.robots_dqtraj[r][bz][1,:],'b',linewidth=lw)
+                    ax4.plot(self.robots_htraj[r][bz][0,0],self.robots_dqtraj[r][bz][1,0],'bo',markersize=s)
+                else:
+                    ax4.plot(self.robots_htraj[r][bz][0,:],self.robots_dqtraj[r][bz][1,:],robot_ls[r],linewidth=lw)
+                    ax4.plot(self.robots_htraj[r][bz][0,0],self.robots_dqtraj[r][bz][1,0],'ko',markersize=s)
+            ax4.plot(self.robots_htraj[r][-1][0,-1],self.robots_dqtraj[r][-1][1,-1],'ko',markersize=s)
+        # ax4.set_title("dx-t plane")
+        ax4.grid(True)
+        ax4.set_xlabel(r"Time [s]")
+        ax4.set_ylabel(r"y velocity [m/s]")
+
+
+
         fig.tight_layout()
-        
         plt.savefig("/home/arian/repos/thesis/impact_stl/planner/figures/plot.svg")
         plt.savefig("/home/arian/repos/thesis/impact_stl/planner/figures/plot.png")
-
         
+        # Plotting the entire trajectory in x-y plane in its own figure
+        fig_xy = plt.figure(figsize=(10, 10))
+        axs = fig_xy.add_subplot(1, 1, 1)
+        self.world.plot(axs)
+        for r in range(self.nrobots):
+            for bz in range(self.robots_nbzs[r]):
+                axs.plot(self.robots_rtraj[r][bz][0, :], self.robots_rtraj[r][bz][1, :], robot_ls[r], linewidth=lw)
+                axs.plot(self.robots_rtraj[r][bz][0, 0], self.robots_rtraj[r][bz][1, 0], 'ko', markersize=s)
+                axs.plot(self.robots_rtraj[r][-1][0, -1], self.robots_rtraj[r][-1][1, -1], 'ko', markersize=s)
+        for o in range(self.nobjects):
+            for bz in range(self.objects_nbzs[o]):
+                axs.plot(self.objects_rtraj[o][bz][0, :], self.objects_rtraj[o][bz][1, :], object_ls[o], linewidth=lw)
+                axs.plot(self.objects_rtraj[o][bz][0, 0], self.objects_rtraj[o][bz][1, 0], 'ro', markersize=s)
+                axs.plot(self.objects_rtraj[o][-1][0, -1], self.objects_rtraj[o][-1][1, -1], 'ro', markersize=s)
+        axs.set_title("x-y plane")
+        axs.set_xlabel("x [m]")
+        axs.set_ylabel("y [m]")
+        axs.grid(True)
+        axs.set_aspect('equal', 'box')
+        fig_xy.tight_layout()
+        plt.savefig("/home/arian/repos/thesis/impact_stl/planner/figures/xy_plane.svg")
+        plt.savefig("/home/arian/repos/thesis/impact_stl/planner/figures/xy_plane.png")
+    
     def animate(self):
         Neval = 250
         self.t_range = np.linspace(self.world.spec.t0,self.world.spec.tf,Neval)
@@ -1249,7 +1249,9 @@ class SR_Impact_STL:
             bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', boxstyle='round,pad=0.2'))
             # plot trajectory 
             for bz in range(self.robots_nbzs[r]):
-                self.ax_anim.plot(self.robots_rtraj[r][bz][0,:],self.robots_rtraj[r][bz][1,:],'k')
+                #Only plot the traj if
+                if self.robots[r].ids[bz] == 'inter':
+                    self.ax_anim.plot(self.robots_rtraj[r][bz][0,:],self.robots_rtraj[r][bz][1,:],'b', linewidth=2)
         for o in range(self.nobjects):
             # plot circle
             c = (value_bezier(self.objects_rtraj[o][idxs_objects[o]],s_objects[o])[0],
@@ -1259,7 +1261,8 @@ class SR_Impact_STL:
             self.ax_anim.add_patch(circle)
             # plot trajectory
             for bz in range(self.objects_nbzs[o]):
-                self.ax_anim.plot(self.objects_rtraj[o][bz][0,:],self.objects_rtraj[o][bz][1,:],'r')
+                if self.objects[o].ids[bz] != 'inter':
+                    self.ax_anim.plot(self.objects_rtraj[o][bz][0,:],self.objects_rtraj[o][bz][1,:],'r',linewidth=2)
         self.ax_anim.set_title("x-y plane")
         self.ax_anim.set_xlabel("x [m]")
         self.ax_anim.set_ylabel("y [m]")
