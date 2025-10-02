@@ -48,7 +48,7 @@ ALLOW_CONS_XY = False #This causes some slowdown compared to just ALLOW_CONSECUT
 ROBOT_ROBOT_COL_AVOIDANCE = False
 
 #Save CSVs of solutions
-SAVE_SOLUTIONS = False
+SAVE_SOLUTIONS = True
 
 class SR_Impact_STL:
     def __init__(self,world: World):
@@ -1265,7 +1265,7 @@ class SR_Impact_STL:
             # plot circle
             c = (value_bezier(self.objects_rtraj[o][idxs_objects[o]],s_objects[o])[0],
                 value_bezier(self.objects_rtraj[o][idxs_objects[o]],s_objects[o])[1])
-            rad = 0.2
+            rad = 0.3
             circle = plt.Circle(c,rad,fill=False,color='r')
             self.ax_anim.add_patch(circle)
             # plot trajectory
