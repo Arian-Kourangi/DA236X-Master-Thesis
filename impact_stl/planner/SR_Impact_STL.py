@@ -44,8 +44,10 @@ ALLOW_CONSECUTIVE = False
 #Allow consecutive interactions but in diff dimensions
 ALLOW_CONS_XY = False #This causes some slowdown compared to just ALLOW_CONSECUTIVE = False
 
-#Test collision avoidance between robots
-ROBOT_ROBOT_COL_AVOIDANCE = False
+# This has to be set to true in order for robots not to collide during the transport.
+# Ensures col avoidance between robots and other robots and between objects and other objects
+# Collision avoidance between robots and objects when not interactions has to be done in the online planner or MPC
+ROBOT_ROBOT_COL_AVOIDANCE = True
 
 #Save CSVs of solutions
 SAVE_SOLUTIONS = True
@@ -128,7 +130,7 @@ class SR_Impact_STL:
         self._stl_constraints()
         if ROBOT_ROBOT_COL_AVOIDANCE:
             self._robot_robot_collision_constraints()
-        #self._object_object_collision_constraints()
+            self._object_object_collision_constraints()
         self._set_cost()
 
     
