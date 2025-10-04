@@ -22,6 +22,18 @@ from impact_stl.helpers.read_write_plan import csv_to_plan
 from impact_stl.helpers.solve_a_b_plan import solve_a_b_plan
 
 def plan_to_plan_msg(rvars,hvars,idvars,other_names):
+
+    """
+    Converts a list of rvars and hvars (numpy arrays) to a BezierPlan message.
+    Args:
+        rvars: list of numpy arrays of shape (3, n) where n is the number of control points
+        hvars: list of numpy arrays of shape (1, n) where n is the
+        idvars: list of strings
+        other_names: list of strings
+    returns: 
+        BezierPlan message
+
+    """
     nbzs = len(rvars)
     rvars = [rvar.astype(np.float64) for rvar in rvars]
     hvars = [hvar.astype(np.float64) for hvar in hvars]
@@ -62,6 +74,14 @@ class MinimalClientAsync(Node):
         self.req = SetVerbosePlan.Request()
     
     def send_request(self, rvars, hvars, idvars, other_names):
+        """
+        Sends a request to the service to set the plan.
+        rvars: list of numpy arrays of shape (3, n) where n is the number of control points
+        hvars: list of numpy arrays of shape (1, n) where n is the number of control points
+        idvars: list of strings
+        other_names: list of strings
+        returns: response from the service
+        """
         assert(len(rvars) == len(hvars))
         plan = plan_to_plan_msg(rvars,hvars,idvars,other_names)
 
@@ -133,6 +153,8 @@ class MainPlanner(Node):
         package_share_directory = get_package_share_directory('impact_stl')
         plans_path = os.path.join(package_share_directory)
 
+        # list of np.arrays, or strings one for each bezier curve. Each curve is of shape (d, n) where n is the number of control points
+        # d=3 for rvars, d=1 for hvars
         self.rvars,self.hvars,self.idvars,self.other_names = csv_to_plan(robot_name=self.robot_name,
                                                                          scenario_name=self.scenario_name,
                                                                          path=plans_path)                      

@@ -241,10 +241,20 @@ class SpacecraftImpactMPC(Node):
         self.publisher_rates_setpoint.publish(rates_setpoint_msg)
 
     def get_pre_idx_and_tI(self,t):
+        """
+        Get the index of the pre-impact bezier segment and the impact time tI.
+        Args:
+            t: current time
+        Returns:
+            pre_idx: index of the next pre-impact bezier segment
+            tI: impact time
+        """
         # if plan0 is pre, and plan1 is post, that means an impact has occurred
         # in the horizon, and we need to use an impact-mpc
         try:
+            # Get all indices where the id is 'pre'
             pre_indices = [i for i, x in enumerate(self.plan['ids']) if x == 'pre']
+            # Get the end times of all pre-impact beziers
             pre_tIs = [self.plan['hvar'][i][0,-1] for i in pre_indices]
             # impacts may only occur in the future, so we find the first for which tI > t
             pre_idx = next((i for i, tI in enumerate(pre_tIs) if tI > t), len(pre_tIs)-1)
@@ -259,6 +269,7 @@ class SpacecraftImpactMPC(Node):
 
 
     def get_setpoints(self):
+        #current time in seconds, compared to start_time
         t = (Clock().now().nanoseconds / 1000 - self.start_time) / 1e6
         setpoints = []
         times = []
@@ -282,15 +293,26 @@ class SpacecraftImpactMPC(Node):
         # we started the simulation
         else:
             # self.get_logger().info(f"planner time: {t}")
+
+            # Find the current values for the bezier segment we are at
+            # plan0 is the current bezier segment, planf is the last bezier segment 
             plan0 = interpolate_bezier(self.plan,t)
             tf = t+self.mpc.Tf
             planf = interpolate_bezier(self.plan,tf)
 
             # print(f"id: {plan0['id']}")
+
+            #Find the segment id
             self.idx, _ = eval_t(self.plan['hvar'], t)
+            
+            # Get the index of the next pre-impact bezier segment and the impact time tI. 
             self.pre_idx, tI, pre_tIs = self.get_pre_idx_and_tI(t)
+
             # self.get_logger().info(f"pre_idx: {self.pre_idx}, tI: {tI}, pre_tIs: {pre_tIs}")
+            # check if t is near a tI (0.5 second before or after)
             t_near_a_tI = any([np.abs(pre_tI - t) < 5e-1 for pre_tI in pre_tIs])
+
+            # NOTE: Here I should look at the logic of the pre times, i don't think i am enforcing times to equal and the end of the pre curves, so be mindful
 
             # 1. find the index of the pre-impact bezier of the object
             for idx_I in range(len(self.plan_object['ids'])):
@@ -307,6 +329,8 @@ class SpacecraftImpactMPC(Node):
             # self.get_logger().info(f"plan_object['ids'][idx_I]: {self.plan_object['ids'][idx_I]}")
             # 2a. check if all 'ids' from idx_Now to idx_I are 'post' or 'none', if that's so, we could replan
             # self.get_logger().info(f"idx_Now: {idx_Now}, idx_I: {idx_I}, self.idx: {self.idx}")
+
+
             going_straight = True
             for idx in range(idx_Now,idx_I):
                 # self.get_logger().info(f"plan_object['ids'][{idx}]: {self.plan_object['ids'][idx]}")
@@ -321,7 +345,9 @@ class SpacecraftImpactMPC(Node):
                     and self.t_object_coming == np.inf and not self.replanned:
                 self.t_object_coming = t
                 self.get_logger().info(f"that means we can replan, but we need to wait a bit")
-
+            
+            # NOTE: HERE IS THE CONDITION TO REPLAN
+            
             # 4. if the current bezier is a pre-impact bezier, we havent replanned yet, the object's 
             #    pre-impact bezier is the same as the current one, and the object is coming, we replan
             #    also do not replan 1 second before or one second after the desired impact time
@@ -330,6 +356,7 @@ class SpacecraftImpactMPC(Node):
             # self.get_logger().info(f"plan0['id']==pre: {plan0['id']=='pre'}, not replanned: {not self.replanned}, going_straight: {going_straight}, not t_near_a_tI: {not t_near_a_tI}, waited: {t - self.t_object_coming > self.object_coming_wait}")
             if plan0['id'] == 'pre' and not self.replanned and going_straight and \
                     t - self.t_object_coming > self.object_coming_wait and not t_near_a_tI:
+                
                 self.get_logger().info('Calling Replanning Service in ff_rate_mpc_impact')
                 msg = StampedBool()
                 msg.timestamp = int(Clock().now().nanoseconds / 1000)

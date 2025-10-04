@@ -41,6 +41,16 @@ def value_bezier(cps, t):
         return vals
 
 def eval_t(hvars, t):
+    """
+    Evaluates the bezier curves in hvars at time t to find the segment index and a local parameter s that maps 
+    the time t to the bezier segment.
+    Args:
+        hvars: list of numpy arrays, each of shape (1, n) where n is the number of control points
+        t: time to evaluate at
+    Returns:
+        idx: index of the bezier segment
+
+    """
     t_array = np.array([hvar[0,0] for hvar in hvars])
     idx = np.where(t_array <= t)[0][-1]
 
