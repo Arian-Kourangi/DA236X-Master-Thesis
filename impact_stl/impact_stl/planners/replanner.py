@@ -191,6 +191,7 @@ class RePlanner(Node):
         self.get_logger().info("Local plan recomputed")
 
         if msg.data:
+            #Sending the new plan to the ff_rate_mpc_impact node
             self.get_logger().info('Sending plan')
             self.minimal_client.send_request(self.re_rvars, self.re_hvars, self.re_idvars, self.re_other_names)
             self.get_logger().info('Plan received')
@@ -239,6 +240,10 @@ class RePlanner(Node):
                 break
         # then obtain the desired state of the object after free-floating
         # which is either the next pre-impact state or the last state
+        
+        #NOTE: Here Joris uses the the next pre_impact state as the desired state, instead of using the end of the post-impact state. this makes it so  
+        # he can correct the current trajectory to hit the future desired state better. I might change this, since he only cares about getting to the enxt impact site
+
         if max(pre_idxs_obj) > pre_idx_obj:
             post_idx_obj = [idx for idx in pre_idxs_obj if idx > pre_idx_obj][0]
         else:
@@ -477,16 +482,19 @@ class RePlanner(Node):
         rvars = [cp.Variable((2, n_cp)) for _ in range(2)]
         hvars = [cp.Variable((1, n_cp)) for _ in range(2)]
         
-        # Find index of pre-impact segment
+        # Find first index where idvar is 'pre' and tI > time of request
         pre_idxs = [i for i, x in enumerate(self.idvars) if x == 'pre']
         pre_tIs = [self.hvars[idx][0, -1] for idx in pre_idxs]
         pre_idx = next((pre_idxs[i] for i, tI in enumerate(pre_tIs) if tI > self.planner_time), len(pre_tIs)-1)
 
+        #Beginning of pre curve, end of pre curve is the collision (or interaction), end of next curve is the end of the interation
         t0 = self.hvars[pre_idx][0,0]
         tI = self.hvars[pre_idx][0,-1]
         tf = self.hvars[pre_idx+1][0,-1]
 
+        # The objects preicted stated at impact time tI based on current state and the desired post-impact state (from the plan)
         xObjectI, dxObjectI, dxObjectI_post = self.compute_object_pre_post_state(pre_idx, tI)
+        
         dxI_init = np.array([self.drvars[pre_idx][0,-1]/self.dhvars[pre_idx][0,-1],
                             self.drvars[pre_idx][1,-1]/self.dhvars[pre_idx][0,-1]])
         theta_init = np.arctan2(dxI_init[1], dxI_init[0]) + np.pi

@@ -30,6 +30,18 @@ def solve_two_body_impact(xObjectI,dxObjectI,dxObjectI_post,
                           dx_init_guess=None,
                           theta_init_guess=None,
                           logger=None):
+    """
+    Solves a two-body impact problem using CasADi.
+    The robot is modeled as a circle with radius r_R and mass m_R.
+    The object is modeled as a circle with radius r_O and mass m_O.
+    The object is initially at position xObjectI with velocity dxObjectI.
+    The desired post-impact velocity of the object is dxObjectI_post.
+    The robot's position at impact is determined by the angle thetavar.
+    The robot's pre-impact velocity is a variable to be optimized.
+    The post-impact velocities of both the robot and the object are variables to be optimized.
+    The coefficient of restitution is e.
+    
+    """
     t0 = time.time()
     logger.info("\n\nStarting two-body-impact construction") if logger is not None else None
     # here a slightly smaller radius works better so that the impact is guaranteed
