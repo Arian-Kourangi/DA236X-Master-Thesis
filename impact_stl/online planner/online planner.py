@@ -14,7 +14,7 @@ from matplotlib.patches import Rectangle
 
 import numpy as np
 from scipy import optimize
-
+import time
 # Set up plot style
 plt.style.use(['science'])
 rc('text', usetex=True)
@@ -25,6 +25,9 @@ plt.rcParams['legend.facecolor'] = 'white'        # Set background color
 plt.rcParams['legend.edgecolor'] = 'white'        # Set border color
 plt.rcParams['legend.framealpha'] = 1.0
 plt.rcParams['legend.loc'] = 'best'
+
+# if true the constraints on velocity during the interaction are linear (on dr, dh is kept constant) otherwise they are on dq (nonlinear)
+KEEP_VEL_CONSTRAINTS_LINEAR = True 
 
 class TestOnlinePlanner():
     def __init__(self):
@@ -115,8 +118,11 @@ class TestOnlinePlanner():
         #Contuinuity constraints
         opti.subject_to(rvars[0][:,-1] == rvars[-1][:,0])
         opti.subject_to(hvars[0][:,-1] == hvars[-1][:,0])
+        opti.subject_to(drvars[0][:,-1] == drvars[-1][:,0])
+        opti.subject_to(dhvars[0][:,-1] == dhvars[-1][:,0])
 
-        #Initial conditions on robot ( i don't have updated robot state, lets just assume it follows the preplanned one)
+
+        #Initial conditions on robot (i don't have updated robot state, lets just assume it follows the preplanned one)
         #Get all pre idx
         pre_idxs = np.where(np.array(self.robot_idvars) == 'pre')[0]
         # Get the time of impact for all pre idxs, the impact time is the final time of the curve
@@ -124,7 +130,7 @@ class TestOnlinePlanner():
         #Get the last pre idx before t_meas (or when the all is made whatever)
         pre_idx = next((pre_idxs[i] for i, tI in enumerate(pre_tIs) if tI > t_meas), len(pre_tIs)-1)
 
-        #Beginning of pre curve ( not sure if this should be current time or planned beginning??)
+        #Beginning of pre curve ( not sure if this should be current time or planned beginning of pre curve??)
         
         t0 = self.robot_hvars[pre_idx][0,0]
         # Planned time of impact
@@ -149,12 +155,6 @@ class TestOnlinePlanner():
         #Initial velocity
         opti.subject_to(drvars[0][:,0] == dr_start)
         opti.subject_to(dhvars[0][0,0] == dh_start)
-        #Final position
-        opti.subject_to(rvars[-1][:,-1] == x_end)
-        opti.subject_to(hvars[-1][0,-1] == tf)
-        #Final velocity
-        opti.subject_to(drvars[-1][:,-1] == dr_end)
-        opti.subject_to(dhvars[-1][0,-1] == dh_end)
         #Time of interaction within bounds
         opti.subject_to(t_I >= t_meas)
         opti.subject_to(t_I <= tf)
@@ -163,29 +163,93 @@ class TestOnlinePlanner():
         opti.subject_to(hvars[0][0,-1] == t_I)
         opti.subject_to(hvars[1][0,0] == t_I)
 
-        delta_V = dr_end/dh_end - vel_meas # Same as the desired object velocity at the end of the interaction
+        # Desired velocity after interaction - current measured velocity = desired change in velocity
+        delta_V = dr_end/dh_end - vel_meas # Same as the desired object velocity at the end of the interaction - current object velocity
         travel_dir = np.arctan2(delta_V[1],delta_V[0])
         #print("Desired travel direction after interaction is ", travel_dir*180/np.pi, " degrees")
+        unit_push_dir = np.array([np.cos(travel_dir), np.sin(travel_dir)])
 
-        unit_push_dir = [np.cos(travel_dir), np.sin(travel_dir)]
-        #print("Unit push direction is ", unit_push_dir)
+        ###### Pre curve constraints
+
+        # reach the predicted position at the end of pre curve and offset by the radii
+        opti.subject_to(rvars[0][:,-1]== predicted_pos(t_I)-(self.rob_rad+self.obj_rad)*unit_push_dir) 
+        
+        # match its velocity
+        opti.subject_to(drvars[0][:,-1] == vel_meas*dhvars[0][0,-1])
+
+
+        ###### Interaction curve constraints
+        #Final position ( again offset by the radii so the the objects is the one that needs to be at the target position not the robot)
+        opti.subject_to(rvars[-1][:,-1] == x_end - (self.rob_rad+self.obj_rad)*unit_push_dir)
+        opti.subject_to(hvars[-1][0,-1] == tf)
+        #Final velocity
+        opti.subject_to(drvars[-1][:,-1] == dr_end)
+        opti.subject_to(dhvars[-1][0,-1] == dh_end)
 
         y_pos = False # if false the direction of force in y demension is negative
         x_pos = False # if false the direction of force in x demension is negative
+
+        # Push constraints - only push in the direction of desired velocity during the interaction
         if 0<= travel_dir <= np.pi:
             y_pos = True
-        if -np.pi/2 < travel_dir < np.pi/2:
+        if -np.pi/2 <= travel_dir <= np.pi/2:
             x_pos = True
-        print("x_pos = ", x_pos, " y_pos = ", y_pos)
+        #print("x_pos = ", x_pos, " y_pos = ", y_pos)
+
+        # iterate over derivative control points (there are n_cp-1 derivative control points)
+        # when comparing consecutive derivative control points we should stop one earlier
+        # to avoid indexing past the last column
+        for cp in range(drvars[1].shape[1]-1):
+            if KEEP_VEL_CONSTRAINTS_LINEAR:
+                if x_pos:
+                    opti.subject_to(drvars[1][0,cp+1] - drvars[1][0,cp] >= 0) # increasing positive x velocity or decreasing negative x velocity
+                else:
+                    opti.subject_to(drvars[1][0,cp+1] - drvars[1][0,cp] <= 0) # decreasing positive x velocity or increasing negative x velocity
+                if y_pos:
+                    opti.subject_to(drvars[1][1,cp+1] - drvars[1][1,cp] >= 0) # increasing positive y velocity or decreasing negative y velocity
+                else:
+                    opti.subject_to(drvars[1][1,cp+1] - drvars[1][1,cp] <= 0) # decreasing positive y velocity or increasing negative y velocity
+
+                opti.subject_to(dhvars[1][0,cp+1] == dhvars[1][0,cp]) # Constant time derivative for now
+
+            else:
+                if x_pos:
+                    opti.subject_to(drvars[1][0,cp+1]/dhvars[1][0,cp+1]  - drvars[1][0,cp]/dhvars[1][0,cp]  >= 0) # increasing positive x velocity or decreasing negative x velocity
+                else:
+                    opti.subject_to(drvars[1][0,cp+1]/dhvars[1][0,cp+1]  - drvars[1][0,cp]/dhvars[1][0,cp]  <= 0) # decreasing positive x velocity or increasing negative x velocity
+                if y_pos:
+                    opti.subject_to(drvars[1][1,cp+1]/dhvars[1][0,cp+1]  - drvars[1][1,cp]/dhvars[1][0,cp]  >= 0) # increasing positive y velocity or decreasing negative y velocity
+                else:
+                    opti.subject_to(drvars[1][1,cp+1]/dhvars[1][0,cp+1]  - drvars[1][1,cp]/dhvars[1][0,cp]  <= 0) # decreasing positive y velocity or increasing negative y velocity
 
 
-
-
-
-
-
-
-
+        # keep the robot in the world bounds
+        for idx in range(len(rvars)):
+            for i in range(rvars[idx].shape[1]):
+                opti.subject_to(rvars[idx][0,i] >= self.world_lb[0])
+                opti.subject_to(rvars[idx][0,i] <= self.world_ub[0])
+                opti.subject_to(rvars[idx][1,i] >= self.world_lb[1])
+                opti.subject_to(rvars[idx][1,i] <= self.world_ub[1])
+        # Minimize the acceleration
+        J = 0
+        for idx in range(len(rvars)):
+            for i in range(ddrvars[idx].shape[1]):
+                J += ca.sumsqr(ddrvars[idx][:,i])
+            for i in range(ddhvars[idx].shape[1]):
+                J += ca.sumsqr(ddhvars[idx][0,i])
+        opti.minimize(J)
+        # Set initial guesses
+                # set solver method
+        opts = {'ipopt.print_level': 0,
+                'ipopt.tol': 1e-2,
+                'ipopt.max_iter': 100,
+                'print_time': 0, 'ipopt.sb': 'no'}
+        
+        opti.solver('ipopt',opts)
+        time_start = time.time()
+        sol = opti.solve()
+        time_end = time.time()
+        print("Solved in ", time_end - time_start, " seconds")
 
 
 
