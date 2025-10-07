@@ -374,7 +374,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
 
 
     elif specification == "minimal_test_throw_and_catch":
-        tf = 30
+        tf = 40
 
         world.spec = Spec(t0=0,tf=tf)
         bz = 6
@@ -386,18 +386,18 @@ def spatial_specifications(world: Object ,specification: str) -> None:
                        dxf=np.array([0,0]),nbz=bz, dq_lb=np.array([-2,-2]),dq_ub=np.array([2,2]))
         
         robot2 = Robot(name="crackle",
-                       x0=np.array([5,10]),
+                       x0=np.array([5,20]),
                        dx0=np.array([0,0]),
-                       xf=np.array([5,10]),
+                       xf=np.array([5,20]),
                        dxf=np.array([0,0]),nbz=bz, dq_lb=np.array([-2,-2]),dq_ub=np.array([2,2]))
         
         object1 = Object(name="pop",
                          x0=np.array([5,2]),
                          dx0=np.array([0,0]),
-                         xf=np.array([5,8]),
+                         xf=np.array([5,18]),
                          dxf=np.array([0,0]),nbz=bz, dq_lb=np.array([-2,-2]),dq_ub=np.array([2,2]))
         
-        area1 = Area(x_min=np.array([4.5,7.5]),x_max=np.array([5.5,8.5]))
+        area1 = Area(x_min=np.array([4.5,17.5]),x_max=np.array([5.5,18.5]))
 
         world.dim = 2
         world.robots = [robot1,robot2]
@@ -405,7 +405,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
 
         # World bounding box
         world.x_lb = np.array([0,0])
-        world.x_ub = np.array([10,10])
+        world.x_ub = np.array([10,20])
 
         # Obstacles
         world.obstacles= []
