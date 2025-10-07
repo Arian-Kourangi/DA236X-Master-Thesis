@@ -180,11 +180,15 @@ class TestOnlinePlanner():
 
         ###### Interaction curve constraints
         #Final position ( again offset by the radii so the the objects is the one that needs to be at the target position not the robot)
-        opti.subject_to(rvars[-1][:,-1] == x_end - (self.rob_rad+self.obj_rad)*unit_push_dir)
-        opti.subject_to(hvars[-1][0,-1] == tf)
-        #Final velocity
-        opti.subject_to(drvars[-1][:,-1] == dr_end)
-        opti.subject_to(dhvars[-1][0,-1] == dh_end)
+        # Instead of enforcing exact equalities that may over-constrain the NLP,
+        # create soft targets and penalize deviations in the objective.
+        # Convert numpy targets to CasADi DM for safe mixing with CasADi variables.
+        target_r_end = ca.DM(x_end - (self.rob_rad + self.obj_rad) * unit_push_dir)
+        target_h_tf = float(tf)
+        target_dr_end = ca.DM(dr_end)
+        target_dh_end = float(dh_end)
+        # Note: penalties are added to the objective J later. Keep these as soft targets
+        # so the solver can trade off exact satisfaction vs feasibility.
 
         y_pos = False # if false the direction of force in y demension is negative
         x_pos = False # if false the direction of force in x demension is negative
@@ -237,11 +241,40 @@ class TestOnlinePlanner():
                 J += ca.sumsqr(ddrvars[idx][:,i])
             for i in range(ddhvars[idx].shape[1]):
                 J += ca.sumsqr(ddhvars[idx][0,i])
+        # --- Soft penalties for final targets (relax exact equalities) ---
+        # Weights (tune as needed)
+        w_r = 1e3
+        w_dr = 1e3
+        w_h = 1e3
+        w_dh = 1e2
+
+        try:
+            # target_* were prepared earlier (CasADi DM or floats)
+            J += w_r * ca.sumsqr(rvars[-1][:,-1] - target_r_end)
+            J += w_dr * ca.sumsqr(drvars[-1][:,-1] - target_dr_end)
+            J += w_h * (hvars[-1][0,-1] - target_h_tf)**2
+            J += w_dh * (dhvars[-1][0,-1] - target_dh_end)**2
+        except NameError:
+            # If targets are not defined (shouldn't happen), skip adding penalties
+            pass
+
         opti.minimize(J)
         # Set initial guesses
-                # set solver method
+        for idx in range(len(rvars)):
+            for k in range(rvars[idx].shape[0]):
+                for i in range(rvars[idx].shape[1]):
+                    opti.set_initial(rvars[idx][k,i], self.robot_rvars[pre_idx+idx][k,i])
+                    opti.set_initial(hvars[idx][0,i], self.robot_hvars[pre_idx+idx][0,i]))
+            #for k in range(drvars[idx].shape[0]):
+            #    for i in range(drvars[idx].shape[1]):
+            #        opti.set_initial(drvars[idx][k,i], self.robot_drvars[pre_idx+idx][k,i])
+            #        opti.set_initial(dhvars[idx][0,i], self.robot_dhvars[pre_idx+idx][0,i])
+
+        #opti.set_initial(t_I, (t0 + tf)/2)
+
+
         opts = {'ipopt.print_level': 0,
-                'ipopt.tol': 1e-2,
+                'ipopt.tol': 1e-3,
                 'ipopt.max_iter': 100,
                 'print_time': 0, 'ipopt.sb': 'no'}
         
@@ -250,8 +283,14 @@ class TestOnlinePlanner():
         sol = opti.solve()
         time_end = time.time()
         print("Solved in ", time_end - time_start, " seconds")
-
-
+        print("Optimal cost J = ", opti.value(J))
+        print("Optimal time of interaction t_I = ", opti.value(t_I))
+        #Extract the solution
+        self.sol_robot_rvars = [sol.value(rvars[k]) for k in range(len(rvars))]
+        self.sol_robot_hvars = [sol.value(hvars[k]) for k in range(len(hvars))]
+        # Compare the replanned end velocity and postion with the desired ones
+        print('Replanned end position = ', sol.value(rvars[-1][:,-1]), ' target position = ', x_end - (self.rob_rad + self.obj_rad) * unit_push_dir)
+        print('Replanned end velocity = ', sol.value(drvars[-1][:,-1]/dhvars[-1][0,-1]), ' target velocity = ', dr_end/dh_end)
 
     def compute_trajectories(self):
         N_eval = 100
