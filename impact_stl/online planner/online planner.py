@@ -1,5 +1,5 @@
 import casadi as ca
-from utilities.beziers import get_derivative_control_points_gurobi, eval_bezier, value_bezier
+from utilities.beziers import get_derivative_control_points_gurobi, eval_bezier, value_bezier, eval_t
 from utilities.read_write_plan import csv_to_plan, plan_to_csv
 # plotting imports
 import scienceplots
@@ -30,7 +30,7 @@ class TestOnlinePlanner():
     def __init__(self):
         #Size of world
         self.world_lb = np.array([0,0])
-        self.world_ub = np.array([10,10])        
+        self.world_ub = np.array([10,20])        
         self.robot_rvars,self.robot_hvars,self.robot_idvars,self.robot_other_names = csv_to_plan(robot_name='snap',
                                                                          scenario_name='minimal_test_throw_and_catch',
                                                                          path='/home/arian/repos/thesis/impact_stl/planner/plans')  
@@ -39,8 +39,16 @@ class TestOnlinePlanner():
                                                                          scenario_name='minimal_test_throw_and_catch',
                                                                          path='/home/arian/repos/thesis/impact_stl/planner/plans')
         #Size = [nbzs][dim,ncp]
+
+        #now we change the firs bezier of the object so it has an x velocity
+        self.obj_rvars[0][0,0] = 0
+        self.obj_rvars[0][0,1] = 2.5
+        self.obj_rvars[1][0,0] = 2.5
+        self.obj_rvars[1][0,1] = 5
+        
         self.nbzs = len(self.robot_rvars)
         self.dim = 2
+        self.ncp = self.robot_rvars[0].shape[1]
         self.world_tf = self.robot_hvars[-1][0,-1]
         #Remkaing to 2d for plotting
         self.obj_rvars = [self.obj_rvars[k][:2,:] for k in range(self.nbzs)]
@@ -50,10 +58,136 @@ class TestOnlinePlanner():
         self.obj_drvars = [get_derivative_control_points_gurobi(self.obj_rvars[k], 1) for k in range(self.nbzs)]
         self.robot_dhvars = [get_derivative_control_points_gurobi(self.robot_hvars[k], 1) for k in range(self.nbzs)]
         self.obj_dhvars = [get_derivative_control_points_gurobi(self.obj_hvars[k], 1) for k in range(self.nbzs)]
-        
+        self.obj_rad = 0.3
+        self.rob_rad = 0.2
         #self.plot()
-        self.compute_trajectories()
-        self.animate()
+        #self.compute_trajectories()
+        #self.animate()
+        self.replan()
+
+
+
+    def replan(self):
+        opti = ca.Opti()
+        # lets pretend at the beginning of the pre curve we observe the new state of the object
+        t_meas = 7.640449438202293
+        #vel_meas = (self.obj_rvars[1][:,1] - self.obj_rvars[1][:,0]) / (self.obj_hvars[1][0,1] - self.obj_hvars[1][0,0])
+        id, s = eval_t(self.obj_hvars, t_meas)
+        print("At time t = ", t_meas, " we are in segment ", id, " with local parameter s = ", s)
+        pos_meas = value_bezier(self.obj_rvars[id], s)
+        print("At time t = ", t_meas, " the object is at position ", pos_meas)
+        vel_meas = value_bezier(self.obj_drvars[id], s) / value_bezier(self.obj_dhvars[id], s)
+        print("At time t = ", t_meas, " the object has velocity ", vel_meas) 
+        
+        #Testing for sanity
+        #vel_meas2 = (self.obj_rvars[1][:,1] - self.obj_rvars[1][:,0]) / (self.obj_hvars[1][0,1] - self.obj_hvars[1][0,0])
+        #print("vel_meas2 = ", vel_meas2)
+        #pos_meas2 = self.obj_rvars[1][:,0] + vel_meas2 * (t_meas - self.obj_hvars[1][0,0])
+        #print("pos_meas2 = ", pos_meas2)
+        
+        predicted_pos = lambda t: pos_meas + vel_meas * (t - t_meas)
+        
+        #print("Predicted position at t = ", self.world_tf, " is ", predicted_pos(self.world_tf))
+        n_cp = 6
+
+        # New bezier variables for the robot, pre and inter curves
+        rvars = [opti.variable(2,n_cp) for _ in range(2)] 
+        hvars = [opti.variable(1,n_cp) for _ in range(2)]
+        t_I = opti.variable() #time of interaction
+
+        idvars = ['pre','inter']
+        other_names = ['pop','pop']
+
+        # dr and ddr
+        drvars, ddrvars = [], []
+        dhvars, ddhvars = [], []
+        for idx in range(len(rvars)):
+            drvars.append(get_derivative_control_points_gurobi(rvars[idx]))
+            ddrvars.append(get_derivative_control_points_gurobi(rvars[idx],der_order=2))
+            dhvars.append(get_derivative_control_points_gurobi(hvars[idx]))
+            ddhvars.append(get_derivative_control_points_gurobi(hvars[idx],der_order=2))
+        
+        # increasing time
+        for idx in range(len(dhvars)): 
+            for i in range(dhvars[idx].shape[1]):
+                opti.subject_to(dhvars[idx][0,i] >= 1e-1)
+
+        #Contuinuity constraints
+        opti.subject_to(rvars[0][:,-1] == rvars[-1][:,0])
+        opti.subject_to(hvars[0][:,-1] == hvars[-1][:,0])
+
+        #Initial conditions on robot ( i don't have updated robot state, lets just assume it follows the preplanned one)
+        #Get all pre idx
+        pre_idxs = np.where(np.array(self.robot_idvars) == 'pre')[0]
+        # Get the time of impact for all pre idxs, the impact time is the final time of the curve
+        pre_tIs = [self.robot_hvars[pre_idx][0,-1] for pre_idx in pre_idxs]
+        #Get the last pre idx before t_meas (or when the all is made whatever)
+        pre_idx = next((pre_idxs[i] for i, tI in enumerate(pre_tIs) if tI > t_meas), len(pre_tIs)-1)
+
+        #Beginning of pre curve ( not sure if this should be current time or planned beginning??)
+        
+        t0 = self.robot_hvars[pre_idx][0,0]
+        # Planned time of impact
+        #tI = self.robot_hvars[pre_idx][0,-1]
+        
+        # Planned end of interaction
+        tf = self.robot_hvars[pre_idx+1][0,-1]
+
+        # Planned start and end positions and velocities
+        x_start = self.robot_rvars[pre_idx][:,0]
+        x_end = self.robot_rvars[pre_idx+1][:,-1]
+
+        dr_start = self.robot_drvars[pre_idx][:,0] 
+        dh_start = self.robot_dhvars[pre_idx][0,0]
+
+        dr_end = self.robot_drvars[pre_idx+1][:,-1]
+        dh_end = self.robot_dhvars[pre_idx+1][0,-1]
+
+        #Initial position
+        opti.subject_to(rvars[0][:,0] == x_start)
+        opti.subject_to(hvars[0][0,0] == t0)
+        #Initial velocity
+        opti.subject_to(drvars[0][:,0] == dr_start)
+        opti.subject_to(dhvars[0][0,0] == dh_start)
+        #Final position
+        opti.subject_to(rvars[-1][:,-1] == x_end)
+        opti.subject_to(hvars[-1][0,-1] == tf)
+        #Final velocity
+        opti.subject_to(drvars[-1][:,-1] == dr_end)
+        opti.subject_to(dhvars[-1][0,-1] == dh_end)
+        #Time of interaction within bounds
+        opti.subject_to(t_I >= t_meas)
+        opti.subject_to(t_I <= tf)
+
+        # End of pre curve should be the time of interaction
+        opti.subject_to(hvars[0][0,-1] == t_I)
+        opti.subject_to(hvars[1][0,0] == t_I)
+
+        delta_V = dr_end/dh_end - vel_meas # Same as the desired object velocity at the end of the interaction
+        travel_dir = np.arctan2(delta_V[1],delta_V[0])
+        #print("Desired travel direction after interaction is ", travel_dir*180/np.pi, " degrees")
+
+        unit_push_dir = [np.cos(travel_dir), np.sin(travel_dir)]
+        #print("Unit push direction is ", unit_push_dir)
+
+        y_pos = False # if false the direction of force in y demension is negative
+        x_pos = False # if false the direction of force in x demension is negative
+        if 0<= travel_dir <= np.pi:
+            y_pos = True
+        if -np.pi/2 < travel_dir < np.pi/2:
+            x_pos = True
+        print("x_pos = ", x_pos, " y_pos = ", y_pos)
+
+
+
+
+
+
+
+
+
+
+
 
     def compute_trajectories(self):
         N_eval = 100
@@ -248,8 +382,7 @@ class TestOnlinePlanner():
         # plot circle
         c = (value_bezier(self.robot_rtraj[idxs_robot],s_robot)[0],
             value_bezier(self.robot_rtraj[idxs_robot],s_robot)[1])
-        rad = 0.2
-        circle = plt.Circle(c,rad,fill=False,color='k')
+        circle = plt.Circle(c,self.rob_rad,fill=False,color='k')
         self.ax_anim.add_patch(circle)
         self.ax_anim.text(
         c[0], c[1] + 0.25,  # slightly above the circle
@@ -265,8 +398,7 @@ class TestOnlinePlanner():
         # plot circle
         c = (value_bezier(self.obj_rtraj[idxs_object],s_object)[0],
             value_bezier(self.obj_rtraj[idxs_object],s_object)[1])
-        rad = 0.3
-        circle = plt.Circle(c,rad,fill=False,color='r')
+        circle = plt.Circle(c,self.obj_rad,fill=False,color='r')
         self.ax_anim.add_patch(circle)
         # plot trajectory
         for bz in range(self.nbzs):

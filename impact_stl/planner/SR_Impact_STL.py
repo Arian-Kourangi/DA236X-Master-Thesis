@@ -36,7 +36,7 @@ from World import World
 MOVE_DIAGONALLY = True
 
 #Must be false if MOVE_DIAGONALLY is false
-PUSH_DIAGONALLY = False
+PUSH_DIAGONALLY = True
 
 #Must be false if ALLOW_CONS_XY is true
 ALLOW_CONSECUTIVE = False
@@ -919,13 +919,14 @@ class SR_Impact_STL:
                         bzo = np.where(zs_sol[bzr,:] == 1)[0][0]
                         #Getting the direction binary for the interaction
                         dir = np.where(zs_dir_sol[bzr,bzo,:] == 1)[0][0]
-                        self.robots[r].ids[bzr] = 'inter' + dir_list[dir]
+                        self.robots[r].ids[bzr] = 'inter' #+ dir_list[dir]
                         self.robots[r].other_names[bzr] = self.objects[o].name
-                        if bzr < self.robots[r].nbz-2:
-                            self.robots[r].ids[bzr+1] = 'post' + dir_list[dir]
-                            self.robots[r].other_names[bzr+1] = self.objects[o].name
+                        #Don't care about post curves
+                        #if bzr < self.robots[r].nbz-2:
+                        #    self.robots[r].ids[bzr+1] = 'post' + dir_list[dir]
+                        #    self.robots[r].other_names[bzr+1] = self.objects[o].name
                         if bzr > 0:
-                            self.robots[r].ids[bzr-1] = 'pre' + dir_list[dir]
+                            self.robots[r].ids[bzr-1] = 'pre' #+ dir_list[dir]
                             self.robots[r].other_names[bzr-1] = self.objects[o].name
         # for the objects
         # NOTE: Should maybe update this to also include direction of interaction
@@ -937,9 +938,10 @@ class SR_Impact_STL:
                     if any(zs_sol[:,bzo] == 1):
                         self.objects[o].ids[bzo] = 'inter'
                         self.objects[o].other_names[bzo] = self.robots[r].name
-                    if bzo > 0 and any(zs_sol[:,bzo-1] == 1):
-                        self.objects[o].ids[bzo] = 'post'
-                        self.objects[o].other_names[bzo] = self.robots[r].name
+                    #Don't care about post curves
+                    #if bzo > 0 and any(zs_sol[:,bzo-1] == 1):
+                    #    self.objects[o].ids[bzo] = 'post'
+                    #    self.objects[o].other_names[bzo] = self.robots[r].name
                     if bzo < self.objects[o].nbz-2 and any(zs_sol[:,bzo+1] == 1):
                         self.objects[o].ids[bzo] = 'pre'
                         self.objects[o].other_names[bzo] = self.robots[r].name
@@ -1118,7 +1120,7 @@ class SR_Impact_STL:
             for bz in range(self.robots_nbzs[r]):
 
                 #If there is an interaction, plot the robot trajectory in blue
-                if 'inter' in self.robots[r].ids[bz] and 'x' in self.robots[r].ids[bz]:
+                if 'inter' in self.robots[r].ids[bz] :#and 'x' in self.robots[r].ids[bz]:
                     ax1.plot(self.robots_htraj[r][bz][0,:],self.robots_rtraj[r][bz][0,:],'b',linewidth=lw)
                     ax1.plot(self.robots_htraj[r][bz][0,0],self.robots_rtraj[r][bz][0,0],'bo',markersize=s)
                 else:
@@ -1141,7 +1143,7 @@ class SR_Impact_STL:
         for r in range(self.nrobots):
             for bz in range(self.robots_nbzs[r]):
                 #If there is an interaction, plot the robot trajectory in blue
-                if 'inter' in self.robots[r].ids[bz] and 'y' in self.robots[r].ids[bz]:
+                if 'inter' in self.robots[r].ids[bz]:#and 'y' in self.robots[r].ids[bz]:
                     ax2.plot(self.robots_htraj[r][bz][0,:],self.robots_rtraj[r][bz][1,:],'b',linewidth=lw)
                     ax2.plot(self.robots_htraj[r][bz][0,0],self.robots_rtraj[r][bz][1,0],'bo',markersize=s)
                 else:
@@ -1165,7 +1167,7 @@ class SR_Impact_STL:
         for r in range(self.nrobots):
             for bz in range(self.robots_nbzs[r]):
                 #If there is an interaction, plot the robot trajectory in blue
-                if 'inter' in self.robots[r].ids[bz] and 'x' in self.robots[r].ids[bz]:
+                if 'inter' in self.robots[r].ids[bz] :#and 'x' in self.robots[r].ids[bz]:
                     ax3.plot(self.robots_htraj[r][bz][0,:],self.robots_dqtraj[r][bz][0,:],'b',linewidth=lw)
                     ax3.plot(self.robots_htraj[r][bz][0,0],self.robots_dqtraj[r][bz][0,0],'bo',markersize=s)
                 else:
@@ -1189,7 +1191,7 @@ class SR_Impact_STL:
         for r in range(self.nrobots):
             for bz in range(self.robots_nbzs[r]):
                 #If there is an interaction, plot the robot trajectory in blue
-                if 'inter' in self.robots[r].ids[bz] and 'y' in self.robots[r].ids[bz]:
+                if 'inter' in self.robots[r].ids[bz] :#and 'y' in self.robots[r].ids[bz]:
                     ax4.plot(self.robots_htraj[r][bz][0,:],self.robots_dqtraj[r][bz][1,:],'b',linewidth=lw)
                     ax4.plot(self.robots_htraj[r][bz][0,0],self.robots_dqtraj[r][bz][1,0],'bo',markersize=s)
                 else:
