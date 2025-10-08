@@ -45,8 +45,8 @@ class TestOnlinePlanner():
 
         #now we change the firs bezier of the object so it has an x velocity
         self.obj_rvars[0][0,0] = 0
-        self.obj_rvars[0][0,1] = 2
-        self.obj_rvars[1][0,0] = 2
+        self.obj_rvars[0][0,1] = 2.5
+        self.obj_rvars[1][0,0] = 2.5
         self.obj_rvars[1][0,1] = 5
         
         self.nbzs = len(self.robot_rvars)
