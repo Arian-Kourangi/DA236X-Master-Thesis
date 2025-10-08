@@ -27,7 +27,7 @@ plt.rcParams['legend.framealpha'] = 1.0
 plt.rcParams['legend.loc'] = 'best'
 
 # if true the constraints on velocity during the interaction are linear (on dr, dh is kept constant) otherwise they are on dq (nonlinear)
-KEEP_VEL_CONSTRAINTS_LINEAR = True 
+KEEP_VEL_CONSTRAINTS_LINEAR = False 
 
 class TestOnlinePlanner():
     def __init__(self):
@@ -185,6 +185,8 @@ class TestOnlinePlanner():
         # Instead of enforcing exact equalities that may over-constrain the NLP,
         # create soft targets and penalize deviations in the objective.
         # Convert numpy targets to CasADi DM for safe mixing with CasADi variables.
+        # keep in mind that x_end is taken from the robots planned trajectory, but it actually represents where the object should be.
+        # Thats why we subtract the radii times unit_push_dir
         target_r_end = ca.DM(x_end - (self.rob_rad + self.obj_rad) * unit_push_dir)
         target_h_tf = float(tf)
         target_dr_end = ca.DM(dr_end)
@@ -248,7 +250,7 @@ class TestOnlinePlanner():
         w_r = 1e3
         w_dr = 1e3
         w_h = 1e3
-        w_dh = 1e2
+        w_dh = 1e3
 
         try:
             # target_* were prepared earlier (CasADi DM or floats)
@@ -275,12 +277,30 @@ class TestOnlinePlanner():
         #opti.set_initial(t_I, (t0 + tf)/2)
 
 
-        opts = {'ipopt.print_level': 0,
-                'ipopt.tol': 1e-3,
-                'ipopt.max_iter': 100,
-                'print_time': 0, 'ipopt.sb': 'no'}
+        #opts = {'ipopt.print_level': 0,
+        #        'ipopt.tol': 1e-3,
+        #        'ipopt.max_iter': 100,
+        #        'print_time': 0, 'ipopt.sb': 'no'}
+        #
+        #opti.solver('ipopt',opts)
+        qp_opts = {
+            # 'max_iter': 5,
+            'error_on_fail': False,
+            'printLevel': "none",
+            # 'print_header': False,
+            # 'print_iter': False
+        }
+        sqp_opts = {
+            'max_iter': 10,
+            'qpsol': 'qpoases',
+            'convexify_margin': 1e-4,
+            'print_header': False,
+            'print_time': False,
+            'print_iteration': False,
+            'qpsol_options': qp_opts
+        }
+        opti.solver('sqpmethod', sqp_opts)
         
-        opti.solver('ipopt',opts)
         time_start = time.time()
         sol = opti.solve()
         time_end = time.time()
