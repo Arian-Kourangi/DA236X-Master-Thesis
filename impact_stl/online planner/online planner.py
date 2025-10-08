@@ -28,6 +28,7 @@ plt.rcParams['legend.loc'] = 'best'
 
 # if true the constraints on velocity during the interaction are linear (on dr, dh is kept constant) otherwise they are on dq (nonlinear)
 KEEP_VEL_CONSTRAINTS_LINEAR = False 
+Hard_end_time_constraint = True # if true the end time of the interaction curve is kept fixed, otherwise it can change and is penalized in the cost
 
 class TestOnlinePlanner():
     def __init__(self):
@@ -195,9 +196,14 @@ class TestOnlinePlanner():
         # Convert numpy targets to CasADi DM for safe mixing with CasADi variables.
         # keep in mind that x_end is taken from the robots planned trajectory, but it actually represents where the object should be.
         # Thats why we subtract the radii times unit_push_dir
+        
         target_r_end = ca.DM(x_end - (self.rob_rad + self.obj_rad) * unit_push_dir)
-        opti.subject_to(hvars[-1][0,-1] == tf)
-        #target_h_tf = float(tf)
+        if Hard_end_time_constraint:
+        # Hard constraint version:
+            opti.subject_to(hvars[-1][0,-1] == tf)
+        else:
+            # Soft constraint version: See below in the cost
+            target_h_tf = float(tf)
         target_dr_end = ca.DM(dr_end)
         target_dh_end = float(dh_end)
         # Note: penalties are added to the objective J later. Keep these as soft targets
@@ -257,6 +263,7 @@ class TestOnlinePlanner():
                 opti.subject_to(rvars[idx][1,i] <= self.world_ub[1])
         # Minimize the acceleration
         J = 0
+        
         for idx in range(len(rvars)):
             for i in range(ddrvars[idx].shape[1]):
                 J += ca.sumsqr(ddrvars[idx][:,i])
@@ -264,7 +271,7 @@ class TestOnlinePlanner():
                 J += ca.sumsqr(ddhvars[idx][0,i])
         # --- Soft penalties for final targets (relax exact equalities) ---
         # Weights (tune as needed)
-        w_r = 1e3
+        w_r = 1e4
         w_dr = 1e3
         w_h = 1e3
         w_dh = 1e3
@@ -273,7 +280,8 @@ class TestOnlinePlanner():
             # target_* were prepared earlier (CasADi DM or floats)
             J += w_r * ca.sumsqr(rvars[-1][:,-1] - target_r_end)
             J += w_dr * ca.sumsqr(drvars[-1][:,-1] - target_dr_end)
-            #J += w_h * (hvars[-1][0,-1] - target_h_tf)**2
+            if not Hard_end_time_constraint:
+                J += w_h * (hvars[-1][0,-1] - target_h_tf)**2
             J += w_dh * (dhvars[-1][0,-1] - target_dh_end)**2
         except NameError:
             # If targets are not defined (shouldn't happen), skip adding penalties
@@ -326,21 +334,34 @@ class TestOnlinePlanner():
         print("Solved in ", time_end - time_start, " seconds")
         print("Optimal cost J = ", opti.value(J))
         print("Optimal time of interaction t_I = ", opti.value(t_I))
+        print('Planned end time = ', self.robot_hvars[pre_idx+1][0,-1], ' replanned end time = ', sol.value(hvars[1][0,-1]))
         #Extract the solution
         self.sol_robot_rvars = [sol.value(rvars[k]).reshape(2,n_cp) for k in range(len(rvars))]
         self.sol_robot_hvars = [sol.value(hvars[k]).reshape(1,n_cp) for k in range(len(hvars))]
         # Compare the replanned end velocity and postion with the desired ones
         print('Replanned end position = ', sol.value(rvars[-1][:,-1]), ' target position = ', x_end - (self.rob_rad + self.obj_rad) * unit_push_dir)
         print('Replanned end velocity = ', sol.value(drvars[-1][:,-1]/dhvars[-1][0,-1]), ' target velocity = ', dr_end/dh_end)
-
+        
         #Added the new curves to the existing ones
         self.robot_rvars[pre_idx] = self.sol_robot_rvars[0]
         self.robot_rvars[pre_idx+1] = self.sol_robot_rvars[1]
         self.robot_rvars[pre_idx+2][:,0] = self.sol_robot_rvars[1][:,-1] - (self.rob_rad + self.obj_rad) * unit_push_dir #updating the beginning of the next curve for plotting
         self.robot_drvars[pre_idx] = get_derivative_control_points_gurobi(self.robot_rvars[pre_idx], 1)
         self.robot_drvars[pre_idx+1] = get_derivative_control_points_gurobi(self.robot_rvars[pre_idx+1], 1)
+        
+        # If I allow the time at the end of the interaction to shift, I need to propogate this change to the rest of the curves
+        # Compute the time difference at the end of the interaction curve
+        end_time_diff  = self.sol_robot_hvars[1][0,-1] - self.robot_hvars[pre_idx+1][0,-1]
+        ## Propogate time change to the rest of the curves
+        for k in range(pre_idx+2, self.nbzs):
+            self.robot_hvars[k][0,:] += end_time_diff
+            self.obj_hvars[k][0,:] += end_time_diff
+        
+        # Adding the solved curves to the plan
         self.robot_hvars[pre_idx] = self.sol_robot_hvars[0]
         self.robot_hvars[pre_idx+1] = self.sol_robot_hvars[1]
+
+
         self.robot_dhvars[pre_idx] = get_derivative_control_points_gurobi(self.robot_hvars[pre_idx], 1)
         self.robot_dhvars[pre_idx+1] = get_derivative_control_points_gurobi(self.robot_hvars[pre_idx+1], 1)
         #Update the rest of the curves to match the new end velocity
