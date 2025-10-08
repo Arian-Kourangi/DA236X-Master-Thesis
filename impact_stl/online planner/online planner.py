@@ -33,7 +33,9 @@ class TestOnlinePlanner():
     def __init__(self):
         #Size of world
         self.world_lb = np.array([0,0])
-        self.world_ub = np.array([10,20])        
+        self.world_ub = np.array([10,20])
+        self.dq_lb = np.array([-2,-2])
+        self.dq_ub = np.array([2,2])        
         self.robot_rvars,self.robot_hvars,self.robot_idvars,self.robot_other_names = csv_to_plan(robot_name='snap',
                                                                          scenario_name='minimal_test_throw_and_catch',
                                                                          path='/home/arian/repos/thesis/impact_stl/planner/plans')  
@@ -115,7 +117,7 @@ class TestOnlinePlanner():
         # increasing time
         for idx in range(len(dhvars)): 
             for i in range(dhvars[idx].shape[1]):
-                opti.subject_to(dhvars[idx][0,i] >= 1e-1)
+                opti.subject_to(dhvars[idx][0,i] >= 1*1e-1)
 
         #Contuinuity constraints
         opti.subject_to(rvars[0][:,-1] == rvars[-1][:,0])
@@ -179,6 +181,12 @@ class TestOnlinePlanner():
         # match its velocity
         opti.subject_to(drvars[0][:,-1] == vel_meas*dhvars[0][0,-1])
 
+        #Velocity constraints - keep the velocity within bounds
+        for i in range(drvars[0].shape[1]):
+            opti.subject_to(drvars[0][0,i] <= self.dq_ub[0]*dhvars[0][0,i])
+            opti.subject_to(drvars[0][0,i] >= self.dq_lb[0]*dhvars[0][0,i])
+            opti.subject_to(drvars[0][1,i] <= self.dq_ub[1]*dhvars[0][0,i])
+            opti.subject_to(drvars[0][1,i] >= self.dq_lb[1]*dhvars[0][0,i])
 
         ###### Interaction curve constraints
         #Final position ( again offset by the radii so the the objects is the one that needs to be at the target position not the robot)
@@ -230,6 +238,14 @@ class TestOnlinePlanner():
                     opti.subject_to(drvars[1][1,cp+1]/dhvars[1][0,cp+1]  - drvars[1][1,cp]/dhvars[1][0,cp]  >= 0) # increasing positive y velocity or decreasing negative y velocity
                 else:
                     opti.subject_to(drvars[1][1,cp+1]/dhvars[1][0,cp+1]  - drvars[1][1,cp]/dhvars[1][0,cp]  <= 0) # decreasing positive y velocity or increasing negative y velocity
+
+        #Velocity constraints - keep the velocity within bounds
+        # now we want the max velocity to half of actual max, since the robot is also pushing the object
+        for i in range(drvars[1].shape[1]):
+            opti.subject_to(drvars[1][0,i] <= 0.5*self.dq_ub[0]*dhvars[1][0,i])
+            opti.subject_to(drvars[1][0,i] >= 0.5*self.dq_lb[0]*dhvars[1][0,i])
+            opti.subject_to(drvars[1][1,i] <= 0.5*self.dq_ub[1]*dhvars[1][0,i])
+            opti.subject_to(drvars[1][1,i] >= 0.5*self.dq_lb[1]*dhvars[1][0,i])
 
 
         # keep the robot in the world bounds
@@ -311,13 +327,13 @@ class TestOnlinePlanner():
         print("Optimal cost J = ", opti.value(J))
         print("Optimal time of interaction t_I = ", opti.value(t_I))
         #Extract the solution
-        self.sol_robot_rvars = [sol.value(rvars[k]).reshape(2,6) for k in range(len(rvars))]
-        self.sol_robot_hvars = [sol.value(hvars[k]).reshape(1,6) for k in range(len(hvars))]
+        self.sol_robot_rvars = [sol.value(rvars[k]).reshape(2,n_cp) for k in range(len(rvars))]
+        self.sol_robot_hvars = [sol.value(hvars[k]).reshape(1,n_cp) for k in range(len(hvars))]
         # Compare the replanned end velocity and postion with the desired ones
         print('Replanned end position = ', sol.value(rvars[-1][:,-1]), ' target position = ', x_end - (self.rob_rad + self.obj_rad) * unit_push_dir)
         print('Replanned end velocity = ', sol.value(drvars[-1][:,-1]/dhvars[-1][0,-1]), ' target velocity = ', dr_end/dh_end)
 
-        #Adde the new curves to the existing ones
+        #Added the new curves to the existing ones
         self.robot_rvars[pre_idx] = self.sol_robot_rvars[0]
         self.robot_rvars[pre_idx+1] = self.sol_robot_rvars[1]
         self.robot_rvars[pre_idx+2][:,0] = self.sol_robot_rvars[1][:,-1] - (self.rob_rad + self.obj_rad) * unit_push_dir #updating the beginning of the next curve for plotting
