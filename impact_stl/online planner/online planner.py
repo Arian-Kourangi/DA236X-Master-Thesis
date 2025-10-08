@@ -45,8 +45,8 @@ class TestOnlinePlanner():
 
         #now we change the firs bezier of the object so it has an x velocity
         self.obj_rvars[0][0,0] = 0
-        self.obj_rvars[0][0,1] = 2.5
-        self.obj_rvars[1][0,0] = 2.5
+        self.obj_rvars[0][0,1] = 2
+        self.obj_rvars[1][0,0] = 2
         self.obj_rvars[1][0,1] = 5
         
         self.nbzs = len(self.robot_rvars)
@@ -78,11 +78,11 @@ class TestOnlinePlanner():
         t_meas = 7.640449438202293
         #vel_meas = (self.obj_rvars[1][:,1] - self.obj_rvars[1][:,0]) / (self.obj_hvars[1][0,1] - self.obj_hvars[1][0,0])
         id, s = eval_t(self.obj_hvars, t_meas)
-        print("At time t = ", t_meas, " we are in segment ", id, " with local parameter s = ", s)
+        #print("At time t = ", t_meas, " we are in segment ", id, " with local parameter s = ", s)
         pos_meas = value_bezier(self.obj_rvars[id], s)
-        print("At time t = ", t_meas, " the object is at position ", pos_meas)
+        #print("At time t = ", t_meas, " the object is at position ", pos_meas)
         vel_meas = value_bezier(self.obj_drvars[id], s) / value_bezier(self.obj_dhvars[id], s)
-        print("At time t = ", t_meas, " the object has velocity ", vel_meas) 
+        #print("At time t = ", t_meas, " the object has velocity ", vel_meas) 
         
         #Testing for sanity
         #vel_meas2 = (self.obj_rvars[1][:,1] - self.obj_rvars[1][:,0]) / (self.obj_hvars[1][0,1] - self.obj_hvars[1][0,0])
@@ -188,7 +188,8 @@ class TestOnlinePlanner():
         # keep in mind that x_end is taken from the robots planned trajectory, but it actually represents where the object should be.
         # Thats why we subtract the radii times unit_push_dir
         target_r_end = ca.DM(x_end - (self.rob_rad + self.obj_rad) * unit_push_dir)
-        target_h_tf = float(tf)
+        opti.subject_to(hvars[-1][0,-1] == tf)
+        #target_h_tf = float(tf)
         target_dr_end = ca.DM(dr_end)
         target_dh_end = float(dh_end)
         # Note: penalties are added to the objective J later. Keep these as soft targets
@@ -256,7 +257,7 @@ class TestOnlinePlanner():
             # target_* were prepared earlier (CasADi DM or floats)
             J += w_r * ca.sumsqr(rvars[-1][:,-1] - target_r_end)
             J += w_dr * ca.sumsqr(drvars[-1][:,-1] - target_dr_end)
-            J += w_h * (hvars[-1][0,-1] - target_h_tf)**2
+            #J += w_h * (hvars[-1][0,-1] - target_h_tf)**2
             J += w_dh * (dhvars[-1][0,-1] - target_dh_end)**2
         except NameError:
             # If targets are not defined (shouldn't happen), skip adding penalties
@@ -283,16 +284,18 @@ class TestOnlinePlanner():
         #        'print_time': 0, 'ipopt.sb': 'no'}
         #
         #opti.solver('ipopt',opts)
-        qp_opts = {
-            # 'max_iter': 5,
-            'error_on_fail': False,
-            'printLevel': "none",
-            # 'print_header': False,
-            # 'print_iter': False
+        qp_opts = {'osqp': {
+            'max_iter': 100,
+            'verbose': False,
+            'eps_abs': 1e-3,
+            'eps_rel': 1e-3,
+            'adaptive_rho': False,
+            'polish':True}, 'warm_start_primal': True, 'warm_start_dual': True
         }
+
         sqp_opts = {
-            'max_iter': 10,
-            'qpsol': 'qpoases',
+            'max_iter': 12,
+            'qpsol': 'osqp',
             'convexify_margin': 1e-4,
             'print_header': False,
             'print_time': False,
