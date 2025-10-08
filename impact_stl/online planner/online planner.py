@@ -63,10 +63,12 @@ class TestOnlinePlanner():
         self.obj_dhvars = [get_derivative_control_points_gurobi(self.obj_hvars[k], 1) for k in range(self.nbzs)]
         self.obj_rad = 0.3
         self.rob_rad = 0.2
-        #self.plot()
-        #self.compute_trajectories()
-        #self.animate()
+        
         self.replan()
+        self.compute_trajectories()
+        self.plot()
+        self.animate()
+
 
 
 
@@ -264,7 +266,7 @@ class TestOnlinePlanner():
             for k in range(rvars[idx].shape[0]):
                 for i in range(rvars[idx].shape[1]):
                     opti.set_initial(rvars[idx][k,i], self.robot_rvars[pre_idx+idx][k,i])
-                    opti.set_initial(hvars[idx][0,i], self.robot_hvars[pre_idx+idx][0,i]))
+                    opti.set_initial(hvars[idx][0,i], self.robot_hvars[pre_idx+idx][0,i])
             #for k in range(drvars[idx].shape[0]):
             #    for i in range(drvars[idx].shape[1]):
             #        opti.set_initial(drvars[idx][k,i], self.robot_drvars[pre_idx+idx][k,i])
@@ -286,11 +288,29 @@ class TestOnlinePlanner():
         print("Optimal cost J = ", opti.value(J))
         print("Optimal time of interaction t_I = ", opti.value(t_I))
         #Extract the solution
-        self.sol_robot_rvars = [sol.value(rvars[k]) for k in range(len(rvars))]
-        self.sol_robot_hvars = [sol.value(hvars[k]) for k in range(len(hvars))]
+        self.sol_robot_rvars = [sol.value(rvars[k]).reshape(2,6) for k in range(len(rvars))]
+        self.sol_robot_hvars = [sol.value(hvars[k]).reshape(1,6) for k in range(len(hvars))]
         # Compare the replanned end velocity and postion with the desired ones
         print('Replanned end position = ', sol.value(rvars[-1][:,-1]), ' target position = ', x_end - (self.rob_rad + self.obj_rad) * unit_push_dir)
         print('Replanned end velocity = ', sol.value(drvars[-1][:,-1]/dhvars[-1][0,-1]), ' target velocity = ', dr_end/dh_end)
+
+        #Adde the new curves to the existing ones
+        self.robot_rvars[pre_idx] = self.sol_robot_rvars[0]
+        self.robot_rvars[pre_idx+1] = self.sol_robot_rvars[1]
+        self.robot_rvars[pre_idx+2][:,0] = self.sol_robot_rvars[1][:,-1] - (self.rob_rad + self.obj_rad) * unit_push_dir #updating the beginning of the next curve for plotting
+        self.robot_drvars[pre_idx] = get_derivative_control_points_gurobi(self.robot_rvars[pre_idx], 1)
+        self.robot_drvars[pre_idx+1] = get_derivative_control_points_gurobi(self.robot_rvars[pre_idx+1], 1)
+        self.robot_hvars[pre_idx] = self.sol_robot_hvars[0]
+        self.robot_hvars[pre_idx+1] = self.sol_robot_hvars[1]
+        self.robot_dhvars[pre_idx] = get_derivative_control_points_gurobi(self.robot_hvars[pre_idx], 1)
+        self.robot_dhvars[pre_idx+1] = get_derivative_control_points_gurobi(self.robot_hvars[pre_idx+1], 1)
+        #Update the rest of the curves to match the new end velocity
+
+        #For plotting
+        self.obj_rvars[pre_idx+2][:,0] = self.sol_robot_rvars[1][:,-1] + (self.rob_rad + self.obj_rad) * unit_push_dir
+        self.obj_hvars[pre_idx +2][0,0] = self.sol_robot_hvars[1][0,-1]
+        self.obj_drvars[pre_idx+2][:,0] = self.sol_robot_rvars[1][:,-1]
+        self.obj_dhvars[pre_idx+2][0,0] = self.sol_robot_hvars[1][0,-1]
 
     def compute_trajectories(self):
         N_eval = 100
@@ -420,6 +440,7 @@ class TestOnlinePlanner():
         ax4.set_ylabel(r"y velocity [m/s]")
 
         fig.tight_layout()
+        plt.savefig("/home/arian/repos/thesis/impact_stl/online planner/figures/plot.svg")
 
         #fig.show()
 
@@ -443,9 +464,10 @@ class TestOnlinePlanner():
         axs.grid(True)
         axs.set_aspect('equal', 'box')
         fig_xy.tight_layout()
-        
-        fig_xy.show()
-        plt.pause(100)
+        plt.savefig("/home/arian/repos/thesis/impact_stl/online planner/figures/xy_plane.svg")
+
+        #fig_xy.show()
+        #plt.pause(100)
 
 
     def evaluate_t(self,t):
