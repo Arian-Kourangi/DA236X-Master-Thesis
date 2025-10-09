@@ -28,7 +28,7 @@ plt.rcParams['legend.loc'] = 'best'
 
 # if true the constraints on velocity during the interaction are linear (on dr, dh is kept constant) otherwise they are on dq (nonlinear)
 KEEP_VEL_CONSTRAINTS_LINEAR = False 
-Hard_end_time_constraint = True # if true the end time of the interaction curve is kept fixed, otherwise it can change and is penalized in the cost
+Hard_end_time_constraint = False # if true the end time of the interaction curve is kept fixed, otherwise it can change and is penalized in the cost
 
 class TestOnlinePlanner():
     def __init__(self):
@@ -351,11 +351,11 @@ class TestOnlinePlanner():
         
         # If I allow the time at the end of the interaction to shift, I need to propogate this change to the rest of the curves
         # Compute the time difference at the end of the interaction curve
-        end_time_diff  = self.sol_robot_hvars[1][0,-1] - self.robot_hvars[pre_idx+1][0,-1]
+        self.end_time_diff  = self.sol_robot_hvars[1][0,-1] - self.robot_hvars[pre_idx+1][0,-1]
         ## Propogate time change to the rest of the curves
         for k in range(pre_idx+2, self.nbzs):
-            self.robot_hvars[k][0,:] += end_time_diff
-            self.obj_hvars[k][0,:] += end_time_diff
+            self.robot_hvars[k][0,:] += self.end_time_diff
+            self.obj_hvars[k][0,:] += self.end_time_diff
         
         # Adding the solved curves to the plan
         self.robot_hvars[pre_idx] = self.sol_robot_hvars[0]
@@ -547,7 +547,9 @@ class TestOnlinePlanner():
     
     def animate(self):
         Neval = 250
-        self.t_range = np.linspace(0,self.world_tf,Neval)
+        #If we change the end time of the interation and then propogate this change to the rest of the curves, the final time of the plan changes
+        # and no longer coincides with world end time. So we need to account for this in the animation time range
+        self.t_range = np.linspace(0,self.world_tf+self.end_time_diff,Neval)
 
         self.fig_anim = plt.figure(figsize=(10,10))
         self.ax_anim = plt.axes()
