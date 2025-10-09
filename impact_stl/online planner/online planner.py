@@ -116,9 +116,11 @@ class TestOnlinePlanner():
             ddhvars.append(get_derivative_control_points_gurobi(hvars[idx],der_order=2))
         
         # increasing time
-        for idx in range(len(dhvars)): 
-            for i in range(dhvars[idx].shape[1]):
-                opti.subject_to(dhvars[idx][0,i] >= 1*1e-1)
+        for i in range(dhvars[0].shape[1]):
+            opti.subject_to(dhvars[0][0,i] >= 1*1e-1)
+        ## Tigher constraing for interaction cruve
+        for i in range(dhvars[1].shape[1]):
+            opti.subject_to(dhvars[1][0,i] >= 75*1e-1)
 
         #Contuinuity constraints
         opti.subject_to(rvars[0][:,-1] == rvars[-1][:,0])
@@ -345,19 +347,22 @@ class TestOnlinePlanner():
         #Added the new curves to the existing ones
         self.robot_rvars[pre_idx] = self.sol_robot_rvars[0]
         self.robot_rvars[pre_idx+1] = self.sol_robot_rvars[1]
-        self.robot_rvars[pre_idx+2][:,0] = self.sol_robot_rvars[1][:,-1] - (self.rob_rad + self.obj_rad) * unit_push_dir #updating the beginning of the next curve for plotting
+
+        self.robot_rvars[pre_idx+2][:,0] = self.sol_robot_rvars[1][:,-1] # Do this for the object for plotting
+
         self.robot_drvars[pre_idx] = get_derivative_control_points_gurobi(self.robot_rvars[pre_idx], 1)
         self.robot_drvars[pre_idx+1] = get_derivative_control_points_gurobi(self.robot_rvars[pre_idx+1], 1)
         
         # If I allow the time at the end of the interaction to shift, I need to propogate this change to the rest of the curves
         # Compute the time difference at the end of the interaction curve
         self.end_time_diff  = self.sol_robot_hvars[1][0,-1] - self.robot_hvars[pre_idx+1][0,-1]
-        ## Propogate time change to the rest of the curves
+        ## Propogate time change to the rest of the curves ( this should be done to all robots probably)
+
+        # TODO: Examine logic of itneraction and replanning. Need to think about how different time and velocity affects the next curves
+        
         for k in range(pre_idx+2, self.nbzs):
             self.robot_hvars[k][0,:] += self.end_time_diff
-            self.obj_hvars[k][0,:] += self.end_time_diff
-        
-        # Adding the solved curves to the plan
+        # adding these after I propgate time otherwise there would be no propogation
         self.robot_hvars[pre_idx] = self.sol_robot_hvars[0]
         self.robot_hvars[pre_idx+1] = self.sol_robot_hvars[1]
 
@@ -367,10 +372,30 @@ class TestOnlinePlanner():
         #Update the rest of the curves to match the new end velocity
 
         #For plotting
-        self.obj_rvars[pre_idx+2][:,0] = self.sol_robot_rvars[1][:,-1] + (self.rob_rad + self.obj_rad) * unit_push_dir
-        self.obj_hvars[pre_idx +2][0,0] = self.sol_robot_hvars[1][0,-1]
-        self.obj_drvars[pre_idx+2][:,0] = self.sol_robot_rvars[1][:,-1]
-        self.obj_dhvars[pre_idx+2][0,0] = self.sol_robot_hvars[1][0,-1]
+
+        # Get obj pre index
+        obj_pre_idxs = np.where(np.array(self.obj_idvars) == 'pre')[0]
+        obj_pre_TIs = [self.obj_hvars[pre_idx][0,-1] for pre_idx in obj_pre_idxs]
+        obj_pre_idx = next((obj_pre_idxs[i] for i, tI in enumerate(obj_pre_TIs) if tI > t_meas), len(obj_pre_TIs)-1)
+
+        #self.obj_hvars[obj_pre_idx+1][0,0] = self.sol_robot_hvars[1][0,0]
+        # We have changed the beginning of the inter curve (time of impact) and the end of the inter curve.
+        # We let the object keep thinking thats its pre curve ends at the planned time
+        # We then extend it inter curve to the new end time
+        self.obj_hvars[obj_pre_idx+1][0,-1] = self.sol_robot_hvars[1][0,-1]
+
+        # update the position after the inter curve
+        self.obj_rvars[obj_pre_idx +2][:,0] = self.sol_robot_rvars[1][:,-1] + (self.rob_rad + self.obj_rad) * unit_push_dir
+        
+        #self.obj_hvars[obj_pre_idx +2][0,0] = self.sol_robot_hvars[1][0,-1]
+
+        # get the speed at the end of the interaction curve
+        self.obj_drvars[obj_pre_idx +2][:,0] = self.robot_drvars[pre_idx+1][:,-1]
+        self.obj_dhvars[obj_pre_idx +2][0,0] = self.robot_dhvars[pre_idx+1][0,-1]
+
+        # Propogate the time change to the rest of the object curves
+        for k in range(obj_pre_idx+2, self.nbzs):
+            self.obj_hvars[k][0,:] += self.end_time_diff
 
     def compute_trajectories(self):
         N_eval = 100
@@ -571,11 +596,11 @@ class TestOnlinePlanner():
             value_bezier(self.robot_rtraj[idxs_robot],s_robot)[1])
         circle = plt.Circle(c,self.rob_rad,fill=False,color='k')
         self.ax_anim.add_patch(circle)
-        self.ax_anim.text(
-        c[0], c[1] + 0.25,  # slightly above the circle
-        'RobTheRobot',
-        color='k', fontsize=12, ha='center', va='bottom', weight='bold',
-        bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', boxstyle='round,pad=0.2'))
+        #self.ax_anim.text(
+        #c[0], c[1] + 0.25,  # slightly above the circle
+        #'RobTheRobot',
+        #color='k', fontsize=12, ha='center', va='bottom', weight='bold',
+        #bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', boxstyle='round,pad=0.2'))
         # plot trajectory 
         for bz in range(self.nbzs):
             #Only plot the traj if interaction
