@@ -27,7 +27,7 @@ plt.rcParams['legend.framealpha'] = 1.0
 plt.rcParams['legend.loc'] = 'best'
 
 # if true the constraints on velocity during the interaction are linear (on dr, dh is kept constant) otherwise they are on dq (nonlinear)
-KEEP_VEL_CONSTRAINTS_LINEAR = False 
+KEEP_VEL_CONSTRAINTS_LINEAR = True 
 Hard_end_time_constraint = False # if true the end time of the interaction curve is kept fixed, otherwise it can change and is penalized in the cost
 
 class TestOnlinePlanner():
@@ -120,7 +120,7 @@ class TestOnlinePlanner():
             opti.subject_to(dhvars[0][0,i] >= 1*1e-1)
         ## Tigher constraing for interaction cruve
         for i in range(dhvars[1].shape[1]):
-            opti.subject_to(dhvars[1][0,i] >= 75*1e-1)
+            opti.subject_to(dhvars[1][0,i] >= 95*1e-1)
 
         #Contuinuity constraints
         opti.subject_to(rvars[0][:,-1] == rvars[-1][:,0])
@@ -141,7 +141,7 @@ class TestOnlinePlanner():
         
         t0 = self.robot_hvars[pre_idx][0,0]
         # Planned time of impact
-        #tI = self.robot_hvars[pre_idx][0,-1]
+        tI = self.robot_hvars[pre_idx][0,-1]
         
         # Planned end of interaction
         tf = self.robot_hvars[pre_idx+1][0,-1]
@@ -164,7 +164,7 @@ class TestOnlinePlanner():
         opti.subject_to(dhvars[0][0,0] == dh_start)
         #Time of interaction within bounds
         opti.subject_to(t_I >= t_meas)
-        opti.subject_to(t_I <= tf)
+        #opti.subject_to(t_I <= tf)
 
         # End of pre curve should be the time of interaction
         opti.subject_to(hvars[0][0,-1] == t_I)
@@ -266,16 +266,21 @@ class TestOnlinePlanner():
         # Minimize the acceleration
         J = 0
         
-        for idx in range(len(rvars)):
-            for i in range(ddrvars[idx].shape[1]):
-                J += ca.sumsqr(ddrvars[idx][:,i])
-            for i in range(ddhvars[idx].shape[1]):
-                J += ca.sumsqr(ddhvars[idx][0,i])
+        #for idx in range(len(rvars)):
+        for i in range(ddrvars[0].shape[1]):
+            J += ca.sumsqr(ddrvars[0][:,i])
+        for i in range(ddhvars[0].shape[1]):
+            J += ca.sumsqr(ddhvars[0][0,i])
+        w_acc = 1e2
+        for i in range(ddrvars[1].shape[1]):
+            J += w_acc*ca.sumsqr(ddrvars[1][:,i])
+        for i in range(ddhvars[1].shape[1]):
+            J += w_acc*ca.sumsqr(ddhvars[1][0,i])
         # --- Soft penalties for final targets (relax exact equalities) ---
         # Weights (tune as needed)
-        w_r = 1e4
+        w_r = 1e5
         w_dr = 1e3
-        w_h = 1e3
+        w_h = 1e1
         w_dh = 1e3
 
         try:
@@ -284,6 +289,7 @@ class TestOnlinePlanner():
             J += w_dr * ca.sumsqr(drvars[-1][:,-1] - target_dr_end)
             if not Hard_end_time_constraint:
                 J += w_h * (hvars[-1][0,-1] - target_h_tf)**2
+                J += w_h * (t_I - tI )**2  # also penalize deviation from t_I at start of interaction curve
             J += w_dh * (dhvars[-1][0,-1] - target_dh_end)**2
         except NameError:
             # If targets are not defined (shouldn't happen), skip adding penalties
@@ -311,16 +317,16 @@ class TestOnlinePlanner():
         #
         #opti.solver('ipopt',opts)
         qp_opts = {'osqp': {
-            'max_iter': 100,
+            'max_iter': 1000,
             'verbose': False,
             'eps_abs': 1e-3,
             'eps_rel': 1e-3,
-            'adaptive_rho': False,
+            'adaptive_rho': True,
             'polish':True}, 'warm_start_primal': True, 'warm_start_dual': True
         }
 
         sqp_opts = {
-            'max_iter': 12,
+            'max_iter': 100,
             'qpsol': 'osqp',
             'convexify_margin': 1e-4,
             'print_header': False,
