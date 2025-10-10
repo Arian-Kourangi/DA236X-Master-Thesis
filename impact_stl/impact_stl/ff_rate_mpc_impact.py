@@ -302,7 +302,7 @@ class SpacecraftImpactMPC(Node):
 
             # print(f"id: {plan0['id']}")
 
-            #Find the segment id
+            #Find the segment id that we are currently at
             self.idx, _ = eval_t(self.plan['hvar'], t)
             
             # Get the index of the next pre-impact bezier segment and the impact time tI. 

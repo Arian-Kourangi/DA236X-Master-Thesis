@@ -10,15 +10,22 @@ from impact_stl.models.spacecraft_rate_model import SpacecraftRateModel
 
 class SpacecraftRateMPC():
     def __init__(self, model, Tf=1.0, N=10, add_cbf=False):
+        """ Model predictive controller for the spacecraft rate model.
+        Args:
+            model (SpacecraftRateModel): spacecraft rate model
+            Tf (float): time horizon
+            N (int): number of discretization steps
+            add_cbf (bool): whether to add control barrier function constraints
+        """
         self.model = model
         self.Tf = Tf
-        self.N = N
+        self.N = N # number of discretization steps in the horizon
         self.dt = self.Tf/self.N
 
         self.add_cbf = add_cbf
 
-        self.nx = 10
-        self.nu = 6
+        self.nx = 10 # Number of state variables
+        self.nu = 6 # Number of control inputs
 
         self.params = {}
         self.vars = {}
@@ -79,9 +86,11 @@ class SpacecraftRateMPC():
     def setup(self):
         # create casadi optimization problem
         ocp = cs.Opti()
+        # State and input variables (over the whole horizon)
         X = ocp.variable(self.nx,self.N+1)
         U = ocp.variable(self.nu,self.N)
 
+        # parameters (initial state and reference state over the whole horizon)
         x0 = ocp.parameter(self.nx)
         xref = ocp.parameter(self.nx,self.N+1)
 
