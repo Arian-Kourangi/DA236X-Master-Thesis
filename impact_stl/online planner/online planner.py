@@ -120,7 +120,7 @@ class TestOnlinePlanner():
             opti.subject_to(dhvars[0][0,i] >= 1*1e-1)
         ## Tigher constraing for interaction cruve
         for i in range(dhvars[1].shape[1]):
-            opti.subject_to(dhvars[1][0,i] >= 95*1e-1)
+            opti.subject_to(dhvars[1][0,i] >= 30*1e-1)
 
         #Contuinuity constraints
         opti.subject_to(rvars[0][:,-1] == rvars[-1][:,0])
@@ -272,7 +272,6 @@ class TestOnlinePlanner():
         # Minimize the acceleration
         J = 0
         
-        #for idx in range(len(rvars)):
         for i in range(ddrvars[0].shape[1]):
             J += ca.sumsqr(ddrvars[0][:,i])
         for i in range(ddhvars[0].shape[1]):
@@ -399,15 +398,18 @@ class TestOnlinePlanner():
         # update the position after the inter curve
         self.obj_rvars[obj_pre_idx +2][:,0] = self.sol_robot_rvars[1][:,-1] + (self.rob_rad + self.obj_rad) * unit_push_dir
         
+        # Propogate the time change to the rest of the object curves
+        for k in range(obj_pre_idx+2, self.nbzs):
+            self.obj_hvars[k][0,:] += self.end_time_diff
+        
         #self.obj_hvars[obj_pre_idx +2][0,0] = self.sol_robot_hvars[1][0,-1]
 
         # get the speed at the end of the interaction curve
         self.obj_drvars[obj_pre_idx +2][:,0] = self.robot_drvars[pre_idx+1][:,-1]
         self.obj_dhvars[obj_pre_idx +2][0,0] = self.robot_dhvars[pre_idx+1][0,-1]
 
-        # Propogate the time change to the rest of the object curves
-        for k in range(obj_pre_idx+2, self.nbzs):
-            self.obj_hvars[k][0,:] += self.end_time_diff
+        self.obj_rvars[obj_pre_idx+2][:,1] = self.obj_rvars[obj_pre_idx+2][:,0] + self.obj_drvars[obj_pre_idx +2][:,0] / self.obj_dhvars[obj_pre_idx +2][0,0] * (self.obj_hvars[obj_pre_idx +2][0,1] - self.obj_hvars[obj_pre_idx +2][0,0])
+
 
     def compute_trajectories(self):
         N_eval = 100
