@@ -254,7 +254,13 @@ class TestOnlinePlanner():
             opti.subject_to(drvars[1][0,i] >= 0.5*self.dq_lb[0]*dhvars[1][0,i])
             opti.subject_to(drvars[1][1,i] <= 0.5*self.dq_ub[1]*dhvars[1][0,i])
             opti.subject_to(drvars[1][1,i] >= 0.5*self.dq_lb[1]*dhvars[1][0,i])
-
+        
+        # Make sure the ratio of change in y velocity to change in x velocity is the same as the desired delta_V
+        # This ensures that the robot pushes in the direction of desired velocity
+        for i in range(drvars[1].shape[1]-1):
+            d_x = drvars[1][0,cp+1] - drvars[1][0,cp]
+            d_y = drvars[1][1,cp+1] - drvars[1][1,cp]
+            opti.subject_to(d_x * delta_V[1] - d_y * delta_V[0] == 0) # cross product = 0 means they are colinear
 
         # keep the robot in the world bounds
         for idx in range(len(rvars)):
