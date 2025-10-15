@@ -549,7 +549,7 @@ class TestOnlinePlanner():
         ax4.set_ylabel(r"y velocity [m/s]")
 
         fig.tight_layout()
-        plt.savefig("/home/arian/repos/thesis/impact_stl/online planner/figures/plot.svg")
+        plt.savefig("/home/arian/repos/thesis/impact_stl/online_planner/figures/plot.svg")
 
         #fig.show()
 
@@ -573,7 +573,7 @@ class TestOnlinePlanner():
         axs.grid(True)
         axs.set_aspect('equal', 'box')
         fig_xy.tight_layout()
-        plt.savefig("/home/arian/repos/thesis/impact_stl/online planner/figures/xy_plane.svg")
+        plt.savefig("/home/arian/repos/thesis/impact_stl/online_planner/figures/xy_plane.svg")
 
         #fig_xy.show()
         #plt.pause(100)
@@ -604,7 +604,7 @@ class TestOnlinePlanner():
         self.ax_anim = plt.axes()
         anim = animation.FuncAnimation(self.fig_anim,self._animate_update,
                                         frames=Neval,interval=self.world_tf/Neval*1e6*2)
-        anim.save("/home/arian/repos/thesis/impact_stl/online planner/figures/animation.mp4",writer="ffmpeg", fps=Neval/self.world_tf)
+        anim.save("/home/arian/repos/thesis/impact_stl/online_planner/figures/animation.mp4",writer="ffmpeg", fps=Neval/self.world_tf)
 
 
     def _animate_update(self,i):
