@@ -98,6 +98,7 @@ class TestOnlinePlanner():
         #print("Predicted position at t = ", self.world_tf, " is ", predicted_pos(self.world_tf))
         n_cp = 6
 
+        Beginning_time = time.time()
         # New bezier variables for the robot, pre and inter curves
         rvars = [opti.variable(2,n_cp) for _ in range(2)] 
         hvars = [opti.variable(1,n_cp) for _ in range(2)]
@@ -136,6 +137,15 @@ class TestOnlinePlanner():
         pre_tIs = [self.robot_hvars[pre_idx][0,-1] for pre_idx in pre_idxs]
         #Get the last pre idx before t_meas (or when the all is made whatever)
         pre_idx = next((pre_idxs[i] for i, tI in enumerate(pre_tIs) if tI > t_meas), len(pre_tIs)-1)
+
+        # Get obj pre index
+        obj_pre_idxs = np.where(np.array(self.obj_idvars) == 'pre')[0]
+        obj_pre_TIs = [self.obj_hvars[pre_idx][0,-1] for pre_idx in obj_pre_idxs]
+        obj_pre_future_idx = [obj_pre_idxs[i] for i, tI in enumerate(obj_pre_TIs) if tI > t_meas]
+        obj_pre_idx = obj_pre_future_idx[0] # if there are multiple future pre curves take the first one
+        obj_next_pre = obj_pre_future_idx[1] if len(obj_pre_future_idx) > 1 else obj_pre_future_idx[0]
+        print('obj_index',obj_pre_idx)
+        
 
         #Beginning of pre curve ( not sure if this should be current time or planned beginning of pre curve??)
         
@@ -192,14 +202,27 @@ class TestOnlinePlanner():
             opti.subject_to(drvars[0][1,i] >= self.dq_lb[1]*dhvars[0][0,i])
 
         ###### Interaction curve constraints
-        #Final position ( again offset by the radii so the the objects is the one that needs to be at the target position not the robot)
+        # Final position ( again offset by the radii so the the objects is the one that needs to be at the target position not the robot)
         # Instead of enforcing exact equalities that may over-constrain the NLP,
         # create soft targets and penalize deviations in the objective.
         # Convert numpy targets to CasADi DM for safe mixing with CasADi variables.
         # keep in mind that x_end is taken from the robots planned trajectory, but it actually represents where the object should be.
         # Thats why we subtract the radii times unit_push_dir
         
+        ## Also add that the vectors are parallel
+        next_obj_int_pos = self.obj_rvars[obj_next_pre][:,-1]
+        #Vector between planned end of interaction and the next object interaction position
+        v = next_obj_int_pos - x_end
+        # The position of the robot at the end of the interaction plus the radii*unit_push is where the object is at the end of this interaction
+        object_end = rvars[1][:,-1] + (self.rob_rad + self.obj_rad) * unit_push_dir
+        #Create a vector between the replanned end of interaction and the next object interaction position
+        new_v = next_obj_int_pos - object_end
+        #Make sure these are parallel
+        opti.subject_to(v[0]*new_v[1] - v[1]*new_v[0] == 0) # cross product = 0 means they are colinear
+
+        # We also want the end of the itneraction to be as close as possible to the planned end of interaction
         target_r_end = ca.DM(x_end - (self.rob_rad + self.obj_rad) * unit_push_dir)
+        
         if Hard_end_time_constraint:
         # Hard constraint version:
             opti.subject_to(hvars[-1][0,-1] == tf)
@@ -271,11 +294,12 @@ class TestOnlinePlanner():
                 opti.subject_to(rvars[idx][1,i] <= self.world_ub[1])
         # Minimize the acceleration
         J = 0
-        
+        # For pre curve we can have smaller weights
         for i in range(ddrvars[0].shape[1]):
             J += ca.sumsqr(ddrvars[0][:,i])
         for i in range(ddhvars[0].shape[1]):
             J += ca.sumsqr(ddhvars[0][0,i])
+        # For interaction curve we want to minimize acceleration more
         w_acc = 1e2
         for i in range(ddrvars[1].shape[1]):
             J += w_acc*ca.sumsqr(ddrvars[1][:,i])
@@ -285,7 +309,7 @@ class TestOnlinePlanner():
         # Weights (tune as needed)
         w_r = 1e5
         w_dr = 1e3
-        w_h = 1e1
+        w_h = 1e-1
         w_dh = 1e3
 
         try:
@@ -410,6 +434,8 @@ class TestOnlinePlanner():
 
         self.obj_rvars[obj_pre_idx+2][:,1] = self.obj_rvars[obj_pre_idx+2][:,0] + self.obj_drvars[obj_pre_idx +2][:,0] / self.obj_dhvars[obj_pre_idx +2][0,0] * (self.obj_hvars[obj_pre_idx +2][0,1] - self.obj_hvars[obj_pre_idx +2][0,0])
 
+        Stop_time = time.time()
+        print("Time to set up and solve the replanning problem: ", Stop_time - Beginning_time, " seconds")
 
     def compute_trajectories(self):
         N_eval = 100
@@ -455,11 +481,9 @@ class TestOnlinePlanner():
                 ax1.plot(self.obj_htraj[bz][0,0],self.obj_rtraj[bz][0,0],'ro',markersize=s)
         ax1.plot(self.obj_htraj[-1][0,-1],self.obj_rtraj[-1][0,-1],'ro',markersize=s)
         
-
-
         for bz in range(self.nbzs):
             #If there is an interaction, plot the robot trajectory in blue
-            if 'inter' in self.robot_idvars[bz] and 'x' in self.robot_idvars[bz]:
+            if 'inter' in self.robot_idvars[bz]:
                 ax1.plot(self.robot_htraj[bz][0,:],self.robot_rtraj[bz][0,:],'b',linewidth=lw)
                 ax1.plot(self.robot_htraj[bz][0,0],self.robot_rtraj[bz][0,0],'bo',markersize=s)
             else:
@@ -472,7 +496,6 @@ class TestOnlinePlanner():
         ax1.set_ylabel(r"x position [m]")
 
         # Y position vs time
-
         for bz in range(self.nbzs):
             #Only plot object if there is no interaction
             if 'inter' not in self.obj_idvars[bz]:    
@@ -482,7 +505,7 @@ class TestOnlinePlanner():
         
         for bz in range(self.nbzs):
             #If there is an interaction, plot the robot trajectory in blue
-            if 'inter' in self.robot_idvars[bz] and 'y' in self.robot_idvars[bz] :
+            if 'inter' in self.robot_idvars[bz]:
                 ax2.plot(self.robot_htraj[bz][0,:],self.robot_rtraj[bz][1,:],'b',linewidth=lw)
                 ax2.plot(self.robot_htraj[bz][0,0],self.robot_rtraj[bz][1,0],'bo',markersize=s)
             else:
@@ -504,7 +527,7 @@ class TestOnlinePlanner():
         
         for bz in range(self.nbzs):
             #If there is an interaction, plot the robot trajectory in blue
-            if 'inter' in self.robot_idvars[bz] and 'x' in self.robot_idvars[bz]:
+            if 'inter' in self.robot_idvars[bz]:
                 ax3.plot(self.robot_htraj[bz][0,:],self.robot_dqtraj[bz][0,:],'b',linewidth=lw)
                 ax3.plot(self.robot_htraj[bz][0,0],self.robot_dqtraj[bz][0,0],'bo',markersize=s)
             else:
@@ -526,7 +549,7 @@ class TestOnlinePlanner():
 
         for bz in range(self.nbzs):
             #If there is an interaction, plot the robot trajectory in blue
-            if 'inter' in self.robot_idvars[bz] and 'y' in self.robot_idvars[bz]:
+            if 'inter' in self.robot_idvars[bz]:
                 ax4.plot(self.robot_htraj[bz][0,:],self.robot_dqtraj[bz][1,:],'b',linewidth=lw)
                 ax4.plot(self.robot_htraj[bz][0,0],self.robot_dqtraj[bz][1,0],'bo',markersize=s)
             else:
