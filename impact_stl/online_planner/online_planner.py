@@ -63,13 +63,14 @@ class TestOnlinePlanner():
         self.obj_drvars = [get_derivative_control_points_gurobi(self.obj_rvars[k], 1) for k in range(self.nbzs)]
         self.robot_dhvars = [get_derivative_control_points_gurobi(self.robot_hvars[k], 1) for k in range(self.nbzs)]
         self.obj_dhvars = [get_derivative_control_points_gurobi(self.obj_hvars[k], 1) for k in range(self.nbzs)]
-        self.obj_rad = 0.3
+        self.obj_rad = 0.2
         self.rob_rad = 0.2
         
         self.replan()
         self.compute_trajectories()
         self.plot()
         self.animate()
+        #self.save_plan()
 
     def get_pre_Idxs(self, t_meas):
         """
@@ -645,4 +646,11 @@ class TestOnlinePlanner():
         self.ax_anim.set_xlabel("x [m]")
         self.ax_anim.set_ylabel("y [m]")
         self.ax_anim.set_aspect("equal")
+    def save_plan(self):
+        from utilities.read_write_plan import plan_to_csv
+        rvars = [np.vstack((self.robot_rvars[bz],np.zeros((1,self.ncp)))) for bz in range(self.nbzs)]
+        plan_to_csv(rvars, self.robot_hvars, self.robot_idvars, self.robot_other_names,
+                    scenario_name="minimal_test_throw_and_catch",
+                    robot_name = 'snap', 
+                    path = '/home/arian/repos/thesis/impact_stl/online_planner/replans')
 test = TestOnlinePlanner()
