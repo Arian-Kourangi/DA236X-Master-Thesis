@@ -64,6 +64,7 @@ setup(
 
                 # test
                 'test_replanner = impact_stl.tests.test_replanner:main',
+                'sim_test = impact_stl.tests.sim_test:main',
         ],
     },
 )

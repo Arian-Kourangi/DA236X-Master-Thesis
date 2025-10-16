@@ -152,6 +152,7 @@ class SpacecraftImpactMPC(Node):
 
         self.publisher_offboard_mode = self.create_publisher(OffboardControlMode, 'fmu/in/offboard_control_mode', NORMAL_QOS)
         self.publisher_rates_setpoint = self.create_publisher(VehicleRatesSetpoint, 'fmu/in/vehicle_rates_setpoint', NORMAL_QOS)
+        
         self.predicted_path_pub = self.create_publisher(Path, 'impact_stl/predicted_path', 10)
         self.reference_path_pub = self.create_publisher(Path, "impact_stl/reference_path", 10)
         self.entire_path_pub = self.create_publisher(Path, "impact_stl/entire_path", 10)

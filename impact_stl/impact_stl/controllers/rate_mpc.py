@@ -6,7 +6,7 @@ import numpy as np
 import casadi as cs
 import time
 
-from impact_stl.models.spacecraft_rate_model import SpacecraftRateModel
+#from impact_stl.models.spacecraft_rate_model import SpacecraftRateModel
 
 class SpacecraftRateMPC():
     def __init__(self, model, Tf=1.0, N=10, add_cbf=False):
@@ -93,13 +93,14 @@ class SpacecraftRateMPC():
         # parameters (initial state and reference state over the whole horizon)
         x0 = ocp.parameter(self.nx)
         xref = ocp.parameter(self.nx,self.N+1)
+        S = ocp.parameter(self.N)  # selector for switching between two sets of dynamics
 
         # set initial state
         ocp.subject_to(X[:,0] == x0)
 
         # set dynamics constraints
         for i in range(self.N):
-            ocp.subject_to(self.model.get_casadi_ode(X[:,i],U[:,i],self.dt) == X[:,i+1])
+            ocp.subject_to(self.model.get_casadi_ode(X[:,i],U[:,i],self.dt)*(1-S[i]) + self.model.get_casadi_ode(X[:,i],U[:,i],self.dt, True)*S[i] == X[:,i+1])
             # ocp.subject_to(self.model.get_casadi_rk4(X[:,i],U[:,i],self.dt) == X[:,i+1])
 
         # control input constraints
@@ -180,6 +181,7 @@ class SpacecraftRateMPC():
         self.params['Q'] = Q
         self.params['Q_e'] = Q_e
         self.params['R'] = R
+        self.params['S'] = S
 
         self.vars['X'] = X
         self.vars['U'] = U
@@ -204,7 +206,7 @@ class SpacecraftRateMPC():
               weights={'Q': None, 'Q_e': None, 'R': None},
               initial_guess={'X': None, 'U': None},
               xobj=None, enable_cbf=True,
-              logger=None, verbose=False):
+              logger=None, verbose=False, selectors=None):
         t0 = time.time()
 
         # print(f"x0: {x0}")
@@ -217,6 +219,12 @@ class SpacecraftRateMPC():
 
         # set x0 parameter
         self.ocp.set_value(self.params['x0'], x0)
+        
+        #set selectors for a setpoint being on the an inter curve or not
+        if selectors is None:
+            selectors = np.zeros((self.N))
+        
+        self.ocp.set_value(self.params['S'], selectors)
 
         # set setpoints parameter
         xref = np.hstack(setpoints)

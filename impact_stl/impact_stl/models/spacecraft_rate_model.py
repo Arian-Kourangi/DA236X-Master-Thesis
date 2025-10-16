@@ -4,6 +4,7 @@ __contact__ = "jorisv@kth.se"
 
 import casadi as cs
 import numpy as np
+import copy
 
 def skew_symmetric(v):
     """ Returns the skew symmetric matrix of a 3D vector.
@@ -47,6 +48,7 @@ class SpacecraftRateModel():
         # The rest can stay the same.
         # constants
         self.mass = 16.8
+        self.object_mass = 16.8
         self.max_thrust = 1.
         self.max_rate = 0.5
 
@@ -54,7 +56,7 @@ class SpacecraftRateModel():
                               self.max_rate,self.max_rate,0.5*self.max_rate])
         self.u_lb = -self.u_ub
     
-    def get_casadi_dx(self,x,u):
+    def get_casadi_dx(self,x,u, inter = False):
         """ Returns the time derivative of the state for given state and input 
         using CasADi symbols.
         Args:
@@ -64,6 +66,10 @@ class SpacecraftRateModel():
             dx (cs.SX or cs.MX): time derivative of the state (10x1)
         
         """
+        if inter:
+            mass = copy.deepcopy(self.mass + self.object_mass)
+        else:
+            mass = copy.deepcopy(self.mass)
         p = x[0:3]
         v = x[3:6]
         q = x[6:10]
@@ -73,12 +79,12 @@ class SpacecraftRateModel():
 
         # kinematics velocity, acceleration, quaternion rate
         dx = cs.vertcat(v,
-                        v_dot_q(F,q)/self.mass,
+                        v_dot_q(F,q)/mass,
                         1/2 * cs.mtimes(skew_symmetric(w),q))
         return dx
 
-    def get_casadi_ode(self,x,u,dt):
-        dx = self.get_casadi_dx(x,u)
+    def get_casadi_ode(self,x,u,dt, inter = False):
+        dx = self.get_casadi_dx(x,u,inter)
         return x + dx*dt
     
     def get_casadi_rk4(self,x,u,dt):
