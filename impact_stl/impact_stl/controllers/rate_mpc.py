@@ -93,7 +93,7 @@ class SpacecraftRateMPC():
         # parameters (initial state and reference state over the whole horizon)
         x0 = ocp.parameter(self.nx)
         xref = ocp.parameter(self.nx,self.N+1)
-        S = ocp.parameter(self.N)  # selector for switching between two sets of dynamics
+        S = ocp.parameter(self.N+1)  # selector for switching between two sets of dynamics
 
         # set initial state
         ocp.subject_to(X[:,0] == x0)
@@ -222,7 +222,7 @@ class SpacecraftRateMPC():
         
         #set selectors for a setpoint being on the an inter curve or not
         if selectors is None:
-            selectors = np.zeros((self.N))
+            selectors = np.zeros((self.N+1))
         
         self.ocp.set_value(self.params['S'], selectors)
 

@@ -19,7 +19,7 @@ def generate_launch_description():
             name='snap_mpc',
             output='screen',
             emulate_tty=True,
-            parameters=[{'x0':9.0, 'y0':5.0, 'z0':0.0, 'vx0':0.0, 'vy0':0.0, 'vz0':0.0},
+            parameters=[{'x0':5.0, 'y0':0.0, 'z0':0.0, 'vx0':0.0, 'vy0':0.0, 'vz0':0.0},
                         {'scenario_name':'obstacle_avoidance'},
                         {'object_ns':'/pop'}]
         ),
@@ -30,7 +30,7 @@ def generate_launch_description():
             name='crackle_mpc',
             # output='screen',
             emulate_tty=True,
-            parameters=[{'x0':1.0, 'y0':7.0, 'z0':0.0, 'vx0':0.0, 'vy0':0.0, 'vz0':0.0},
+            parameters=[{'x0':5.0, 'y0':20.0, 'z0':0.0, 'vx0':0.0, 'vy0':0.0, 'vz0':0.0},
                         {'scenario_name':'obstacle_avoidance'},
                         {'object_ns':'/pop'},
                         {'enable_cbf':True}]
@@ -56,41 +56,42 @@ def generate_launch_description():
             parameters=[{'scenario_name':'obstacle_avoidance'}]
         ),
 
-        # Impact detector
-        Node(
-            package='impact_stl',
-            namespace='snap',
-            executable='impact_detector',
-            name='snap_impact_detector',
-            parameters=[{'threshold': 1.0}]
-        ),
-        Node(
-            package='impact_stl',
-            namespace='crackle',
-            executable='impact_detector',
-            name='crackle_impact_detector',
-            parameters=[{'threshold': 1.0}]
-        ),
-
-        # Replanner
-        Node(
-            package='impact_stl',
-            namespace='snap',
-            executable='replanner',
-            name='snap_replanner',
-            output='screen',
-            parameters=[{'object_ns':'/pop'},
-                        {'scenario_name':'obstacle_avoidance'}]
-        ),
-        # Replanner
-        Node(
-            package='impact_stl',
-            namespace='crackle',
-            executable='replanner',
-            name='crackle_replanner',
-            # output='screen',
-            parameters=[{'object_ns':'/pop'},
-                        {'scenario_name':'obstacle_avoidance'}]
-        ),
+        
+        ## Impact detector
+        #Node(
+        #    package='impact_stl',
+        #    namespace='snap',
+        #    executable='impact_detector',
+        #    name='snap_impact_detector',
+        #    parameters=[{'threshold': 1.0}]
+        #),
+        #Node(
+        #    package='impact_stl',
+        #    namespace='crackle',
+        #    executable='impact_detector',
+        #    name='crackle_impact_detector',
+        #    parameters=[{'threshold': 1.0}]
+        #),
+#
+        ## Replanner
+        #Node(
+        #    package='impact_stl',
+        #    namespace='snap',
+        #    executable='replanner',
+        #    name='snap_replanner',
+        #    output='screen',
+        #    parameters=[{'object_ns':'/pop'},
+        #                {'scenario_name':'obstacle_avoidance'}]
+        #),
+        ## Replanner
+        #Node(
+        #    package='impact_stl',
+        #    namespace='crackle',
+        #    executable='replanner',
+        #    name='crackle_replanner',
+        #    # output='screen',
+        #    parameters=[{'object_ns':'/pop'},
+        #                {'scenario_name':'obstacle_avoidance'}]
+        #),
 
     ])
