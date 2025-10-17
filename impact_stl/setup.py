@@ -19,6 +19,7 @@ setup(
         (os.path.join('share', package_name), glob(os.path.join('impact_stl/launch/platforms', '*launch.[pxy][yma]*'))),
         (os.path.join('share', package_name), glob(os.path.join('impact_stl/launch/throw_and_catch', '*launch.[pxy][yma]*'))),
         (os.path.join('share', package_name), glob(os.path.join('impact_stl/launch/obstacle_avoidance', '*launch.[pxy][yma]*'))),
+        (os.path.join('share', package_name), glob(os.path.join('impact_stl/launch/minimal_test', '*launch.[pxy][yma]*'))),
         (os.path.join('share', package_name), glob(os.path.join('impact_stl/launch/throw_and_catch_exp', '*launch.[pxy][yma]*'))),
         (os.path.join('share', package_name), glob(os.path.join('impact_stl/launch/pong', '*launch.[pxy][yma]*'))),
         (os.path.join('share', package_name), glob(os.path.join('impact_stl/launch/pingpong', '*launch.[pxy][yma]*'))),
@@ -26,6 +27,7 @@ setup(
         # data files (csv of motion plan)
         (os.path.join('share', package_name), glob(os.path.join('impact_stl/planners/plans/throw_and_catch/SR', '*.csv'))),
         (os.path.join('share', package_name), glob(os.path.join('impact_stl/planners/plans/obstacle_avoidance/SR', '*.csv'))),
+        (os.path.join('share', package_name), glob(os.path.join('impact_stl/planners/plans/minimal_test', '*.csv'))),
         (os.path.join('share', package_name), glob(os.path.join('impact_stl/planners/plans/throw_and_catch_exp/SR', '*.csv'))),
         (os.path.join('share', package_name), glob(os.path.join('impact_stl/planners/plans/pong/SR', '*.csv'))),
         (os.path.join('share', package_name), glob(os.path.join('impact_stl/planners/plans/pingpong/SR', '*.csv'))),

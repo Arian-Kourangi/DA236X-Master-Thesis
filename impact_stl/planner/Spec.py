@@ -274,7 +274,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         # Area's of interest
         world.areas = [area1,area2]
 
-    elif specification == "minimal_test":
+    elif specification == "minimal_test_obstacle":
         tf = 150
 
         #just so I can mark the final location of the object, not actually used in an stl spec
@@ -336,7 +336,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         phi3 = Pred(type="G",I=[0,tf],preds=[phi31])
         
         world.spec = Spec(t0=0,tf=tf)
-        world.spec.add_pred(phi3, name='crockle')
+        world.spec.add_pred(phi3, name='crackle')
         world.spec.add_pred(phi3, name='snap')
         world.spec.add_pred(phi3, name='pop')
         
@@ -346,7 +346,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
                        dx0=np.array([0,0]),
                        xf=None,
                        dxf=None,nbz=bz)
-        robot2 = Robot(name="crockle",
+        robot2 = Robot(name="crackle",
                        x0=np.array([2,9]),
                        dx0=np.array([0,0]),
                        xf=None,
@@ -373,7 +373,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         world.areas = [area1]
 
 
-    elif specification == "minimal_test_throw_and_catch":
+    elif specification == "minimal_test":
         tf = 40
 
         world.spec = Spec(t0=0,tf=tf)
