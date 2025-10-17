@@ -290,6 +290,12 @@ class TestOnlinePlanner():
             d_y = drvars[1][1,cp+1] - drvars[1][1,cp]
             opti.subject_to(d_x * delta_V[1] - d_y * delta_V[0] == 0) # cross product = 0 means they are colinear
         
+        # Ensure paralelle final velocity, since dh is constant we can ignore it
+        dq_end = dr_end/dh_end
+        replanned_dq_end = drvars[1][:,-1]/dhvars[1][0,-1]
+        opti.subject_to(dq_end[0] * replanned_dq_end[1] - dq_end[1] * replanned_dq_end[0] == 0) # cross product = 0 means they are colinear/parallel
+
+
         # Minimize the acceleration
         J = 0
         # For pre curve we can have smaller weights
@@ -308,9 +314,9 @@ class TestOnlinePlanner():
         # --- Soft penalties for final targets (relax exact equalities) ---
         # Weights (tune as needed)
         w_r = 1e5
-        w_dr = 1e3
-        w_h = 1e-1
-        w_dh = 1e3
+        w_dr = 1e4
+        w_h = 1e1
+        w_dh = 1e4
         # We also want the end of the itneraction to be as close as possible to the planned end of interaction
         target_r_end = ca.DM(x_end)
         target_h_tf = float(tf)
