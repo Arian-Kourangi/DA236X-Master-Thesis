@@ -37,11 +37,11 @@ class TestOnlinePlanner():
         self.dq_lb = np.array([-2,-2])
         self.dq_ub = np.array([2,2])        
         self.robot_rvars,self.robot_hvars,self.robot_idvars,self.robot_other_names = csv_to_plan(robot_name='snap',
-                                                                         scenario_name='minimal_test_throw_and_catch',
+                                                                         scenario_name='minimal_test',
                                                                          path='/home/arian/repos/thesis/impact_stl/planner/plans')  
 
         self.obj_rvars,self.obj_hvars,self.obj_idvars,self.obj_other_names = csv_to_plan(robot_name='pop',
-                                                                         scenario_name='minimal_test_throw_and_catch',
+                                                                         scenario_name='minimal_test',
                                                                          path='/home/arian/repos/thesis/impact_stl/planner/plans')
         #Size = [nbzs][dim,ncp]
 
@@ -180,9 +180,12 @@ class TestOnlinePlanner():
 
         # Planned start and end positions and velocities
         x_start = self.robot_rvars[pre_idx][:,0]
+        
         # This is the end position of the object at the end of the interaction curve, but because the offline planner assumes point masses the robots is the same
-        x_end = self.robot_rvars[pre_idx+1][:,-1]
-
+        #x_end = self.robot_rvars[pre_idx+1][:,-1]
+        # I changed it to be the beginning of the curve after the inter curve, since it won't be affected by the replanning
+        x_end = self.obj_rvars[obj_pre_idx+2][:,0]
+        
         dr_start = self.robot_drvars[pre_idx][:,0] 
         dh_start = self.robot_dhvars[pre_idx][0,0]
 
