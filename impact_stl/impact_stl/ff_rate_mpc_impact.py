@@ -255,6 +255,25 @@ class SpacecraftImpactMPC(Node):
             tI = np.inf
         return pre_idx, tI, pre_tIs
 
+    def get_object_next_inter(self,t):
+        """
+        Get the index of the next interaction bezier segment of the object.
+        Args:
+            t: current time
+        Returns:
+            inter_idx: index of the next interaction bezier segment of the object
+        """
+        try:
+            # Get all indices where the id is 'inter'
+            #inter_indices = [i for i, x in enumerate(self.plan_object['ids']) if x == 'inter']
+            inter_indices = np.where(np.array(self.plan_object['ids']) == 'inter')[0]
+            # Get the end times of all interaction beziers
+            inter_tEnd = [self.plan_object['hvar'][inter_idx][0,-1] for inter_idx in inter_indices]
+            # The next interaction is either ongoing or in the future, so we find the first for which tStop > t
+            inter_idx = next((inter_indices[i] for i,tend in enumerate(inter_tEnd) if tend > t), -1)
+        except:
+            inter_idx = -1
+        return inter_idx
 
     def get_setpoints(self):
         #current time in seconds, compared to start_time
@@ -370,6 +389,33 @@ class SpacecraftImpactMPC(Node):
                                             1.0, 0.0, 0.0, 0.0]).reshape(10,1))
                 times.append(ti)
                 selectors.append(1 if plani['id']=='inter' else 0)
+            # Check if no interaction on Horizon and next interaction is ours
+
+            if all(selectors[i]==0 for i in range(len(selectors))) and self.plan_object['other_names'][self.get_object_next_inter(t)] in self.robot_name:
+                self.get_logger().info('Calling Replanning Service in ff_rate_mpc_impact')
+                msg = StampedBool()
+                msg.timestamp = int(Clock().now().nanoseconds / 1000)
+                msg.t = t
+                msg.data = True
+                #self.publisher_recompute_local_plan.publish(msg)
+                #self.replanned = True
+                #self.t_object_coming = np.inf
+
+
+
+            #Checking if we are on an interaction and the end of the interaction is on the horizon
+            # NOTE: WE might need to put some sort of delay after the interaction is done,
+            # since the replanner won't change the pos directly after the interaction
+            # so the MPC might slam into the newly released object.
+
+            if any(selectors[i] ==1 for i in range(len(selectors)-1)) and selectors[-1]==0:
+                #pass
+                # TODO: make all the setpoints after the interaction equal to the last interaction setpoint
+                # We do this so the MPC focuses on the interaction and not on going to some random place afterwards
+                end_idx = next(i for i in range(len(selectors)) if selectors[i]==0)
+                for point in range(end_idx, len(setpoints)):
+                    setpoints[point] = setpoints[end_idx-1]
+
             return setpoints, times, selectors, impact_idx, weights, tI
 
 
@@ -399,7 +445,7 @@ class SpacecraftImpactMPC(Node):
         # get the reference states and corresponding times in the horizon
         setpoints, times, selectors, impact_idx, weights, tI = self.get_setpoints()
         # self.get_logger().info(f"setpoints: {setpoints[0][0:2].T}, pos: {self.vehicle_local_position[0:2].T}")
-        self.get_logger().info(f"selectors: {selectors}")
+        #self.get_logger().info(f"selectors: {selectors}")
         # solve the mpc
         if impact_idx is None:
             # now the initial guess has to be x_pred again, but check the size!
