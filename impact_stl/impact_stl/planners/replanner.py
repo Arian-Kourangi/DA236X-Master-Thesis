@@ -17,7 +17,7 @@ from px4_msgs.msg import VehicleAngularVelocity
 from px4_msgs.msg import VehicleAttitude
 from px4_msgs.msg import VehicleLocalPosition
 
-from my_msgs.msg import StampedBool
+from my_msgs.msg import StampedBool, Replan, TimeShift
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -26,6 +26,10 @@ from impact_stl.helpers.beziers import get_derivative_control_points_gurobi, get
 from impact_stl.helpers.read_write_plan import csv_to_plan, plan_to_csv
 from impact_stl.helpers.solve_two_body_impact import solve_two_body_impact
 from impact_stl.helpers.plot_rvars_hvars import plot_rvars_hvars
+
+from impact_stl.helpers.helpers import vector2PoseMsg, BezierCurve2NumpyArray, \
+                            BezierPlan2NumpyArray, interpolate_bezier, VerboseBezierPlan2NumpyArray,\
+                            Quaternion2Euler, Euler2Quaternion
 
 class RePlanner(Node):
     def __init__(self):
@@ -78,39 +82,33 @@ class RePlanner(Node):
         
         # replan subscriber
         self.replan_sub = self.create_subscription(
-            StampedBool,
+            Replan,
             'impact_stl/recompute_local_plan',
             self.recompute_local_plan_callback,
             RELIABLE_QOS)
         
-        # get the original plan from the csv file
-        package_share_directory = get_package_share_directory('impact_stl')
-        plans_path = os.path.join(package_share_directory)
-        self.rvars,self.hvars,self.idvars,self.other_names = csv_to_plan(self.robot_name,
-                                                                         scenario_name=self.scenario_name,
-                                                                         path=plans_path)
-        # get the plan of the object from the csv file
-        try:
-            self.orvars,self.ohvars,self.oidvars,self.oother_names = csv_to_plan(self.object_ns,
-                                                                                 scenario_name=self.scenario_name,
-                                                                                 path=plans_path)
-        except Exception as e:
-            print(f"Could not find plan for object {self.object_ns}")
-            print(f"Error: {e}")
+        ## get the original plan from the csv file
+        #package_share_directory = get_package_share_directory('impact_stl')
+        #plans_path = os.path.join(package_share_directory)
+        #self.rvars,self.hvars,self.idvars,self.other_names = csv_to_plan(self.robot_name,
+        #                                                                 scenario_name=self.scenario_name,
+        #                                                                 path=plans_path)
+        ## get the plan of the object from the csv file
+        #try:
+        #    self.orvars,self.ohvars,self.oidvars,self.oother_names = csv_to_plan(self.object_ns,
+        #                                                                         scenario_name=self.scenario_name,
+        #                                                                         path=plans_path)
+        #except Exception as e:
+        #    print(f"Could not find plan for object {self.object_ns}")
+        #    print(f"Error: {e}")
 
-        self.drvars = [get_derivative_control_points_gurobi(rvar) for rvar in self.rvars]
-        self.dhvars = [get_derivative_control_points_gurobi(hvar) for hvar in self.hvars]
+        #self.drvars = [get_derivative_control_points_gurobi(rvar) for rvar in self.rvars]
+        #self.dhvars = [get_derivative_control_points_gurobi(hvar) for hvar in self.hvars]
         
         # From the .sdf file:
         # /home/px4space/PX4/PX4-Space-Systems/Tools/simulation/gazebo-classic/sitl_gazebo-classic/models/2d_spacecraft/2d_spacecraft.sdf
         self.robot_radius = 0.20
-        self.robot_mass = 16.8
         self.object_radius = 0.20
-        self.object_mass = 16.8
-        self.m1 = (self.robot_mass-self.object_mass)/(self.robot_mass+self.object_mass)
-        self.m2 = (2*self.object_mass)/(self.robot_mass+self.object_mass)
-        self.m3 = (2*self.robot_mass)/(self.robot_mass+self.object_mass)
-        self.m4 = (self.object_mass-self.robot_mass)/(self.robot_mass+self.object_mass)
 
         # position and velocity variables that are updated with the subscriber calls
         self.object_attitude = np.array([1.0, 0.0, 0.0, 0.0])
@@ -120,7 +118,7 @@ class RePlanner(Node):
         # keep track of a stack of velocities to interpolate
         #TODO: if this is linked to an EKF we should use that, but the EKF needs to consider impacts
         stack_size = 15 # was 30
-        self.planner_time = 0.
+        self.start_time = 0
         self.object_local_velocity_stack = np.zeros((3,stack_size))
         self.object_local_position_stack = np.zeros((3,stack_size))
         self.object_local_position_time_stack = np.zeros((1,stack_size))
@@ -185,8 +183,27 @@ class RePlanner(Node):
         # plus the desired post-impact positions and velocities of the obstacle
         # recompute the pre- and post-impact Beziers to deal with the sizes
         self.get_logger().info('Recomputing local plan for pre- and post- impact Bezier')
-        self.planner_time = msg.t
-        self.get_logger().info(f"planner_time: {self.planner_time}")
+        self.start_time = msg.starttime
+        self.get_logger().info(f"Start time: {self.start_time}")
+        robot_plan = VerboseBezierPlan2NumpyArray(msg.robot_plan)
+        object_plan = VerboseBezierPlan2NumpyArray(msg.object_plan)
+        
+        self.robot_rvars = robot_plan['rvar']
+        self.robot_hvars = robot_plan['hvar']
+        self.robot_drvars = robot_plan['drvar']
+        self.robot_dhvars = robot_plan['dhvar']
+        self.robot_idvars = robot_plan['ids']
+        self.robot_other_names = robot_plan['other_names']
+
+        self.obj_rvars = object_plan['rvar']
+        self.obj_hvars = object_plan['hvar']
+        self.obj_drvars = object_plan['drvar']
+        self.obj_dhvars = object_plan['dhvar']
+        self.obj_idvars = object_plan['ids']
+        self.obj_other_names = object_plan['other_names']
+
+        ########### NOW SOLVE THE REPLANNING PROBLEM ############
+
         self.solve_replan_cvxpy()
         self.get_logger().info("Local plan recomputed")
 

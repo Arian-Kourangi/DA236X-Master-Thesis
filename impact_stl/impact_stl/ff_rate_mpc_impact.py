@@ -27,7 +27,7 @@ from px4_msgs.msg import VehicleLocalPosition
 from px4_msgs.msg import VehicleRatesSetpoint
 
 from my_msgs.srv import SetPlan, SetVerbosePlan
-from my_msgs.msg import StampedBool, VerboseBezierPlan
+from my_msgs.msg import StampedBool, VerboseBezierPlan, TimeShift, Replan
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -148,7 +148,7 @@ class SpacecraftImpactMPC(Node):
         self.predicted_path_pub = self.create_publisher(Path, 'impact_stl/predicted_path', 10)
         self.reference_path_pub = self.create_publisher(Path, "impact_stl/reference_path", 10)
         self.entire_path_pub = self.create_publisher(Path, "impact_stl/entire_path", 10)
-        self.publisher_recompute_local_plan = self.create_publisher(StampedBool, 'impact_stl/recompute_local_plan', RELIABLE_QOS)
+        self.publisher_recompute_local_plan = self.create_publisher(Replan, 'impact_stl/recompute_local_plan', RELIABLE_QOS)
         self.timer_period = 0.05  # seconds
         self.timer = self.create_timer(self.timer_period, self.cmdloop_callback)
 
@@ -389,17 +389,15 @@ class SpacecraftImpactMPC(Node):
                                             1.0, 0.0, 0.0, 0.0]).reshape(10,1))
                 times.append(ti)
                 selectors.append(1 if plani['id']=='inter' else 0)
+            
             # Check if no interaction on Horizon and next interaction is ours
-
             if all(selectors[i]==0 for i in range(len(selectors))) and self.plan_object['other_names'][self.get_object_next_inter(t)] in self.robot_name:
                 self.get_logger().info('Calling Replanning Service in ff_rate_mpc_impact')
-                msg = StampedBool()
-                msg.timestamp = int(Clock().now().nanoseconds / 1000)
-                msg.t = t
-                msg.data = True
-                #self.publisher_recompute_local_plan.publish(msg)
-                #self.replanned = True
-                #self.t_object_coming = np.inf
+                msg = Replan()
+                msg.starttime = self.start_time
+                msg.robot_plan = plan_to_plan_msg(self.plan['rvar'], self.plan['hvar'], self.plan['ids'], self.plan['other_names'])
+                msg.object_plan = plan_to_plan_msg(self.plan_object['rvar'], self.plan_object['hvar'], self.plan_object['ids'], self.plan_object['other_names'])
+                self.publisher_recompute_local_plan.publish(msg)
 
 
 
