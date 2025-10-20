@@ -73,7 +73,7 @@ class MinimalClientAsync(Node):
             self.get_logger().info('service not available, waiting again...')
         self.req = SetVerbosePlan.Request()
     
-    def send_request(self, rvars, hvars, idvars, other_names):
+    def send_request(self, rvars, hvars, idvars, other_names, orvars=None, ohvars=None, oidvars=None, oother_names=None):
         """
         Sends a request to the service to set the plan.
         rvars: list of numpy arrays of shape (3, n) where n is the number of control points
@@ -84,6 +84,14 @@ class MinimalClientAsync(Node):
         """
         assert(len(rvars) == len(hvars))
         plan = plan_to_plan_msg(rvars,hvars,idvars,other_names)
+        
+        if orvars is not None:
+            assert(len(orvars) == len(ohvars))
+            object_plan = plan_to_plan_msg(orvars,ohvars,oidvars,oother_names)
+            self.req.replanned = True
+            self.req.object_plan = object_plan
+        else:
+            self.req.replanned = False
 
         self.req.plan = plan
         self.future = self.cli.call_async(self.req)

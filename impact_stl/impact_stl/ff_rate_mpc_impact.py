@@ -107,13 +107,12 @@ class SpacecraftImpactMPC(Node):
             self.global_reset_callback,
             RELIABLE_QOS)
 
-        # controller heuristics
-        self.post_impact_backup_duration = 1.5  # how long we turn the contoller off after an impact
-        self.t_object_coming = np.inf           # time when the object is coming to our impact point
-        self.object_coming_wait = 2.0           # how long we wait with replanning after the object is coming
 
-        # for long specs, object_coming_wait: 3, stacksize can be larger: more precise
-        # for short specs, object_coming_wait: 1, stacksize has to be smaller
+        self.global_time_shift_sub = self.create_subscription(
+            TimeShift,
+            '/global_time_shift',
+            self.global_time_shift_callback,
+            RELIABLE_QOS)
         
         # get the plan of the object from the csv file
         # this plan also never changes, so we can load it and use it forever :)
@@ -171,6 +170,16 @@ class SpacecraftImpactMPC(Node):
 
         self.object_local_position = np.array([0.0, 0.0, 0.0])
         self.object_local_velocity = np.array([0.0, 0.0, 0.0])
+
+    def global_time_shift_callback(self, msg):
+        self.get_logger().info(f'Global time shift received: {msg.time_shift} seconds')
+        if msg.robot_name not in self.robot_name:
+            #Propogate time shift for robot plan and object plan
+            for idx in range(len(self.plan['hvar'])):
+                self.plan['hvar'][idx][0,:] += msg.time_shift
+            for idx in range(len(self.plan_object['hvar'])):
+                self.plan_object['hvar'][idx][0,:] += msg.time_shift
+
 
     def global_reset_callback(self, msg):
         self.get_logger().info('Global reset received')
@@ -400,7 +409,6 @@ class SpacecraftImpactMPC(Node):
                 self.publisher_recompute_local_plan.publish(msg)
 
 
-
             #Checking if we are on an interaction and the end of the interaction is on the horizon
             # NOTE: WE might need to put some sort of delay after the interaction is done,
             # since the replanner won't change the pos directly after the interaction
@@ -513,6 +521,8 @@ class SpacecraftImpactMPC(Node):
         self.get_logger().info('Received request')
         # self.plan = BezierPlan2NumpyArray(request.plan)
         self.plan = VerboseBezierPlan2NumpyArray(request.plan)
+        if request.replanned:
+            self.plan_object = VerboseBezierPlan2NumpyArray(request.object_plan)
         # print some info
         # self.get_logger().info(f"Number of bezier segments: {len(self.plan['rvar'])}")
         # self.get_logger().info(f"Number of control points: {self.plan['rvar'][0].shape[1]}")
