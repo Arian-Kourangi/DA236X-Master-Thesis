@@ -86,7 +86,7 @@ class RePlanner(Node):
             Replan,
             'impact_stl/recompute_local_plan',
             self.recompute_local_plan_callback,
-            RELIABLE_QOS)
+            NORMAL_QOS)
         self.time_shift_pub = self.create_publisher(
             TimeShift,
             '/global/impact_stl/time_shift',

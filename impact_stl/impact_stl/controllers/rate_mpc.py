@@ -54,7 +54,7 @@ class SpacecraftRateMPC():
             v_o = cs.SX.sym('v_o', 3)
             q_o = cs.SX.sym('q_o', 4)
             u_o = cs.SX.sym('u_o', self.nu)
-            h = cs.sumsqr(p_r[0:2] - p_o[0:2]) - (0.2+0.2+0.1)**2 # 2 times the radius of the object + 0.1 m
+            h = cs.sumsqr(p_r[0:2] - p_o[0:2]) - (0.2+0.2)**2 # 2 times the radius of the object + 0.1 m
             x = cs.vertcat(p_r,p_o)
             dx = cs.vertcat(v_r,v_o)
 

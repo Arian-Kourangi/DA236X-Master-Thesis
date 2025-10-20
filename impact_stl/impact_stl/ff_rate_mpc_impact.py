@@ -158,7 +158,7 @@ class SpacecraftImpactMPC(Node):
 
         # Create Spacecraft and controller objects
         self.model = SpacecraftRateModel()
-        self.mpc = SpacecraftRateMPC(self.model,Tf=2.0,N=20,add_cbf=self.enable_cbf)
+        self.mpc = SpacecraftRateMPC(self.model,Tf=1.0,N=10,add_cbf=self.enable_cbf)
         self.initial_guess = {'X': None, 'U': None}
 
         self.vehicle_attitude = np.array([1.0, 0.0, 0.0, 0.0])
@@ -172,9 +172,9 @@ class SpacecraftImpactMPC(Node):
         self.object_local_velocity = np.array([0.0, 0.0, 0.0])
 
     def global_time_shift_callback(self, msg):
-        self.get_logger().info(f'Global time shift received: {msg.time_shift} seconds')
         if msg.robot_name not in self.robot_name:
             #Propogate time shift for robot plan and object plan
+            self.get_logger().info(f'Global time shift received: {msg.time_shift} seconds')
             for idx in range(len(self.plan['hvar'])):
                 self.plan['hvar'][idx][0,:] += msg.time_shift
             for idx in range(len(self.plan_object['hvar'])):
@@ -401,7 +401,7 @@ class SpacecraftImpactMPC(Node):
             
             # Check if no interaction on Horizon and next interaction is ours
             if all(selectors[i]==0 for i in range(len(selectors))) and self.plan_object['other_names'][self.get_object_next_inter(t)] in self.robot_name:
-                self.get_logger().info('Calling Replanning Service in ff_rate_mpc_impact')
+                #self.get_logger().info('Calling Replanning Service in ff_rate_mpc_impact')
                 msg = Replan()
                 msg.starttime = int(self.start_time)
                 msg.robot_plan = plan_to_plan_msg(self.plan['rvar'], self.plan['hvar'], self.plan['ids'], self.plan['other_names'])
@@ -481,7 +481,7 @@ class SpacecraftImpactMPC(Node):
             self.get_logger().info(f"enable_cbf: {enable_cbf}") if self.enable_cbf else None
             """
             enable_cbf = False
-            if selectors is not None:
+            if selectors is not None and self.enable_cbf:
                 if all(s == 0 for s in selectors):
                     enable_cbf = True
             x_pred, u_pred = self.mpc.solve(x0,setpoints,
