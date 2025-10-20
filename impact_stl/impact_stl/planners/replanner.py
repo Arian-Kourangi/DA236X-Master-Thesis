@@ -11,6 +11,7 @@ from rclpy.clock import Clock
 from impact_stl.helpers.qos_profiles import NORMAL_QOS, RELIABLE_QOS
 import os
 import cvxpy as cp
+import copy
 
 from px4_msgs.msg import VehicleAngularVelocity
 from px4_msgs.msg import VehicleAngularVelocity
@@ -113,6 +114,8 @@ class RePlanner(Node):
         self.rob_rad = 0.20
         self.obj_rad = 0.20
         self.end_time_diff = 0.0
+        self.old_robot_hvars = None
+        self.inter_id = 0
 
         # position and velocity variables that are updated with the subscriber calls
         self.object_attitude = np.array([1.0, 0.0, 0.0, 0.0])
@@ -191,7 +194,20 @@ class RePlanner(Node):
         self.get_logger().info(f"Start time: {self.start_time}")
         robot_plan = VerboseBezierPlan2NumpyArray(msg.robot_plan)
         object_plan = VerboseBezierPlan2NumpyArray(msg.object_plan)
-        
+
+        # To not add more timeshifts when replanning the same inter multiple times
+        # The inter_id is used if the robot has different interactions in the plan so it resets
+
+        if self.old_robot_hvars is None or self.inter_id != msg.inter_id:
+            self.old_robot_hvars = robot_plan['hvar']
+            self.end_time_diff = 0.0
+        elif msg.inter_id == self.inter_id:
+            # If we get a replan for the same inter it can happen without the plans in mpc being updated, 
+            # so to avoid time_shifts accumalating we save the hvars from the previous
+            self.old_robot_hvars = copy.deepcopy(self.robot_hvars)
+
+        self.inter_id = msg.inter_id
+
         self.robot_rvars = robot_plan['rvar']
         self.robot_hvars = robot_plan['hvar']
         self.robot_drvars = robot_plan['drvar']
@@ -525,23 +541,26 @@ class RePlanner(Node):
 
         # If I allow the time at the end of the interaction to shift, I need to propogate this change to the rest of the curves
         # Compute the time difference at the end of the interaction curve
-        self.end_time_diff  = self.sol_robot_hvars[1][0,-1] - self.robot_hvars[pre_idx+1][0,-1]
+        end_time_diff  = self.sol_robot_hvars[1][0,-1] - self.robot_hvars[pre_idx+1][0,-1]
         ## Propogate time change to the rest of the curves
         for k in range(pre_idx+2, len(self.robot_hvars)):
-            self.robot_hvars[k][0,:] += self.end_time_diff
+            self.robot_hvars[k][0,:] += end_time_diff
     
         self.robot_hvars[pre_idx] = self.sol_robot_hvars[0]
         self.robot_hvars[pre_idx+1] = self.sol_robot_hvars[1]
 
         # Propogate the time change to the rest of the object curves
         for k in range(obj_pre_idx+2, len(self.obj_hvars)):
-            self.obj_hvars[k][0,:] += self.end_time_diff
+            self.obj_hvars[k][0,:] += end_time_diff
         
         # Update the objects pre and inter cruves to have the same interaction and end time as the robots
         # NOTE: WE only update the time since we want to keep the original planned positions of the object, for subsequent replannings
         self.obj_hvars[obj_pre_idx][0,-1] = self.robot_hvars[pre_idx][0,-1]
         self.obj_hvars[obj_pre_idx+1][0,0] = self.robot_hvars[pre_idx+1][0,0]
         self.obj_hvars[obj_pre_idx+1][0,-1] = self.robot_hvars[pre_idx+1][0,-1]
+
+        #For publishing the timeshift
+        self.end_time_diff = self.sol_robot_hvars[1][0,-1] - self.old_robot_hvars[pre_idx+1][0,-1]
 
 
 def main(args=None):

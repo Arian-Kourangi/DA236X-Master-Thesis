@@ -406,6 +406,7 @@ class SpacecraftImpactMPC(Node):
                 msg.starttime = int(self.start_time)
                 msg.robot_plan = plan_to_plan_msg(self.plan['rvar'], self.plan['hvar'], self.plan['ids'], self.plan['other_names'])
                 msg.object_plan = plan_to_plan_msg(self.plan_object['rvar'], self.plan_object['hvar'], self.plan_object['ids'], self.plan_object['other_names'])
+                msg.inter_id = self.get_object_next_inter(t)
                 self.publisher_recompute_local_plan.publish(msg)
 
 
