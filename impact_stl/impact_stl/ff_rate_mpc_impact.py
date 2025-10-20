@@ -50,7 +50,7 @@ class SpacecraftImpactMPC(Node):
         self.robot_name = self.get_namespace()
         self.object_ns = self.declare_parameter('object_ns', '/crackle').value
         self.scenario_name = self.declare_parameter('scenario_name', 'throw_and_catch').value
-        self.enable_cbf =False #self.declare_parameter('enable_cbf', False).value
+        self.enable_cbf =self.declare_parameter('enable_cbf', True).value
         self.get_logger().info(f"robot_name: {self.robot_name}, object_ns: {self.object_ns}, enable_cbf: {self.enable_cbf}")
 
         # get initial state from passed parameters
@@ -394,7 +394,7 @@ class SpacecraftImpactMPC(Node):
             if all(selectors[i]==0 for i in range(len(selectors))) and self.plan_object['other_names'][self.get_object_next_inter(t)] in self.robot_name:
                 self.get_logger().info('Calling Replanning Service in ff_rate_mpc_impact')
                 msg = Replan()
-                msg.starttime = self.start_time
+                msg.starttime = int(self.start_time)
                 msg.robot_plan = plan_to_plan_msg(self.plan['rvar'], self.plan['hvar'], self.plan['ids'], self.plan['other_names'])
                 msg.object_plan = plan_to_plan_msg(self.plan_object['rvar'], self.plan_object['hvar'], self.plan_object['ids'], self.plan_object['other_names'])
                 self.publisher_recompute_local_plan.publish(msg)
@@ -469,10 +469,14 @@ class SpacecraftImpactMPC(Node):
                 xobj = xobj
             self.get_logger().info(f"enable_cbf: {enable_cbf}") if self.enable_cbf else None
             """
+            enable_cbf = False
+            if selectors is not None:
+                if all(s == 0 for s in selectors):
+                    enable_cbf = True
             x_pred, u_pred = self.mpc.solve(x0,setpoints,
                                             weights=weights,
                                             initial_guess=self.initial_guess,
-                                            xobj=xobj,enable_cbf=False,
+                                            xobj=xobj,enable_cbf=enable_cbf,
                                             logger=self.get_logger(),
                                             verbose=False,selectors=selectors)
 

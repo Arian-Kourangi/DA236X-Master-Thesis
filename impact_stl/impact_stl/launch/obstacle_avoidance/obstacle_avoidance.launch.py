@@ -21,7 +21,8 @@ def generate_launch_description():
             emulate_tty=True,
             parameters=[{'x0':5.0, 'y0':0.0, 'z0':0.0, 'vx0':0.0, 'vy0':0.0, 'vz0':0.0},
                         {'scenario_name':'obstacle_avoidance'},
-                        {'object_ns':'/pop'}]
+                        {'object_ns':'/pop'},
+                        {'enable_cbf':True}]
         ),
         Node(
             package='impact_stl',
