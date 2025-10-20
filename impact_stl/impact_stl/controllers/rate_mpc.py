@@ -250,9 +250,9 @@ class SpacecraftRateMPC():
                 self.ocp.set_value(self.params['OffSwitch'], 0)
             else:
                 self.ocp.set_value(self.params['OffSwitch'], 10000) # make it a trivial constraint
-            print(f"h: {self.h(x0,xobj)}")
-            print(f"dh: {self.dh(x0,xobj)}")
-            print(f"ddh: {self.ddh(x0,xobj,np.zeros((self.nu,1)),np.zeros((self.nu,1)))}")
+            #print(f"h: {self.h(x0,xobj)}")
+            #print(f"dh: {self.dh(x0,xobj)}")
+            #print(f"ddh: {self.ddh(x0,xobj,np.zeros((self.nu,1)),np.zeros((self.nu,1)))}")
 
         try:
             sol = self.ocp.solve()

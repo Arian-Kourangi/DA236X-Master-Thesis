@@ -109,7 +109,6 @@ class MainPlanner(Node):
             history=QoSHistoryPolicy.KEEP_LAST,
             depth=1
         )
-
         self.minimal_client = MinimalClientAsync()
         self.node = node
 

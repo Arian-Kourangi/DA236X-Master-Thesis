@@ -21,7 +21,8 @@ def generate_launch_description():
             emulate_tty=True,
             parameters=[{'x0':5.0, 'y0':0.0, 'z0':0.0, 'vx0':0.0, 'vy0':0.0, 'vz0':0.0},
                         {'scenario_name':'minimal_test'},
-                        {'object_ns':'/pop'}]
+                        {'object_ns':'/pop'},
+                        {'enable_cbf':True}]
         ),
         Node(
             package='impact_stl',
@@ -56,42 +57,25 @@ def generate_launch_description():
             parameters=[{'scenario_name':'minimal_test'}]
         ),
 
-        
-        ## Impact detector
-        #Node(
-        #    package='impact_stl',
-        #    namespace='snap',
-        #    executable='impact_detector',
-        #    name='snap_impact_detector',
-        #    parameters=[{'threshold': 1.0}]
-        #),
-        #Node(
-        #    package='impact_stl',
-        #    namespace='crackle',
-        #    executable='impact_detector',
-        #    name='crackle_impact_detector',
-        #    parameters=[{'threshold': 1.0}]
-        #),
-#
-        ## Replanner
-        #Node(
-        #    package='impact_stl',
-        #    namespace='snap',
-        #    executable='replanner',
-        #    name='snap_replanner',
-        #    output='screen',
-        #    parameters=[{'object_ns':'/pop'},
-        #                {'scenario_name':'minimal_test'}]
-        #),
-        ## Replanner
-        #Node(
-        #    package='impact_stl',
-        #    namespace='crackle',
-        #    executable='replanner',
-        #    name='crackle_replanner',
-        #    # output='screen',
-        #    parameters=[{'object_ns':'/pop'},
-        #                {'scenario_name':'minimal_test'}]
-        #),
+        # Replanner
+        Node(
+            package='impact_stl',
+            namespace='snap',
+            executable='replanner',
+            name='snap_replanner',
+            output='screen',
+            parameters=[{'object_ns':'/pop'},
+                        {'scenario_name':'minimal_test'}]
+        ),
+        # Replanner
+        Node(
+            package='impact_stl',
+            namespace='crackle',
+            executable='replanner',
+            name='crackle_replanner',
+            # output='screen',
+            parameters=[{'object_ns':'/pop'},
+                        {'scenario_name':'minimal_test'}]
+        ),
 
     ])

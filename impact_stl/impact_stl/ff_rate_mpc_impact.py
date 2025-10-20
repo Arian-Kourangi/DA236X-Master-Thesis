@@ -110,7 +110,7 @@ class SpacecraftImpactMPC(Node):
 
         self.global_time_shift_sub = self.create_subscription(
             TimeShift,
-            '/global_time_shift',
+            '/global/impact_stl/time_shift',
             self.global_time_shift_callback,
             RELIABLE_QOS)
         
@@ -158,7 +158,7 @@ class SpacecraftImpactMPC(Node):
 
         # Create Spacecraft and controller objects
         self.model = SpacecraftRateModel()
-        self.mpc = SpacecraftRateMPC(self.model,Tf=1.0,N=10,add_cbf=self.enable_cbf)
+        self.mpc = SpacecraftRateMPC(self.model,Tf=2.0,N=20,add_cbf=self.enable_cbf)
         self.initial_guess = {'X': None, 'U': None}
 
         self.vehicle_attitude = np.array([1.0, 0.0, 0.0, 0.0])
@@ -406,7 +406,9 @@ class SpacecraftImpactMPC(Node):
                 msg.starttime = int(self.start_time)
                 msg.robot_plan = plan_to_plan_msg(self.plan['rvar'], self.plan['hvar'], self.plan['ids'], self.plan['other_names'])
                 msg.object_plan = plan_to_plan_msg(self.plan_object['rvar'], self.plan_object['hvar'], self.plan_object['ids'], self.plan_object['other_names'])
-                msg.inter_id = self.get_object_next_inter(t)
+                msg.inter_id = int(self.get_object_next_inter(t))
+                #self.get_logger().info(f"next interaction index of the object: {self.get_object_next_inter(t)}")
+                #self.get_logger().info(f"type of next interaction index of the object: {type(self.get_object_next_inter(t))}")
                 self.publisher_recompute_local_plan.publish(msg)
 
 

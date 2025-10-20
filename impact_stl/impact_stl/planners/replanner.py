@@ -25,7 +25,7 @@ from ament_index_python.packages import get_package_share_directory
 from impact_stl.planners.main_planner import MinimalClientAsync
 from impact_stl.helpers.beziers import get_derivative_control_points_gurobi, get_derivative_control_points_cvxpy
 from impact_stl.helpers.read_write_plan import csv_to_plan, plan_to_csv
-from impact_stl.helpers.solve_two_body_impact import solve_two_body_impact
+#from impact_stl.helpers.solve_two_body_impact import solve_two_body_impact
 from impact_stl.helpers.plot_rvars_hvars import plot_rvars_hvars
 
 from impact_stl.helpers.helpers import vector2PoseMsg, BezierCurve2NumpyArray, \
@@ -36,7 +36,7 @@ class RePlanner(Node):
     def __init__(self):
         super().__init__('replanner')
         self.get_logger().info('Creating Replanner Node')
-        
+
         self.minimal_client = MinimalClientAsync()
 
         # the object is an actual robot, so it has a namespace
@@ -116,6 +116,11 @@ class RePlanner(Node):
         self.end_time_diff = 0.0
         self.old_robot_hvars = None
         self.inter_id = 0
+        #Size of world
+        self.world_lb = np.array([0,0])
+        self.world_ub = np.array([10,20])
+        self.dq_lb = np.array([-2,-2])
+        self.dq_ub = np.array([2,2])  
 
         # position and velocity variables that are updated with the subscriber calls
         self.object_attitude = np.array([1.0, 0.0, 0.0, 0.0])
@@ -223,21 +228,23 @@ class RePlanner(Node):
         self.obj_other_names = object_plan['other_names']
 
         ########### NOW SOLVE THE REPLANNING PROBLEM ############
-
-        self.solve_replan_new()
-        self.get_logger().info("Local plan recomputed")
-
+        try:
+            self.solve_replan_new()
+        #self.get_logger().info("Local plan recomputed")
+        except Exception as e:
+            self.get_logger().error(f"Could not replan: {e}")
+            return
         #Send out timeshift to all robots
         msg = TimeShift()
         msg.time_shift = float(self.end_time_diff)
         msg.robot_name = self.robot_name
         self.time_shift_pub.publish(msg)
-
+        self.get_logger().info(f"Published time shift: {self.end_time_diff} seconds")
         #Sending the new plan to the ff_rate_mpc_impact node
-        self.get_logger().info('Sending plan')
+        #self.get_logger().info('Sending plan')
         self.minimal_client.send_request(self.robot_rvars, self.robot_hvars, self.robot_idvars, self.robot_other_names,
                                        self.obj_rvars, self.obj_hvars, self.obj_idvars, self.obj_other_names)
-        self.get_logger().info('Plan received')
+        #self.get_logger().info('Plan received')
     
     def get_pre_Idxs(self, t_meas):
         """
@@ -268,7 +275,10 @@ class RePlanner(Node):
     def solve_replan_new(self):
         opti = cs.Opti()
 
-        t_meas = self.object_local_position_time_stack[0,-1] - self.start_time
+        t_meas = (self.object_local_position_time_stack[0,-1] - self.start_time) / 1e6 # Convert from microseconds to seconds
+        #self.get_logger().info(f"measured at time: {self.object_local_position_time_stack[0,-1]}")
+        #self.get_logger().info(f"start_time: {self.start_time}")
+        #self.get_logger().info(f"t_meas: {t_meas}")
         pos_meas = self.object_local_position[0:2]
         vel_meas = np.mean(self.object_local_velocity_stack,axis=1)[0:2]
 
@@ -396,12 +406,16 @@ class RePlanner(Node):
         next_obj_int_pos = self.obj_rvars[obj_next_pre][0:2,-1]
         #Vector between planned end of interaction and the next object interaction position
         v = next_obj_int_pos - x_end
-        # The position of the robot at the end of the interaction plus the radii*unit_push is where the object is at the end of this interaction
-        object_end = rvars[1][:,-1] + (self.rob_rad + self.obj_rad) * unit_push_dir
-        #Create a vector between the replanned end of interaction and the next object interaction position
-        new_v = next_obj_int_pos - object_end
-        #Make sure these are parallel
-        opti.subject_to(v[0]*new_v[1] - v[1]*new_v[0] == 0) # cross product = 0 means they are colinear/parallel
+        
+        if v[0] == 0 and v[1] == 0:
+            pass
+        else:
+            # The position of the robot at the end of the interaction plus the radii*unit_push is where the object is at the end of this interaction
+            object_end = rvars[1][:,-1] + (self.rob_rad + self.obj_rad) * unit_push_dir
+            #Create a vector between the replanned end of interaction and the next object interaction position
+            new_v = next_obj_int_pos - object_end
+            #Make sure these are parallel
+            opti.subject_to(v[0]*new_v[1] - v[1]*new_v[0] == 0) # cross product = 0 means they are colinear/parallel
 
 
         # Note: penalties are added to the objective J later. Keep these as soft targets
@@ -441,7 +455,10 @@ class RePlanner(Node):
         # Ensure paralelle final velocity, since dh is constant we can ignore it
         dq_end = dr_end/dh_end
         replanned_dq_end = drvars[1][:,-1]/dhvars[1][0,-1]
-        opti.subject_to(dq_end[0] * replanned_dq_end[1] - dq_end[1] * replanned_dq_end[0] == 0) # cross product = 0 means they are colinear/parallel
+        if dq_end[0] == 0 and dq_end[1] == 0:
+            pass
+        else:
+            opti.subject_to(dq_end[0] * replanned_dq_end[1] - dq_end[1] * replanned_dq_end[0] == 0) # cross product = 0 means they are colinear/parallel
 
 
         # Minimize the acceleration
@@ -509,7 +526,7 @@ class RePlanner(Node):
             'qpsol_options': qp_opts
         }
         opti.solver('sqpmethod', sqp_opts)
-        
+
         sol = opti.solve()
 
         #Extract the solution
