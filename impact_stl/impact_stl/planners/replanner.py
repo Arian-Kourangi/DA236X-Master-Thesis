@@ -513,7 +513,7 @@ class RePlanner(Node):
             'eps_abs': 1e-3,
             'eps_rel': 1e-3,
             'adaptive_rho': True,
-            'polish':True}, 'warm_start_primal': True, 'warm_start_dual': True
+            'polish':True}, 'warm_start_primal': True, 'warm_start_dual': True, 'error_on_fail': False
         }
 
         sqp_opts = {
