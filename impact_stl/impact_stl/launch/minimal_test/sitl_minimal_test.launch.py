@@ -72,13 +72,13 @@ def generate_launch_description():
             arguments=['-d', [os.path.join(get_package_share_directory('impact_stl'), 'config.rviz')]]
     ))
     # Plotjuggler from the juggler_2.xml file (2 spacecrafts)
-    ld.add_action(Node(
-            package='plotjuggler',
-            namespace='snap',
-            executable='plotjuggler',
-            name='plotjuggler',
-            arguments=['-l', os.path.join(get_package_share_directory('impact_stl'), 'juggler_sitl_3.xml')]
-    ))
+    #ld.add_action(Node(
+    #        package='plotjuggler',
+    #        namespace='snap',
+    #        executable='plotjuggler',
+    #        name='plotjuggler',
+    #        arguments=['-l', os.path.join(get_package_share_directory('impact_stl'), 'juggler_sitl_3.xml')]
+    #))
 
     # Launch a Gazebo to ROS bridge such that we can use the ground truth
     # position and velocity estimates in the controller

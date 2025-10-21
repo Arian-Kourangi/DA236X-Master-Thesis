@@ -21,7 +21,7 @@ def generate_launch_description():
             DeclareLaunchArgument("name", default_value="snap"),
             DeclareLaunchArgument("delay", default_value="0"),
             DeclareLaunchArgument("headless", default_value="1"),
-            DeclareLaunchArgument("world", default_value="default"),
+            DeclareLaunchArgument("world", default_value="frictionless_kth"),
             ExecuteProcess(
                 cmd=[
                     "xterm",        # or "gnome-terminal", "konsole", "xterm"
