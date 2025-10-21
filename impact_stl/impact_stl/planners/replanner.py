@@ -279,6 +279,18 @@ class RePlanner(Node):
         #self.get_logger().info(f"measured at time: {self.object_local_position_time_stack[0,-1]}")
         #self.get_logger().info(f"start_time: {self.start_time}")
         #self.get_logger().info(f"t_meas: {t_meas}")
+
+
+        dts = np.array([(self.object_local_position_time_stack[0,i+1]-self.object_local_position_time_stack[0,i])/1e6 \
+                        for i in range(self.object_local_position_time_stack.shape[1]-1)])
+        dxs_from_pos = np.zeros((self.object_local_position_stack.shape[0],dts.shape[0]))
+        for i in range(dts.shape[0]):
+            dxs_from_pos[:,i] = (self.object_local_position_stack[:,i+1]-self.object_local_position_stack[:,i])/dts[i]
+        
+
+        # then we obtain the position which is the current position plus the velocity times the time
+
+
         pos_meas = self.object_local_position[0:2]
         vel_meas = np.mean(self.object_local_velocity_stack,axis=1)[0:2]
 
@@ -454,7 +466,7 @@ class RePlanner(Node):
         
         # Ensure paralelle final velocity, since dh is constant we can ignore it
         dq_end = dr_end/dh_end
-        replanned_dq_end = drvars[1][:,-1]/dhvars[1][0,-1]
+        replanned_dq_end = drvars[1][:,-1]
         if dq_end[0] == 0 and dq_end[1] == 0:
             pass
         else:

@@ -41,7 +41,7 @@ class SpacecraftRateMPC():
         # self.R = np.diag([1e-3] * 6)
 
         # px4-mpc 
-        self.Q = np.diag([5e0, 5e0, 5e0, 8e-1, 8e-1, 8e-1, 8e3])
+        self.Q = np.diag([5e0, 5e0, 5e0, 5e0, 5e0, 5e0, 8e3])
         self.Q_e = 10 * self.Q
         self.R = 2*np.diag([1e-2, 1e-2, 1e-2, 2e0, 2e0, 2e0])
 
