@@ -60,7 +60,7 @@ def generate_launch_description():
             package='px4_offboard',
             namespace='pop',
             executable='visualizer',
-            name='visualizer_1',
+            name='visualizer_2',
     )),
 
 
