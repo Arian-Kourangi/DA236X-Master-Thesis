@@ -459,11 +459,16 @@ class RePlanner(Node):
 
         # Make sure the ratio of change in y velocity to change in x velocity is the same as the desired delta_V
         # This ensures that the robot pushes in the direction of desired velocity i.e the interaction angle is constant
-        for i in range(drvars[1].shape[1]-1):
-            d_x = drvars[1][0,cp+1] - drvars[1][0,cp]
-            d_y = drvars[1][1,cp+1] - drvars[1][1,cp]
-            opti.subject_to(d_x * delta_V[1] - d_y * delta_V[0] == 0) # cross product = 0 means they are colinear
+        #for i in range(drvars[1].shape[1]-1):
+        #    d_x = drvars[1][0,cp+1] - drvars[1][0,cp]
+        #    d_y = drvars[1][1,cp+1] - drvars[1][1,cp]
+        #    opti.subject_to(d_x * delta_V[1] - d_y * delta_V[0] == 0) # cross product = 0 means they are colinear
         
+        #Constant change of velocity
+        for i in range(drvars[1].shape[1]-2):
+            opti.subject_to(drvars[1][0,i+2] - 2*drvars[1][0,i+1] + drvars[1][0,i] == 0)
+            opti.subject_to(drvars[1][1,i+2] - 2*drvars[1][1,i+1] + drvars[1][1,i] == 0)
+
         # Ensure paralelle final velocity, since dh is constant we can ignore it
         dq_end = dr_end/dh_end
         replanned_dq_end = drvars[1][:,-1]
@@ -475,12 +480,12 @@ class RePlanner(Node):
 
         # Minimize the acceleration
         J = 0
-        # For pre curve we can have smaller weights
+        ## For pre curve we can have smaller weights
         for i in range(ddrvars[0].shape[1]):
-            J += cs.sumsqr(ddrvars[0][:,i])
+            J += 0.1*cs.sumsqr(ddrvars[0][:,i])
         for i in range(ddhvars[0].shape[1]):
-            J += cs.sumsqr(ddhvars[0][0,i])
-        
+            J += 0.1*cs.sumsqr(ddhvars[0][0,i])
+    
         # For interaction curve we want to minimize acceleration more
         w_acc = 1e2
         for i in range(ddrvars[1].shape[1]):
