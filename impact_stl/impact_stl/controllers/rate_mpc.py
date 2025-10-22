@@ -103,7 +103,7 @@ class SpacecraftRateMPC():
         #    ocp.subject_to(self.model.get_casadi_ode(X[:,i],U[:,i],self.dt)*(1-S[i]) + self.model.get_casadi_ode(X[:,i],U[:,i],self.dt, True)*S[i] == X[:,i+1])
         #    # ocp.subject_to(self.model.get_casadi_rk4(X[:,i],U[:,i],self.dt) == X[:,i+1])
         
-        ######## THIS PART REPLACES THE FOR LOOP TO SPEED UP THE CONSTRUCTION OF THE OCP ########
+        ######## THIS PART REPLACES THE FOR LOOP ABOVE TO SPEED UP THE CONSTRUCTION OF THE OCP ########
         # --- define symbols for a single step ---
         Xk = cs.SX.sym('Xk', self.nx)
         Uk = cs.SX.sym('Uk', self.nu)
@@ -186,7 +186,15 @@ class SpacecraftRateMPC():
             'print_time': False,
             'verbose': False,
         }
-        ocp.solver('ipopt', {**ipopt_opts, 'expand': True,})
+        ocp.solver('ipopt', {
+            **ipopt_opts,
+            'expand': True,       # inline the graph for faster code
+            'jit': True,          # JIT-compile CasADi generated code
+            'jit_options': {
+                'compiler': 'gcc',  # or 'clang' if preferred
+                'flags': '-O3 -march=native -mtune=native -fopenmp'     # optimize aggressively
+            }
+        })
 
         # SQP:
         # qp_opts = {
