@@ -143,7 +143,10 @@ class RePlanner(Node):
         self.Ncalls = 0
         self.Ncallbacks = 0
         self.verbose = True
-
+        self.vars = {}
+        self.params = {}
+        self.n_cp = 6 # number of control points per curve
+        self.opti = self.setup()
         self.get_logger().info('Finished Replanner Node')
 
         
@@ -229,7 +232,7 @@ class RePlanner(Node):
 
         ########### NOW SOLVE THE REPLANNING PROBLEM ############
         try:
-            self.solve_replan_new()
+            self.solve()
         #self.get_logger().info("Local plan recomputed")
         except Exception as e:
             self.get_logger().error(f"Could not replan: {e}")
@@ -272,10 +275,9 @@ class RePlanner(Node):
         obj_next_pre_idx = obj_pre_future_idx[1] if len(obj_pre_future_idx) > 1 else obj_pre_future_idx[0]
         return rob_pre_idx, obj_pre_idx, obj_next_pre_idx
 
-    def solve_replan_new(self):
 
+    def solve(self):
         start = time.time()
-        opti = cs.Opti()
 
         t_meas = (self.object_local_position_time_stack[0,-1] - self.start_time) / 1e6 # Convert from microseconds to seconds
         #self.get_logger().info(f"measured at time: {self.object_local_position_time_stack[0,-1]}")
@@ -283,28 +285,84 @@ class RePlanner(Node):
         #self.get_logger().info(f"t_meas: {t_meas}")
 
 
-        dts = np.array([(self.object_local_position_time_stack[0,i+1]-self.object_local_position_time_stack[0,i])/1e6 \
-                        for i in range(self.object_local_position_time_stack.shape[1]-1)])
-        dxs_from_pos = np.zeros((self.object_local_position_stack.shape[0],dts.shape[0]))
-        for i in range(dts.shape[0]):
-            dxs_from_pos[:,i] = (self.object_local_position_stack[:,i+1]-self.object_local_position_stack[:,i])/dts[i]
+        #dts = np.array([(self.object_local_position_time_stack[0,i+1]-self.object_local_position_time_stack[0,i])/1e6 \
+        #                for i in range(self.object_local_position_time_stack.shape[1]-1)])
+        #dxs_from_pos = np.zeros((self.object_local_position_stack.shape[0],dts.shape[0]))
+        #for i in range(dts.shape[0]):
+        #    dxs_from_pos[:,i] = (self.object_local_position_stack[:,i+1]-self.object_local_position_stack[:,i])/dts[i]
         
 
         # then we obtain the position which is the current position plus the velocity times the time
 
-
         pos_meas = self.object_local_position[0:2]
         vel_meas = np.mean(self.object_local_velocity_stack,axis=1)[0:2]
+        #vel_meas = np.mean(dxs_from_pos,axis=1)[0:2]
+        # Get the idx of the robots next pre curve after t_meas, and the two next pre curves of the object
+        pre_idx, obj_pre_idx, obj_next_pre = self.get_pre_Idxs(t_meas)
+        
+        self.opti.set_value(self.params['t_meas'], t_meas)
+        self.opti.set_value(self.params['pos_meas'], pos_meas)
+        self.opti.set_value(self.params['vel_meas'], vel_meas)
+        self.opti.set_value(self.params['t0'], self.robot_hvars[pre_idx][0,0])
+        self.opti.set_value(self.params['tI'] ,self.robot_hvars[pre_idx][0,-1])
+        self.opti.set_value(self.params['tf'],self.robot_hvars[pre_idx+1][0,-1])
+        self.opti.set_value(self.params['x_start'], self.robot_rvars[pre_idx][0:2,0])
+        self.opti.set_value(self.params['x_end'], self.obj_rvars[obj_pre_idx+2][0:2,0])
+        self.opti.set_value(self.params['dr_start'], self.robot_drvars[pre_idx][0:2,0])
+        self.opti.set_value(self.params['dh_start'], self.robot_dhvars[pre_idx][0,0])
+        self.opti.set_value(self.params['dr_end'], self.robot_drvars[pre_idx+1][0:2,-1])
+        self.opti.set_value(self.params['dh_end'], self.robot_dhvars[pre_idx+1][0,-1])
+        self.opti.set_value(self.params['next_obj_int_pos'], self.obj_rvars[obj_next_pre][0:2,-1])
 
+        # Set initial guesses
+        for idx in range(len(self.vars['rvars'])):
+            for k in range(self.vars['rvars'][idx].shape[0]):
+                for i in range(self.vars['rvars'][idx].shape[1]):
+                    self.opti.set_initial(self.vars['rvars'][idx][k,i], self.robot_rvars[pre_idx+idx][k,i])
+                    self.opti.set_initial(self.vars['hvars'][idx][0,i], self.robot_hvars[pre_idx+idx][0,i])
+        try:
+            sol = self.opti.solve()
+        except Exception as e:
+            import traceback
+            self.get_logger().error(f"Solver error: {e}")
+            self.get_logger().error(f"Traceback: {traceback.format_exc()}")
+            raise
+
+        #Extract the solution
+        self.sol_robot_rvars = [sol.value(self.vars['rvars'][k]).reshape(2,self.n_cp) for k in range(len(self.vars['rvars']))]
+        self.sol_robot_hvars = [sol.value(self.vars['hvars'][k]).reshape(1,self.n_cp) for k in range(len(self.vars['hvars']))]
+        #Add padding to make them compatible with the rest of the plan
+        self.sol_robot_rvars = [np.vstack([rvar,np.zeros((1,rvar.shape[1]))]) for rvar in self.sol_robot_rvars]
+
+        self.update_plan(pre_idx, obj_pre_idx)
+        # I have to update the object plan as well since the interaction time might change and then for 
+        # subsequent replans if I want to replan past the pre-computed objectplans impact time it will choose the wrong pre idx
+
+        #Then the timeshift I will only apply it if its a different robot. I will apply to both robot and object
+
+        end = time.time()
+        #self.get_logger().info(f"Replanning time: {end - start} seconds")
+
+    def setup(self):
+
+        opti = cs.Opti()
+        
+        t_meas = opti.parameter() # time of measurement
+        vel_meas = opti.parameter(2) # velocity measurement at time t_meas
+        pos_meas = opti.parameter(2)  # position measurement at time t_meas
+        self.params['t_meas'] = t_meas
+        self.params['pos_meas'] = pos_meas
+        self.params['vel_meas'] = vel_meas
 
         # Function to predict the position of the object at time t based on current measurement and constant velocity model
         predicted_pos = lambda t: pos_meas + vel_meas * (t - t_meas)
-        n_cp = 6 # number of control points per curve
 
 
         # New bezier variables for the robot, pre and inter curves
-        rvars = [opti.variable(2,n_cp) for _ in range(2)] 
-        hvars = [opti.variable(1,n_cp) for _ in range(2)]
+        rvars = [opti.variable(2,self.n_cp) for _ in range(2)] 
+        hvars = [opti.variable(1,self.n_cp) for _ in range(2)]
+        self.vars['rvars'] = rvars
+        self.vars['hvars'] = hvars
         t_I = opti.variable() #time of interaction
 
         # Construct the derivative control points
@@ -352,30 +410,42 @@ class RePlanner(Node):
             opti.subject_to(drvars[1][1,i] <= 0.5*self.dq_ub[1]*dhvars[1][0,i])
             opti.subject_to(drvars[1][1,i] >= 0.5*self.dq_lb[1]*dhvars[1][0,i])
         
-        # Get the idx of the robots next pre curve after t_meas, and the two next pre curves of the object
-        pre_idx, obj_pre_idx, obj_next_pre = self.get_pre_Idxs(t_meas)
 
         ###### FROM PLANNED TRAJECTORY ######
         # Planned start time of pre curve        
-        t0 = self.robot_hvars[pre_idx][0,0]
+
+        t0 = opti.parameter()
+        self.params['t0'] = t0
+
         # Planned time of impact
-        tI = self.robot_hvars[pre_idx][0,-1]
+        tI = opti.parameter()
+        self.params['tI'] = tI
         # Planned end of interaction
-        tf = self.robot_hvars[pre_idx+1][0,-1]
+        
+        tf = opti.parameter()
+        self.params['tf'] = tf
 
         # Planned start and end positions and velocities
-        x_start = self.robot_rvars[pre_idx][0:2,0]
+
+        x_start = opti.parameter(2)
+        self.params['x_start'] = x_start
         
         # This is the end position of the object at the end of the interaction curve, but because the offline planner assumes point masses the robots is the same
         #x_end = self.robot_rvars[pre_idx+1][:,-1]
         # I changed it to be the beginning of the curve after the inter curve, since it won't be affected by the replanning
-        x_end = self.obj_rvars[obj_pre_idx+2][0:2,0]
-        
-        dr_start = self.robot_drvars[pre_idx][0:2,0] 
-        dh_start = self.robot_dhvars[pre_idx][0,0]
+        x_end = opti.parameter(2)
+        self.params['x_end'] = x_end
+         
+        dr_start = opti.parameter(2)
+        self.params['dr_start'] = dr_start
+        dh_start = opti.parameter()
+        self.params['dh_start'] = dh_start
 
-        dr_end = self.robot_drvars[pre_idx+1][0:2,-1]
-        dh_end = self.robot_dhvars[pre_idx+1][0,-1]
+        
+        dr_end = opti.parameter(2)
+        self.params['dr_end'] = dr_end
+        dh_end = opti.parameter()
+        self.params['dh_end'] = dh_end
         #####################################
         
         #Initial position and time of the robot pre curve
@@ -395,9 +465,10 @@ class RePlanner(Node):
         # Desired velocity after interaction - current measured velocity = desired change in velocity
         delta_V = dr_end/dh_end - vel_meas # Same as the desired object velocity at the end of the interaction - current object velocity
         # Get the interaction angle
-        travel_dir = np.arctan2(delta_V[1],delta_V[0])
+        travel_dir = cs.atan2(delta_V[1], delta_V[0])  # Make it symbolic
+
         # Unit vector in the direction of travel ( to get the ratio of the change in velocity in the two dimensions)
-        unit_push_dir = np.array([np.cos(travel_dir), np.sin(travel_dir)])
+        unit_push_dir = cs.vertcat(cs.cos(travel_dir), cs.sin(travel_dir))
 
         ###### Pre curve constraints
 
@@ -417,47 +488,37 @@ class RePlanner(Node):
         # Thats why we subtract the radii times unit_push_dir
         
         ## Also add that the vectors are parallel
-        next_obj_int_pos = self.obj_rvars[obj_next_pre][0:2,-1]
+        
+        next_obj_int_pos = opti.parameter(2)
+        self.params['next_obj_int_pos'] = next_obj_int_pos
+        
         #Vector between planned end of interaction and the next object interaction position
         v = next_obj_int_pos - x_end
         
-        if v[0] == 0 and v[1] == 0:
-            pass
-        else:
-            # The position of the robot at the end of the interaction plus the radii*unit_push is where the object is at the end of this interaction
-            object_end = rvars[1][:,-1] + (self.rob_rad + self.obj_rad) * unit_push_dir
-            #Create a vector between the replanned end of interaction and the next object interaction position
-            new_v = next_obj_int_pos - object_end
-            #Make sure these are parallel
-            opti.subject_to(v[0]*new_v[1] - v[1]*new_v[0] == 0) # cross product = 0 means they are colinear/parallel
+        
+        # The position of the robot at the end of the interaction plus the radii*unit_push is where the object is at the end of this interaction
+        object_end = rvars[1][:,-1] + (self.rob_rad + self.obj_rad) * unit_push_dir
+        #Create a vector between the replanned end of interaction and the next object interaction position
+        new_v = next_obj_int_pos - object_end
+        #Make sure these are parallel
+        opti.subject_to(new_v[0] * v[1] - new_v[1] * v[0] == 0) # cross product = 0 means they are colinear/parallel
 
 
-        # Note: penalties are added to the objective J later. Keep these as soft targets
-        # so the solver can trade off exact satisfaction vs feasibility.
+        # Directional constraints on velocity changes during interaction curve
+        # Create symbolic boolean conditions
+        y_pos_condition = cs.logic_and(travel_dir >= 0, travel_dir <= np.pi)
+        x_pos_condition = cs.logic_and(travel_dir >= -np.pi/2, travel_dir <= np.pi/2)
+        sign_x = cs.if_else(x_pos_condition, 1, -1)
+        sign_y = cs.if_else(y_pos_condition, 1, -1)
 
-        y_pos = False # if false the direction of force in y demension is negative
-        x_pos = False # if false the direction of force in x demension is negative
-
-        # Push constraints - only push in the direction of desired velocity during the interaction
-        if 0<= travel_dir <= np.pi:
-            y_pos = True
-        if -np.pi/2 <= travel_dir <= np.pi/2:
-            x_pos = True
-        #print("x_pos = ", x_pos, " y_pos = ", y_pos)
-
-        # iterate over derivative control points (there are n_cp-1 derivative control points)
-        # when comparing consecutive derivative control points we should stop one earlier
-        # to avoid indexing past the last column
         for cp in range(drvars[1].shape[1]-1):
-            if x_pos:
-                opti.subject_to(drvars[1][0,cp+1] - drvars[1][0,cp] >= 0) # increasing positive x velocity or decreasing negative x velocity
-            else:
-                opti.subject_to(drvars[1][0,cp+1] - drvars[1][0,cp] <= 0) # decreasing positive x velocity or increasing negative x velocity
-            if y_pos:
-                opti.subject_to(drvars[1][1,cp+1] - drvars[1][1,cp] >= 0) # increasing positive y velocity or decreasing negative y velocity
-            else:
-                opti.subject_to(drvars[1][1,cp+1] - drvars[1][1,cp] <= 0) # decreasing positive y velocity or increasing negative y velocity
-            opti.subject_to(dhvars[1][0,cp+1] == dhvars[1][0,cp]) # Constant time derivative for now
+            dv_x = drvars[1][0,cp+1] - drvars[1][0,cp]
+            dv_y = drvars[1][1,cp+1] - drvars[1][1,cp]
+            
+            opti.subject_to(dv_x * sign_x >= 0)
+            opti.subject_to(dv_y * sign_y >= 0)
+
+            opti.subject_to(dhvars[1][0,cp+1] == dhvars[1][0,cp]) # Constant time derivative
 
         # Make sure the ratio of change in y velocity to change in x velocity is the same as the desired delta_V
         # This ensures that the robot pushes in the direction of desired velocity i.e the interaction angle is constant
@@ -474,11 +535,7 @@ class RePlanner(Node):
         # Ensure paralelle final velocity, since dh is constant we can ignore it
         dq_end = dr_end/dh_end
         replanned_dq_end = drvars[1][:,-1]
-        if dq_end[0] == 0 and dq_end[1] == 0:
-            pass
-        else:
-            opti.subject_to(dq_end[0] * replanned_dq_end[1] - dq_end[1] * replanned_dq_end[0] == 0) # cross product = 0 means they are colinear/parallel
-
+        opti.subject_to(dq_end[0] * replanned_dq_end[1] - dq_end[1] * replanned_dq_end[0] == 0) # cross product = 0 means they are colinear/parallel
 
         # Minimize the acceleration
         J = 0
@@ -502,29 +559,19 @@ class RePlanner(Node):
         w_h = 1e1
         w_dh = 1e4
         # We also want the end of the itneraction to be as close as possible to the planned end of interaction
-        target_r_end = cs.DM(x_end)
-        target_h_tf = float(tf)
-        target_dr_end = cs.DM(dr_end)
-        target_dh_end = float(dh_end)
         try:
             # target_* were prepared earlier (CasADi DM or floats)
             object_pos = rvars[1][:,-1]+(self.rob_rad + self.obj_rad) * unit_push_dir
-            J += w_r * cs.sumsqr(object_pos- target_r_end)
-            J += w_dr * cs.sumsqr(drvars[-1][:,-1] - target_dr_end)
-            J += w_h * (hvars[-1][0,-1] - target_h_tf)**2
+            J += w_r * cs.sumsqr(object_pos- x_end)
+            J += w_dr * cs.sumsqr(drvars[-1][:,-1] - dr_end)
+            J += w_h * (hvars[-1][0,-1] - tf)**2
             J += w_h * (t_I - tI )**2  # also penalize deviation from t_I at start of interaction curve
-            J += w_dh * (dhvars[-1][0,-1] - target_dh_end)**2
+            J += w_dh * (dhvars[-1][0,-1] - dh_end)**2
         except NameError:
             # If targets are not defined (shouldn't happen), skip adding penalties
             pass
 
         opti.minimize(J)
-        # Set initial guesses
-        for idx in range(len(rvars)):
-            for k in range(rvars[idx].shape[0]):
-                for i in range(rvars[idx].shape[1]):
-                    opti.set_initial(rvars[idx][k,i], self.robot_rvars[pre_idx+idx][k,i])
-                    opti.set_initial(hvars[idx][0,i], self.robot_hvars[pre_idx+idx][0,i])
 
         qp_opts = {'osqp': {
             'max_iter': 1000,
@@ -546,22 +593,9 @@ class RePlanner(Node):
         }
         opti.solver('sqpmethod', sqp_opts)
 
-        sol = opti.solve()
 
-        #Extract the solution
-        self.sol_robot_rvars = [sol.value(rvars[k]).reshape(2,n_cp) for k in range(len(rvars))]
-        self.sol_robot_hvars = [sol.value(hvars[k]).reshape(1,n_cp) for k in range(len(hvars))]
-        #Add padding to make them compatible with the rest of the plan
-        self.sol_robot_rvars = [np.vstack([rvar,np.zeros((1,rvar.shape[1]))]) for rvar in self.sol_robot_rvars]
-
-        self.update_plan(pre_idx, obj_pre_idx)
-        # I have to update the object plan as well since the interaction time might change and then for 
-        # subsequent replans if I want to replan past the pre-computed objectplans impact time it will choose the wrong pre idx
-
-        #Then the timeshift I will only apply it if its a different robot. I will apply to both robot and object
-
-        end = time.time()
-        self.get_logger().info(f"Replanning time: {end - start} seconds")
+        return opti
+    
     def update_plan(self, pre_idx, obj_pre_idx):
 
         """

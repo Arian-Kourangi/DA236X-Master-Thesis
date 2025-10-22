@@ -175,8 +175,14 @@ class SpacecraftImpactMPC(Node):
         if msg.robot_name not in self.robot_name:
             #Propogate time shift for robot plan and object plan
             #self.get_logger().info(f'Global time shift received: {msg.time_shift} seconds')
-            for idx in range(len(self.plan['hvar'])):
-                self.plan['hvar'][idx][0,:] += msg.time_shift
+            #current_time = (Clock().now().nanoseconds / 1000 - self.start_time) / 1e6
+            #self.get_logger().info(f'Recieved shift at: {current_time}')
+
+            # TODO: This is causing troubles now that replanning is so fast, need to rethink.
+            # Currently i only propogate the object plan so we atleast replan at the correct time.
+            #for idx in range(len(self.plan['hvar'])):
+            #    self.plan['hvar'][idx][0,:] += msg.time_shift
+
             for idx in range(len(self.plan_object['hvar'])):
                 self.plan_object['hvar'][idx][0,:] += msg.time_shift
 
@@ -516,7 +522,7 @@ class SpacecraftImpactMPC(Node):
         if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             self.publish_rate_setpoint(u_pred)
         
-        print(f"Time elapsed: {time.time() - t0}")
+        #print(f"Time elapsed: {time.time() - t0}")
         if time.time() - t0 > self.timer_period:
             self.get_logger().info(f"LOOP TOOK TOO LONG: {time.time() - t0} (timer_period: {self.timer_period})")
             

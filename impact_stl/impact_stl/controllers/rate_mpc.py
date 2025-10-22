@@ -103,6 +103,7 @@ class SpacecraftRateMPC():
         #    ocp.subject_to(self.model.get_casadi_ode(X[:,i],U[:,i],self.dt)*(1-S[i]) + self.model.get_casadi_ode(X[:,i],U[:,i],self.dt, True)*S[i] == X[:,i+1])
         #    # ocp.subject_to(self.model.get_casadi_rk4(X[:,i],U[:,i],self.dt) == X[:,i+1])
         
+        ######## THIS PART REPLACES THE FOR LOOP TO SPEED UP THE CONSTRUCTION OF THE OCP ########
         # --- define symbols for a single step ---
         Xk = cs.SX.sym('Xk', self.nx)
         Uk = cs.SX.sym('Uk', self.nu)
@@ -124,12 +125,14 @@ class SpacecraftRateMPC():
         # X has shape (nx, N+1)
         # U has shape (nu, N)
         # S has shape (1, N+1)
-        
+
         # Apply f_map to get all next states in one go
         X_next = self.f_map(X[:, :-1], U, S[:-1])
-        
+
         # Add single constraint for all steps
         ocp.subject_to(X[:, 1:] == X_next)
+
+        ##### END REPLACEMENT PART ########
 
         
         # control input constraints
