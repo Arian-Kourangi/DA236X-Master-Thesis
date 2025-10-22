@@ -174,7 +174,7 @@ class SpacecraftImpactMPC(Node):
     def global_time_shift_callback(self, msg):
         if msg.robot_name not in self.robot_name:
             #Propogate time shift for robot plan and object plan
-            self.get_logger().info(f'Global time shift received: {msg.time_shift} seconds')
+            #self.get_logger().info(f'Global time shift received: {msg.time_shift} seconds')
             for idx in range(len(self.plan['hvar'])):
                 self.plan['hvar'][idx][0,:] += msg.time_shift
             for idx in range(len(self.plan_object['hvar'])):
@@ -516,12 +516,12 @@ class SpacecraftImpactMPC(Node):
         if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             self.publish_rate_setpoint(u_pred)
         
-        # print(f"Time elapsed: {time.time() - t0}")
-        # if time.time() - t0 > self.timer_period:
-        #     self.get_logger().info(f"LOOP TOOK TOO LONG: {time.time() - t0} (timer_period: {self.timer_period})")
+        print(f"Time elapsed: {time.time() - t0}")
+        if time.time() - t0 > self.timer_period:
+            self.get_logger().info(f"LOOP TOOK TOO LONG: {time.time() - t0} (timer_period: {self.timer_period})")
             
     def add_set_plan_callback(self, request, response):
-        self.get_logger().info('Received request')
+        #self.get_logger().info('Received request')
         # self.plan = BezierPlan2NumpyArray(request.plan)
         self.plan = VerboseBezierPlan2NumpyArray(request.plan)
         if request.replanned:
@@ -540,7 +540,7 @@ class SpacecraftImpactMPC(Node):
                 posei = vector2PoseMsg('world', np.array([plani['q'][0], plani['q'][1], -0.01]), np.array([1.0, 0.0, 0.0, 0.0]))
                 entire_path_msg.header = posei.header
                 entire_path_msg.poses.append(posei)
-            self.get_logger().info('Publishing the entire path')
+            #self.get_logger().info('Publishing the entire path')
             self.entire_path_pub.publish(entire_path_msg)
         except Exception as e:
             self.get_logger().info(f"Could not publish the entire path: {e}")

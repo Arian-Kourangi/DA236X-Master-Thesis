@@ -194,9 +194,9 @@ class RePlanner(Node):
         # based on the position and velocities of the robot and obstacle
         # plus the desired post-impact positions and velocities of the obstacle
         # recompute the pre- and post-impact Beziers to deal with the sizes
-        self.get_logger().info('Recomputing local plan for pre- and post- impact Bezier')
+        #self.get_logger().info('Recomputing local plan for pre- and post- impact Bezier')
         self.start_time = msg.starttime
-        self.get_logger().info(f"Start time: {self.start_time}")
+        #self.get_logger().info(f"Start time: {self.start_time}")
         robot_plan = VerboseBezierPlan2NumpyArray(msg.robot_plan)
         object_plan = VerboseBezierPlan2NumpyArray(msg.object_plan)
 
@@ -239,7 +239,7 @@ class RePlanner(Node):
         msg.time_shift = float(self.end_time_diff)
         msg.robot_name = self.robot_name
         self.time_shift_pub.publish(msg)
-        self.get_logger().info(f"Published time shift: {self.end_time_diff} seconds")
+        #self.get_logger().info(f"Published time shift: {self.end_time_diff} seconds")
         #Sending the new plan to the ff_rate_mpc_impact node
         #self.get_logger().info('Sending plan')
         self.minimal_client.send_request(self.robot_rvars, self.robot_hvars, self.robot_idvars, self.robot_other_names,
@@ -273,6 +273,8 @@ class RePlanner(Node):
         return rob_pre_idx, obj_pre_idx, obj_next_pre_idx
 
     def solve_replan_new(self):
+
+        start = time.time()
         opti = cs.Opti()
 
         t_meas = (self.object_local_position_time_stack[0,-1] - self.start_time) / 1e6 # Convert from microseconds to seconds
@@ -558,6 +560,8 @@ class RePlanner(Node):
 
         #Then the timeshift I will only apply it if its a different robot. I will apply to both robot and object
 
+        end = time.time()
+        self.get_logger().info(f"Replanning time: {end - start} seconds")
     def update_plan(self, pre_idx, obj_pre_idx):
 
         """

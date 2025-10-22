@@ -98,11 +98,40 @@ class SpacecraftRateMPC():
         # set initial state
         ocp.subject_to(X[:,0] == x0)
 
-        # set dynamics constraints
-        for i in range(self.N):
-            ocp.subject_to(self.model.get_casadi_ode(X[:,i],U[:,i],self.dt)*(1-S[i]) + self.model.get_casadi_ode(X[:,i],U[:,i],self.dt, True)*S[i] == X[:,i+1])
-            # ocp.subject_to(self.model.get_casadi_rk4(X[:,i],U[:,i],self.dt) == X[:,i+1])
+        ## set dynamics constraints
+        #for i in range(self.N):
+        #    ocp.subject_to(self.model.get_casadi_ode(X[:,i],U[:,i],self.dt)*(1-S[i]) + self.model.get_casadi_ode(X[:,i],U[:,i],self.dt, True)*S[i] == X[:,i+1])
+        #    # ocp.subject_to(self.model.get_casadi_rk4(X[:,i],U[:,i],self.dt) == X[:,i+1])
+        
+        # --- define symbols for a single step ---
+        Xk = cs.SX.sym('Xk', self.nx)
+        Uk = cs.SX.sym('Uk', self.nu)
+        Sk = cs.SX.sym('Sk')   # scalar selector
 
+        # --- get both modes once ---
+        f_normal = self.model.get_casadi_ode(Xk, Uk, self.dt)
+        f_alt    = self.model.get_casadi_ode(Xk, Uk, self.dt, True)
+
+        # --- combine using S ---
+        f_dyn = f_normal * (1 - Sk) + f_alt * Sk
+
+        # --- make a function for one integration step ---
+        self.f_step = cs.Function('f_step', [Xk, Uk, Sk], [f_dyn])
+
+
+        self.f_map = self.f_step.map(self.N, "thread")  # "thread" enables parallel eval
+
+        # X has shape (nx, N+1)
+        # U has shape (nu, N)
+        # S has shape (1, N+1)
+        
+        # Apply f_map to get all next states in one go
+        X_next = self.f_map(X[:, :-1], U, S[:-1])
+        
+        # Add single constraint for all steps
+        ocp.subject_to(X[:, 1:] == X_next)
+
+        
         # control input constraints
         for i in range(self.N):
             ocp.subject_to(self.model.u_lb <= U[:,i])
@@ -154,7 +183,7 @@ class SpacecraftRateMPC():
             'print_time': False,
             'verbose': False,
         }
-        ocp.solver('ipopt',ipopt_opts)
+        ocp.solver('ipopt', {**ipopt_opts, 'expand': True,})
 
         # SQP:
         # qp_opts = {
@@ -197,7 +226,10 @@ class SpacecraftRateMPC():
         # quaternion cost
         q = x[6:10].reshape((4,1))
         qref = xref[6:10].reshape((4,1))
-        eq = 1 - (q.T @ qref)**2 
+        dot = cs.dot(q, qref)
+
+        eq = 1-dot*dot
+        #eq = 1 - (q.T @ qref)**2 
         cost_eq = eq.T @ Q[6,6].reshape((1, 1)) @ eq
 
         return cost_eq + cost_es
@@ -269,74 +301,3 @@ class SpacecraftRateMPC():
         return X_pred, U_pred
 
 
-#! Impact detector with direction information
-# __author__ = "Joris Verhagen"
-# __contact__ = "jorisv@kth.se"
-# import numpy as np
-# import rclpy
-# from rclpy.clock import Clock
-# from rclpy.node import Node
-# from impact_stl.helpers.qos_profiles import RELIABLE_QOS, NORMAL_QOS
-# from px4_msgs.msg import VehicleLocalPosition
-# from my_msgs.msg import StampedBool
-# class ImpactDetector(Node):
-#     def __init__(self):
-#         super().__init__('impact_detector')
-#         self.threshold = self.declare_parameter('threshold', 1.0).value # 1.0 for sim, 3.0 for hw
-#         self.gz = self.declare_parameter('gz', True).value
-#         if self.gz:
-#             self.local_position_sub = self.create_subscription(
-#                 VehicleLocalPosition,
-#                 'fmu/out/vehicle_local_position_gz',
-#                 self.vehicle_local_position_callback,
-#                 NORMAL_QOS)
-#         else:
-#             self.local_position_sub = self.create_subscription(
-#                 VehicleLocalPosition,
-#                 'fmu/out/vehicle_local_position',
-#                 self.vehicle_local_position_callback,
-#                 NORMAL_QOS)
-#         self.publisher_impact = self.create_publisher(StampedBool, 'impact_stl/impact_detected', RELIABLE_QOS)
-#         self.publisher_impact_direction = self.create_publisher(StampedBool, 'impact_stl/impact_direction', RELIABLE_QOS)
-#         self.vehicle_acceleration = np.array([0.0, 0.0, 0.0])
-#         self.vehicle_past_accelerations = np.zeros((3,))
-#         self.past_accel_x = np.zeros((3,))
-#         self.past_accel_y = np.zeros((3,))
-#         # get the current time
-#         self.t_start = Clock().now().nanoseconds/1000
-#         self.t_wait  = 3
-#         self.get_logger().info('Created an impact detector')
-#     def vehicle_local_position_callback(self, msg):
-#         if (Clock().now().nanoseconds/1000 - self.t_start)/1e6 < self.t_wait:
-#             return
-#         # TODO: handle NED->ENU transformation
-#         self.vehicle_acceleration[0] = msg.ax
-#         self.vehicle_acceleration[1] = -msg.ay
-#         self.vehicle_acceleration[2] = -msg.az
-#         self.vehicle_past_accelerations[:-1] = self.vehicle_past_accelerations[1:]
-#         self.vehicle_past_accelerations[-1] = np.linalg.norm(self.vehicle_acceleration)
-#         self.past_accel_x[:-1] = self.past_accel_x[1:]
-#         self.past_accel_x[-1] = self.vehicle_acceleration[0]
-#         self.past_accel_y[:-1] = self.past_accel_y[1:]
-#         self.past_accel_y[-1] = self.vehicle_acceleration[1]
-#         if np.mean(self.vehicle_past_accelerations) > self.threshold:
-#             self.get_logger().info('--- IMPACT DETECTED ---')
-#             msg = StampedBool()
-#             msg.timestamp = int(Clock().now().nanoseconds / 1000)
-#             msg.data[0] = True
-#             if abs(np.mean(self.past_accel_x)) > abs(np.mean(self.past_accel_y)):
-#                 self.get_logger().info('Impact direction: y')
-#                 msg.data[1] = True
-#             else:
-#                 self.get_logger().info('Impact direction: x')
-#                 msg.data[1] = False
-#             self.publisher_impact.publish(msg)
-#             self.get_logger().info('Impact message published')
-# def main(args=None):
-#     rclpy.init(args=args)
-#     impact_detector = ImpactDetector()
-#     rclpy.spin(impact_detector)
-#     impact_detector.destroy_node()
-#     rclpy.shutdown()
-# if __name__ == '__main__':
-#     main()
