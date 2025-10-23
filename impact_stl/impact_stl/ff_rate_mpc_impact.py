@@ -144,9 +144,12 @@ class SpacecraftImpactMPC(Node):
         self.publisher_offboard_mode = self.create_publisher(OffboardControlMode, 'fmu/in/offboard_control_mode', NORMAL_QOS)
         self.publisher_rates_setpoint = self.create_publisher(VehicleRatesSetpoint, 'fmu/in/vehicle_rates_setpoint', NORMAL_QOS)
         
-        self.predicted_path_pub = self.create_publisher(Path, 'impact_stl/predicted_path', 10)
-        self.reference_path_pub = self.create_publisher(Path, "impact_stl/reference_path", 10)
+        #self.predicted_path_pub = self.create_publisher(Path, 'impact_stl/predicted_path', 10)
+        #self.reference_path_pub = self.create_publisher(Path, "impact_stl/reference_path", 10)
+        
         self.entire_path_pub = self.create_publisher(Path, "impact_stl/entire_path", 10)
+        self.replanned_path_pub = self.create_publisher(Path, "impact_stl/replanned_path", 10)
+        
         self.publisher_recompute_local_plan = self.create_publisher(Replan, 'impact_stl/recompute_local_plan', RELIABLE_QOS)
         self.timer_period = 0.05  # seconds
         self.timer = self.create_timer(self.timer_period, self.cmdloop_callback)
@@ -243,32 +246,6 @@ class SpacecraftImpactMPC(Node):
         rates_setpoint_msg.thrust_body[2] = -float(thrust_command[2])
         self.publisher_rates_setpoint.publish(rates_setpoint_msg)
 
-    def get_pre_idx_and_tI(self,t):
-        """
-        Get the index of the pre-impact bezier segment and the impact time tI.
-        Args:
-            t: current time
-        Returns:
-            pre_idx: index of the next pre-impact bezier segment
-            tI: impact time
-        """
-        # if plan0 is pre, and plan1 is post, that means an impact has occurred
-        # in the horizon, and we need to use an impact-mpc
-        try:
-            # Get all indices where the id is 'pre'
-            pre_indices = [i for i, x in enumerate(self.plan['ids']) if x == 'pre']
-            # Get the end times of all pre-impact beziers
-            pre_tIs = [self.plan['hvar'][i][0,-1] for i in pre_indices]
-            # impacts may only occur in the future, so we find the first for which tI > t
-            pre_idx = next((i for i, tI in enumerate(pre_tIs) if tI > t), len(pre_tIs)-1)
-            tI = pre_tIs[pre_idx]
-            # print(f"pre_indices: {pre_indices}, pre_tIs: {pre_tIs}")
-            # print(f"pre_idx: {pre_idx}, tI: {tI}")
-        except:
-            pre_tIs = [0.0]
-            pre_idx = -1
-            tI = np.inf
-        return pre_idx, tI, pre_tIs
 
     def get_object_next_inter(self,t):
         """
@@ -527,31 +504,40 @@ class SpacecraftImpactMPC(Node):
             self.get_logger().info(f"LOOP TOOK TOO LONG: {time.time() - t0} (timer_period: {self.timer_period})")
             
     def add_set_plan_callback(self, request, response):
-        #self.get_logger().info('Received request')
-        # self.plan = BezierPlan2NumpyArray(request.plan)
         self.plan = VerboseBezierPlan2NumpyArray(request.plan)
         if request.replanned:
+            #Save the object plan with new times
             self.plan_object = VerboseBezierPlan2NumpyArray(request.object_plan)
-        # print some info
-        # self.get_logger().info(f"Number of bezier segments: {len(self.plan['rvar'])}")
-        # self.get_logger().info(f"Number of control points: {self.plan['rvar'][0].shape[1]}")
-        # self.get_logger().info(f"Segment ids: {self.plan['ids']}")
-        # create the entire path and publish it to rviz
+        self.publish_plan(request.replanned)
+        return response
+    
+    def publish_plan(self,replanned):
+        if not replanned:
+            start = 0
+            stop = -1
+            pub = self.entire_path_pub
+            path_id = 'entire'
+        else:
+            t = (Clock().now().nanoseconds / 1000 - self.start_time) / 1e6
+            start = self.get_pre_idx(t)
+            stop = start +1
+            pub = self.replanned_path_pub
+            path_id = 'replanned'
+
         try:
             N = 100
-            ts = np.linspace(self.plan['hvar'][0][0,0],self.plan['hvar'][-1][0,-1],N)
-            entire_path_msg = Path()
+            ts = np.linspace(self.plan['hvar'][start][0,0],self.plan['hvar'][stop][0,-1],N)
+            path_msg = Path()
             for t in ts:
                 plani = interpolate_bezier(self.plan,t)
                 posei = vector2PoseMsg('world', np.array([plani['q'][0], plani['q'][1], -0.01]), np.array([1.0, 0.0, 0.0, 0.0]))
-                entire_path_msg.header = posei.header
-                entire_path_msg.poses.append(posei)
-            #self.get_logger().info('Publishing the entire path')
-            self.entire_path_pub.publish(entire_path_msg)
+                path_msg.header = posei.header
+                path_msg.poses.append(posei)
+            self.get_logger().info(f'Publishing the {path_id} path')
+            pub.publish(path_msg)
         except Exception as e:
-            self.get_logger().info(f"Could not publish the entire path: {e}")
-
-        return response
+            self.get_logger().info(f"Could not publish the {path_id} path: {e}")
+        
 
     def execute_plan_callback(self, msg):
         self.get_logger().info('Starting executing the plan')
@@ -564,7 +550,24 @@ class SpacecraftImpactMPC(Node):
                 self.started = True
                 self.start_time = Clock().now().nanoseconds / 1000
         
-
+    def get_pre_idx(self,t):
+        """
+        Get the index of the next pre-impact bezier segment and the impact time tI.
+        Args:
+            t: current time
+        Returns:
+            pre_idx: index of the next pre-impact bezier segment
+        """
+        try:
+            # Get all indices where the id is 'pre'
+            pre_indices = [i for i, x in enumerate(self.plan['ids']) if x == 'pre']
+            # Get the end times of all pre-impact beziers
+            pre_tIs = [self.plan['hvar'][i][0,-1] for i in pre_indices]
+            # impacts may only occur in the future, so we find the first for which tI > t
+            pre_idx = next((pre_indices[i] for i, tI in enumerate(pre_tIs) if tI > t), len(pre_tIs)-1)
+        except:
+            pre_idx = -1
+        return pre_idx
 
 def main(args=None):
     rclpy.init(args=args)
