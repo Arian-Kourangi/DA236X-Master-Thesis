@@ -52,6 +52,8 @@ class SpacecraftImpactMPC(Node):
         self.scenario_name = self.declare_parameter('scenario_name', 'throw_and_catch').value
         self.enable_cbf =self.declare_parameter('enable_cbf', True).value
         self.get_logger().info(f"robot_name: {self.robot_name}, object_ns: {self.object_ns}, enable_cbf: {self.enable_cbf}")
+        self.gz = self.declare_parameter('gz', True).value
+        gz_suffix = '_gz' if self.gz else ''
 
         # get initial state from passed parameters
         self.x0 = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -88,7 +90,7 @@ class SpacecraftImpactMPC(Node):
         # subscriber for the object for the CBF
         self.object_local_position_sub = self.create_subscription(
             VehicleLocalPosition,
-            f'{self.object_ns}/fmu/out/vehicle_local_position_gz',
+            f'{self.object_ns}/fmu/out/vehicle_local_position{gz_suffix}',
             self.object_local_position_callback,
             NORMAL_QOS)
         

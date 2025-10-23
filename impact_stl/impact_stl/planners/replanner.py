@@ -172,7 +172,10 @@ class RePlanner(Node):
 
     def object_local_position_callback(self, msg):
         self.object_local_position_time_stack[:,0:-1] = self.object_local_position_time_stack[:,1:]
-        self.object_local_position_time_stack[:,-1] = msg.timestamp
+        if self.gz:
+            self.object_local_position_time_stack[:,-1] = msg.timestamp
+        else:
+            self.object_local_position_time_stack[:,-1] = msg.timestamp_sample
         self.object_local_position[0] = msg.x
         self.object_local_position[1] = -msg.y
         self.object_local_position[2] = -msg.z
