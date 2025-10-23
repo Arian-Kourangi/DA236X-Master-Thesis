@@ -6,10 +6,9 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
-        - /Snap_entire_path1
-        - /Crackle_entire_path1
-        - /Snap_replanned_path1
-        - /Crackle_replanned_path1
+        - /Grid1
+        - /Snap1/Topic1
+        - /Pop_vel1/Topic1
       Splitter Ratio: 0.5
     Tree Height: 682
   - Class: rviz_common/Selection
@@ -28,10 +27,10 @@ Panels:
 Visualization Manager:
   Class: ""
   Displays:
-    - Alpha: 0.5
+    - Alpha: 0.30000001192092896
       Cell Size: 1
       Class: rviz_default_plugins/Grid
-      Color: 160; 160; 164
+      Color: 215; 215; 220
       Enabled: true
       Line Style:
         Line Width: 0.029999999329447746
@@ -158,9 +157,87 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /crackle/impact_stl/replanned_path
       Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Snap
+      Namespaces:
+        robot_radius: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /snap/px4_visualizer/vehicle_radius
+      Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Crackle
+      Namespaces:
+        robot_radius: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /crackle/px4_visualizer/vehicle_radius
+      Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Pop
+      Namespaces:
+        robot_radius: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /pop/px4_visualizer/vehicle_radius
+      Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Snap_vel
+      Namespaces:
+        arrow: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /snap/px4_visualizer/vehicle_velocity
+      Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Crackle_vel
+      Namespaces:
+        arrow: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /crackle/px4_visualizer/vehicle_velocity
+      Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Pop_vel
+      Namespaces:
+        arrow: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /pop/px4_visualizer/vehicle_velocity
+      Value: true
   Enabled: true
   Global Options:
-    Background Color: 170; 0; 0
+    Background Color: 255; 255; 255
     Fixed Frame: world
     Frame Rate: 30
   Name: root
@@ -204,25 +281,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 6.64164400100708
+      Distance: 6.708713054656982
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 4.648149013519287
-        Y: 2.4821438789367676
-        Z: 2.9490761756896973
+        X: 3.253603458404541
+        Y: 4.4694671630859375
+        Z: 8.705769538879395
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.704797089099884
+      Pitch: 0.9197969436645508
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.375437259674072
+      Yaw: 4.4822821617126465
     Saved: ~
 Window Geometry:
   Displays:
