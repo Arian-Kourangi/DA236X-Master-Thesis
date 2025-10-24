@@ -8,7 +8,7 @@ import rclpy
 import casadi as cs
 from rclpy.node import Node
 from rclpy.clock import Clock
-from impact_stl.helpers.qos_profiles import NORMAL_QOS, RELIABLE_QOS
+from impact_stl.helpers.qos_profiles import NORMAL_QOS, RELIABLE_QOS, RELIABLE_QOS_2
 import os
 import cvxpy as cp
 import copy
@@ -87,35 +87,25 @@ class RePlanner(Node):
             'impact_stl/recompute_local_plan',
             self.recompute_local_plan_callback,
             NORMAL_QOS)
+        
         self.time_shift_pub = self.create_publisher(
             TimeShift,
             '/global/impact_stl/time_shift',
-            RELIABLE_QOS)
-        ## get the original plan from the csv file
-        #package_share_directory = get_package_share_directory('impact_stl')
-        #plans_path = os.path.join(package_share_directory)
-        #self.rvars,self.hvars,self.idvars,self.other_names = csv_to_plan(self.robot_name,
-        #                                                                 scenario_name=self.scenario_name,
-        #                                                                 path=plans_path)
-        ## get the plan of the object from the csv file
-        #try:
-        #    self.orvars,self.ohvars,self.oidvars,self.oother_names = csv_to_plan(self.object_ns,
-        #                                                                         scenario_name=self.scenario_name,
-        #                                                                         path=plans_path)
-        #except Exception as e:
-        #    print(f"Could not find plan for object {self.object_ns}")
-        #    print(f"Error: {e}")
-
-        #self.drvars = [get_derivative_control_points_gurobi(rvar) for rvar in self.rvars]
-        #self.dhvars = [get_derivative_control_points_gurobi(hvar) for hvar in self.hvars]
+            RELIABLE_QOS_2)
         
-        # From the .sdf file:
-        # /home/px4space/PX4/PX4-Space-Systems/Tools/simulation/gazebo-classic/sitl_gazebo-classic/models/2d_spacecraft/2d_spacecraft.sdf
+        self.time_shift_sub = self.create_subscription(
+            TimeShift,
+            '/global/impact_stl/time_shift',
+            self.time_shift_callback,
+            RELIABLE_QOS_2)
+
         self.rob_rad = 0.20
         self.obj_rad = 0.20
-        self.end_time_diff = 0.0
-        self.old_robot_hvars = None
-        self.inter_id = 0
+        self.new_time_shift = 0.0
+        self.cum_time_shift = 0.0
+        self.original_rob_plan = None
+        self.original_obj_plan = None
+
         #Size of world
         self.world_lb = np.array([0,0])
         self.world_ub = np.array([10,20])
@@ -139,6 +129,7 @@ class RePlanner(Node):
         self.robot_angular_velocity = np.array([0.0, 0.0, 0.0])
         self.robot_local_position = np.array([0.0, 0.0, 0.0])
         self.robot_local_velocity = np.array([0.0, 0.0, 0.0])
+        self.robot_local_time = 0
 
         self.Ncalls = 0
         self.Ncallbacks = 0
@@ -188,6 +179,7 @@ class RePlanner(Node):
         self.object_local_velocity_stack[:,-1] = self.object_local_velocity
 
     def robot_local_position_callback(self, msg):
+        self.robot_local_time = msg.timestamp_sample
         self.robot_local_position[0] = msg.x
         self.robot_local_position[1] = -msg.y
         self.robot_local_position[2] = -msg.z
@@ -195,6 +187,19 @@ class RePlanner(Node):
         self.robot_local_velocity[1] = -msg.vy
         self.robot_local_velocity[2] = -msg.vz
         
+    def time_shift_callback(self, msg):
+        """ Receive global time shift messages and update cumulative time shift 
+        Args:
+            msg (TimeShift): message containing time shift and robot name
+        Effects:
+            Updates cumulative time shift if the message is from a different robot.
+            If this robot is replanning, the cumalitive time shifts are applied in recompute_local_plan_callback.
+            If another robot replans, we need to save those cumalitive time shifts to know how much to shift our own plan when we replan next time.
+        """
+
+        if msg.robot_name != self.robot_name:
+            self.cum_time_shift += msg.time_shift
+        #self.get_logger().info(f"Received global time shift of {msg.time_shift} seconds from {msg.robot_name}, cumulative time shift is now {self.cum_time_shift} seconds")
     
     def recompute_local_plan_callback(self, msg):
         # based on the position and velocities of the robot and obstacle
@@ -209,15 +214,9 @@ class RePlanner(Node):
         # To not add more timeshifts when replanning the same inter multiple times
         # The inter_id is used if the robot has different interactions in the plan so it resets
 
-        if self.old_robot_hvars is None or self.inter_id != msg.inter_id:
-            self.old_robot_hvars = robot_plan['hvar']
-            self.end_time_diff = 0.0
-        elif msg.inter_id == self.inter_id:
-            # If we get a replan for the same inter it can happen without the plans in mpc being updated, 
-            # so to avoid time_shifts accumalating we save the hvars from the previous
-            self.old_robot_hvars = copy.deepcopy(self.robot_hvars)
-
-        self.inter_id = msg.inter_id
+        if self.original_rob_plan is None:
+            self.original_rob_plan = copy.deepcopy(robot_plan)
+            self.original_obj_plan = copy.deepcopy(object_plan)
 
         self.robot_rvars = robot_plan['rvar']
         self.robot_hvars = robot_plan['hvar']
@@ -234,23 +233,26 @@ class RePlanner(Node):
         self.obj_other_names = object_plan['other_names']
 
         ########### NOW SOLVE THE REPLANNING PROBLEM ############
-        try:
-            self.solve()
+
+        success = self.solve()
         #self.get_logger().info("Local plan recomputed")
-        except Exception as e:
-            self.get_logger().error(f"Could not replan: {e}")
-            return
-        #Send out timeshift to all robots
-        msg = TimeShift()
-        msg.time_shift = float(self.end_time_diff)
-        msg.robot_name = self.robot_name
-        self.time_shift_pub.publish(msg)
-        #self.get_logger().info(f"Published time shift: {self.end_time_diff} seconds")
-        #Sending the new plan to the ff_rate_mpc_impact node
-        #self.get_logger().info('Sending plan')
-        self.minimal_client.send_request(self.robot_rvars, self.robot_hvars, self.robot_idvars, self.robot_other_names,
-                                       self.obj_rvars, self.obj_hvars, self.obj_idvars, self.obj_other_names)
-        #self.get_logger().info('Plan received')
+        
+        if success:
+            #Send out timeshift to all robots
+            msg = TimeShift()
+            msg.time_shift = float(self.new_time_shift)
+            msg.robot_name = self.robot_name
+            self.time_shift_pub.publish(msg)
+            
+            #self.get_logger().info(f"Published time shift: {self.new_time_shift} seconds")
+            #Sending the new plan to the ff_rate_mpc_impact node
+            self.get_logger().info('Replanning succeeded, sending new plan to MPC node')
+            self.minimal_client.send_request(self.robot_rvars, self.robot_hvars, self.robot_idvars, self.robot_other_names,
+                                           self.obj_rvars, self.obj_hvars, self.obj_idvars, self.obj_other_names)
+        else:
+            pass
+            #self.get_logger().error("Replanning failed, keeping old plan")
+            
     
     def get_pre_Idxs(self, t_meas):
         """
@@ -281,40 +283,56 @@ class RePlanner(Node):
 
     def solve(self):
         start = time.time()
-
         t_meas = (self.object_local_position_time_stack[0,-1] - self.start_time) / 1e6 # Convert from microseconds to seconds
-        #self.get_logger().info(f"measured at time: {self.object_local_position_time_stack[0,-1]}")
-        #self.get_logger().info(f"start_time: {self.start_time}")
-        #self.get_logger().info(f"t_meas: {t_meas}")
 
-
-        #dts = np.array([(self.object_local_position_time_stack[0,i+1]-self.object_local_position_time_stack[0,i])/1e6 \
-        #                for i in range(self.object_local_position_time_stack.shape[1]-1)])
-        #dxs_from_pos = np.zeros((self.object_local_position_stack.shape[0],dts.shape[0]))
-        #for i in range(dts.shape[0]):
-        #    dxs_from_pos[:,i] = (self.object_local_position_stack[:,i+1]-self.object_local_position_stack[:,i])/dts[i]
+        # There is some acceleration left in the velocity from px4/gazebo
+        # So we compute the velocity based on the position stack instead of using the velocity stack directly    
+        dts = np.array([(self.object_local_position_time_stack[0,i+1]-self.object_local_position_time_stack[0,i])/1e6 \
+                        for i in range(self.object_local_position_time_stack.shape[1]-1)])
+        dxs_from_pos = np.zeros((self.object_local_position_stack.shape[0],dts.shape[0]))
+        for i in range(dts.shape[0]):
+            dxs_from_pos[:,i] = (self.object_local_position_stack[:,i+1]-self.object_local_position_stack[:,i])/dts[i]
         
 
         # then we obtain the position which is the current position plus the velocity times the time
-
         pos_meas = self.object_local_position[0:2]
-        vel_meas = np.mean(self.object_local_velocity_stack,axis=1)[0:2]
-        #vel_meas = np.mean(dxs_from_pos,axis=1)[0:2]
+        
+        #vel_meas = np.mean(self.object_local_velocity_stack,axis=1)[0:2]
+        
+        # There is some wierd acceleration left form the previous interaction so we use the position stack to compute velocity
+        vel_meas = np.mean(dxs_from_pos,axis=1)[0:2]
         # Get the idx of the robots next pre curve after t_meas, and the two next pre curves of the object
         pre_idx, obj_pre_idx, obj_next_pre = self.get_pre_Idxs(t_meas)
         
+        ##### PARAMS BASED ON UPDATED STATE ####
+        ### OBJECT STATE ###
+        # Time that measurments are taken
         self.opti.set_value(self.params['t_meas'], t_meas)
+        # Measured position and velocity of the object at t_meas
         self.opti.set_value(self.params['pos_meas'], pos_meas)
         self.opti.set_value(self.params['vel_meas'], vel_meas)
-        self.opti.set_value(self.params['t0'], self.robot_hvars[pre_idx][0,0])
-        self.opti.set_value(self.params['tI'] ,self.robot_hvars[pre_idx][0,-1])
-        self.opti.set_value(self.params['tf'],self.robot_hvars[pre_idx+1][0,-1])
-        self.opti.set_value(self.params['x_start'], self.robot_rvars[pre_idx][0:2,0])
-        self.opti.set_value(self.params['x_end'], self.obj_rvars[obj_pre_idx+2][0:2,0])
-        self.opti.set_value(self.params['dr_start'], self.robot_drvars[pre_idx][0:2,0])
-        self.opti.set_value(self.params['dh_start'], self.robot_dhvars[pre_idx][0,0])
-        self.opti.set_value(self.params['dr_end'], self.robot_drvars[pre_idx+1][0:2,-1])
-        self.opti.set_value(self.params['dh_end'], self.robot_dhvars[pre_idx+1][0,-1])
+        
+        ### ROBOT STATE ###
+        # Start time of the replanned pre curve should be the time we get the measurments for the robot
+        self.opti.set_value(self.params['t0'], (self.robot_local_time-self.start_time)/1e6)   #self.robot_hvars[pre_idx][0,0])
+        # Replanned start of the pre curve is the current position of the robot
+        self.opti.set_value(self.params['x_start'], self.robot_local_position[0:2])   #self.robot_rvars[pre_idx][0:2,0])
+        # Replanned start velocity of the pre curve is the current velocity of the robot
+        self.opti.set_value(self.params['dr_start'],self.robot_local_velocity[0:2]) #self.robot_drvars[pre_idx][0:2,0])
+        
+        ##### PARAMS BASED ON ORIGINAL PLAN #####
+        # Time of interaction, not used currently
+        #self.opti.set_value(self.params['tI'] ,self.original_rob_plan['hvar'][pre_idx][0,-1])
+        # Planned End time of the interaction curve 
+        self.opti.set_value(self.params['tf'],self.original_rob_plan['hvar'][pre_idx+1][0,-1])
+        # Desired position of the object at the end of the interaction (we use robot plan since the object and robot coincide according to the precomputed plan)
+        self.opti.set_value(self.params['x_end'], self.original_rob_plan['rvar'][pre_idx+1][0:2,-1])
+        
+        #self.opti.set_value(self.params['dh_start'], self.robot_dhvars[pre_idx][0,0]) # Not used anymore
+        # Desired velocity of the object at the end of the interaction
+        self.opti.set_value(self.params['dr_end'], self.original_rob_plan['drvar'][pre_idx+1][0:2,-1])
+        self.opti.set_value(self.params['dh_end'], self.original_rob_plan['dhvar'][pre_idx+1][0,-1])
+        # Desired position of the object at the start of the next interaction/end of the next pre curve
         self.opti.set_value(self.params['next_obj_int_pos'], self.obj_rvars[obj_next_pre][0:2,-1])
 
         # Set initial guesses
@@ -326,10 +344,9 @@ class RePlanner(Node):
         try:
             sol = self.opti.solve()
         except Exception as e:
-            import traceback
             self.get_logger().error(f"Solver error: {e}")
-            self.get_logger().error(f"Traceback: {traceback.format_exc()}")
-            raise
+            return False
+
 
         #Extract the solution
         self.sol_robot_rvars = [sol.value(self.vars['rvars'][k]).reshape(2,self.n_cp) for k in range(len(self.vars['rvars']))]
@@ -345,6 +362,7 @@ class RePlanner(Node):
 
         end = time.time()
         #self.get_logger().info(f"Replanning time: {end - start} seconds")
+        return True
 
     def setup(self):
 
@@ -441,8 +459,8 @@ class RePlanner(Node):
          
         dr_start = opti.parameter(2)
         self.params['dr_start'] = dr_start
-        dh_start = opti.parameter()
-        self.params['dh_start'] = dh_start
+        #dh_start = opti.parameter()
+        #self.params['dh_start'] = dh_start
 
         
         dr_end = opti.parameter(2)
@@ -455,8 +473,8 @@ class RePlanner(Node):
         opti.subject_to(rvars[0][:,0] == x_start)
         opti.subject_to(hvars[0][0,0] == t0)
         #Initial velocity of the robot pre curve
-        opti.subject_to(drvars[0][:,0] == dr_start)
-        opti.subject_to(dhvars[0][0,0] == dh_start)
+        opti.subject_to(drvars[0][:,0] == dr_start*dhvars[0][0,0])
+        #opti.subject_to(dhvars[0][0,0] == dh_start)
         #Time of interaction within bounds
         opti.subject_to(t_I >= t_meas)
         #opti.subject_to(t_I <= tf)
@@ -568,7 +586,7 @@ class RePlanner(Node):
             J += w_r * cs.sumsqr(object_pos- x_end)
             J += w_dr * cs.sumsqr(drvars[-1][:,-1] - dr_end)
             J += w_h * (hvars[-1][0,-1] - tf)**2
-            J += w_h * (t_I - tI )**2  # also penalize deviation from t_I at start of interaction curve
+            #J += w_h * (t_I - tI )**2  # also penalize deviation from t_I at start of interaction curve
             J += w_dh * (dhvars[-1][0,-1] - dh_end)**2
         except NameError:
             # If targets are not defined (shouldn't happen), skip adding penalties
@@ -614,28 +632,35 @@ class RePlanner(Node):
         self.robot_rvars[pre_idx+1] = self.sol_robot_rvars[1]
         self.robot_rvars[pre_idx+2][:,0] = self.sol_robot_rvars[1][:,-1] # Contunuity
 
-        # If I allow the time at the end of the interaction to shift, I need to propogate this change to the rest of the curves
-        # Compute the time difference at the end of the interaction curve
-        end_time_diff  = self.sol_robot_hvars[1][0,-1] - self.robot_hvars[pre_idx+1][0,-1]
-        ## Propogate time change to the rest of the curves
-        for k in range(pre_idx+2, len(self.robot_hvars)):
-            self.robot_hvars[k][0,:] += end_time_diff
-    
         self.robot_hvars[pre_idx] = self.sol_robot_hvars[0]
         self.robot_hvars[pre_idx+1] = self.sol_robot_hvars[1]
 
-        # Propogate the time change to the rest of the object curves
-        for k in range(obj_pre_idx+2, len(self.obj_hvars)):
-            self.obj_hvars[k][0,:] += end_time_diff
-        
         # Update the objects pre and inter cruves to have the same interaction and end time as the robots
-        # NOTE: WE only update the time since we want to keep the original planned positions of the object, for subsequent replannings
+        # This is so that the call to replanner in the future will get the correct pre idx
         self.obj_hvars[obj_pre_idx][0,-1] = self.robot_hvars[pre_idx][0,-1]
         self.obj_hvars[obj_pre_idx+1][0,0] = self.robot_hvars[pre_idx+1][0,0]
         self.obj_hvars[obj_pre_idx+1][0,-1] = self.robot_hvars[pre_idx+1][0,-1]
 
-        #For publishing the timeshift
-        self.end_time_diff = self.sol_robot_hvars[1][0,-1] - self.old_robot_hvars[pre_idx+1][0,-1]
+        # Nullify the previous hvars to avoid confusion
+        for id in range(pre_idx):
+            self.robot_hvars[id][0,:] = 0.0
+        for id in range(obj_pre_idx):
+            self.obj_hvars[id][0,:] = 0.0
+        
+        #If I allow the time at the end of the interaction to shift, I need to propogate this change to the rest of the curves
+
+        #GLOBAL TIME SHIFT, the solution compared to the original plan, used to update the robot and object plan and publish the timeshift for other robots
+        global_diff = self.sol_robot_hvars[1][0,-1] - self.original_rob_plan['hvar'][pre_idx+1][0,-1]
+
+        # Propogate the time shift to the rest of the plan
+        for k in range(pre_idx+2, len(self.robot_hvars)):
+            self.robot_hvars[k][0,:] = self.original_rob_plan['hvar'][k][0,:] + global_diff
+        for k in range(obj_pre_idx+2, len(self.obj_hvars)):
+            self.obj_hvars[k][0,:] = self.original_obj_plan['hvar'][k][0,:] + global_diff
+
+        # Update the cumulative and new time shifts
+        self.new_time_shift = global_diff - self.cum_time_shift
+        self.cum_time_shift += self.new_time_shift
 
 
 def main(args=None):
