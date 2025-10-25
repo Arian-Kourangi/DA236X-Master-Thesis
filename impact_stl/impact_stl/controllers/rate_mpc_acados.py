@@ -56,8 +56,8 @@ class SpacecraftRateMPC():
         xdot = cs.SX.sym('xdot', self.nx) 
         s = cs.SX.sym('s') # selector for switching between two sets of dynamics
 
-        f_normal = self.model.get_casadi_ode(x, u, self.dt)
-        f_alt    = self.model.get_casadi_ode(x, u, self.dt, True)
+        f_normal = self.model.get_casadi_dx(x, u)
+        f_alt    = self.model.get_casadi_dx(x, u, True)
 
         f_expl = f_normal * (1 - s) + f_alt * s
         f_impl = xdot - f_expl
@@ -109,7 +109,7 @@ class SpacecraftRateMPC():
         ocp.solver_options.nlp_solver_type = "SQP_RTI"
         ocp.solver_options.integrator_type = "ERK"
         ocp.solver_options.print_level = 0
-        ocp.solver_options.hessian_approx = "GAUSS_NEWTON"
+        #ocp.solver_options.hessian_approx = "GAUSS_NEWTON"
         ocp.solver_options.nlp_solver_tol_stat = 1e-6
         ocp.solver_options.nlp_solver_tol_eq   = 1e-6
         ocp.solver_options.nlp_solver_tol_ineq = 1e-6

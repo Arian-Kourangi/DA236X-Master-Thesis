@@ -166,7 +166,7 @@ class SpacecraftImpactMPC(Node):
 
         # Create Spacecraft and controller objects
         self.model = SpacecraftRateModel()
-        self.mpc = SpacecraftRateMPC(self.model,Tf=1.0,N=100,add_cbf=self.enable_cbf) # N = 10 for rape_mpc, 100 for rate_mpc_acados
+        self.mpc = SpacecraftRateMPC(self.model,Tf=1.0,N=10,add_cbf=self.enable_cbf) # N = 10 for rape_mpc, 100 for rate_mpc_acados
         self.initial_guess = {'X': None, 'U': None}
 
         self.vehicle_attitude = np.array([1.0, 0.0, 0.0, 0.0])
@@ -418,7 +418,7 @@ class SpacecraftImpactMPC(Node):
         if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             self.publish_rate_setpoint(u_pred)
         
-        print(f"Time elapsed: {time.time() - t0}")
+        #print(f"Time elapsed: {time.time() - t0}")
         if time.time() - t0 > self.timer_period:
             self.get_logger().info(f"LOOP TOOK TOO LONG: {time.time() - t0} (timer_period: {self.timer_period})")
             
