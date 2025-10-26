@@ -27,6 +27,10 @@ class SpacecraftRateMPC():
 
         self.nx = 10 # Number of state variables
         self.nu = 6 # Number of control inputs
+        self.nu_phys = self.nu   # keep physical input size
+        if self.add_cbf:
+            #Add another input for slack variable
+            self.nu = self.nu_phys + 1 
 
         self.params = {}
         self.vars = {}
@@ -45,7 +49,35 @@ class SpacecraftRateMPC():
         self.Q = np.diag([5e1, 5e1, 5e1, 5e1, 5e1, 5e1, 8e3, 8e3, 8e3, 8e3])
         self.Q_e = 10 * self.Q
         self.R = 2*np.diag([1e-2, 1e-2, 1e-2, 2e0, 2e0, 2e0])
+        
+        if self.add_cbf:
+            p_r = cs.SX.sym('p_r', 3)
+            v_r = cs.SX.sym('v_r', 3)
+            q_r = cs.SX.sym('q_r', 4)
+            u_r = cs.SX.sym('u_r', self.nu_phys)
+            p_o = cs.SX.sym('p_o', 3)
+            v_o = cs.SX.sym('v_o', 3)
+            q_o = cs.SX.sym('q_o', 4)
+            u_o = cs.SX.sym('u_o', self.nu_phys)
 
+            h = cs.sumsqr(p_r[0:2] - p_o[0:2]) - (0.2 + 0.2 + 0.1)**2
+            x = cs.vertcat(p_r, p_o)
+            dx = cs.vertcat(v_r, v_o)
+
+            X_r = cs.vertcat(p_r, v_r, q_r)
+            X_o = cs.vertcat(p_o, v_o, q_o)
+
+            dh = cs.jacobian(h, x) @ dx
+            ddh = cs.jacobian(dh, x) @ dx + cs.jacobian(dh, dx) @ cs.vertcat(
+                self.model.get_casadi_dx(X_r, u_r)[3:6],
+                self.model.get_casadi_dx(X_o, u_o)[3:6]
+            )
+
+            self.h = cs.Function('h', [X_r, X_o], [h])
+            self.dh = cs.Function('dh', [X_r, X_o], [dh])
+            self.ddh = cs.Function('ddh', [X_r, X_o, u_r, u_o], [ddh])
+            self.alpha = 2.0
+            self.beta = 1.0
         
         self.solver = self.setup()
 
@@ -56,9 +88,13 @@ class SpacecraftRateMPC():
         xdot = cs.SX.sym('xdot', self.nx) 
         s = cs.SX.sym('s') # selector for switching between two sets of dynamics
 
-        f_normal = self.model.get_casadi_dx(x, u)
-        f_alt    = self.model.get_casadi_dx(x, u, True)
+        # split u into physics and slack
+        u_phys = u[:self.nu_phys]               # first 6 elements
+        u_delta = u[self.nu_phys]               # slack delta (scalar)
 
+
+        f_normal = self.model.get_casadi_dx(x, u_phys)
+        f_alt    = self.model.get_casadi_dx(x, u_phys, True)
         f_expl = f_normal * (1 - s) + f_alt * s
         f_impl = xdot - f_expl
 
@@ -69,11 +105,41 @@ class SpacecraftRateMPC():
         model_ac.u = u
         model_ac.xdot = xdot
         model_ac.name = 'spacecraft_rate_model_acados'
-        model_ac.p = s
 
+        if self.add_cbf:
+            # symbolic parameter placeholders for object state/input and OffSwitch
+            X_o = cs.SX.sym('X_o', self.nx)
+            U_o = cs.SX.sym('U_o', self.nu_phys)
+            OffSwitch = cs.SX.sym('OffSwitch')
+
+            # recreate the CBF pieces as in rate_mpc.py but using the symbolic x split
+            # assume your self.h, self.dh, self.ddh are available (created in __init__)
+            cbf_stage = self.ddh(x, X_o, u_phys, U_o)[0] \
+                        + self.alpha * self.dh(x, X_o)[0] \
+                        + self.beta * self.h(x, X_o)[0] \
+                        + u_delta + OffSwitch   # δ enters additively
+
+            # attach to model as a path constraint expression (h >= 0)
+            model_ac.con_h_expr = cbf_stage
+            # allow no terminal constraint:
+            model_ac.con_h_expr_e = cs.SX.zeros(0)
+
+            # append the new parameters to model_ac.p
+            # order: s, X_o, U_o, OffSwitch
+            model_ac.p = cs.vertcat(s, X_o, U_o, OffSwitch)
+        else:
+            model_ac.p = s
+        
+        
+        
         ocp = AcadosOcp()
-        ocp.parameter_values = np.zeros(1)
         ocp.model = model_ac
+        if self.add_cbf:
+            ocp.constraints.lh = np.array([0.0])
+            ocp.constraints.uh = np.array([1e6])   # large upper bound (not very important)
+        
+        # initialize parameters
+        ocp.parameter_values = np.zeros(ocp.model.p.size()[0])
         ocp.dims.N = self.N
         ocp.solver_options.tf = self.Tf
 
@@ -83,7 +149,17 @@ class SpacecraftRateMPC():
         #set cost matrices
         W = np.zeros((self.nx + self.nu, self.nx + self.nu))
         W[:self.nx, :self.nx] = self.Q
-        W[self.nx:, self.nx:] = self.R
+        #W[self.nx:, self.nx:] = self.R
+        
+        # expand R to full size if we have slack variable
+        R_full = np.zeros((self.nu, self.nu))
+        R_orig = self.R # this is nu_phys x nu_phys
+        R_full[:self.nu_phys, :self.nu_phys] = R_orig
+
+        if self.add_cbf:
+            # penalize slack strongly (last row/col)
+            R_full[self.nu_phys, self.nu_phys] = 1e3   # choose a large weight
+        W[self.nx:, self.nx:] = R_full
         ocp.cost.W = W
         ocp.cost.W_e = self.Q_e
 
@@ -91,7 +167,12 @@ class SpacecraftRateMPC():
         Vx[0:self.nx, 0:self.nx] = np.eye(self.nx)     # all states go straight in
 
         Vu = np.zeros((self.nx + self.nu, self.nu))
-        Vu[self.nx:, 0:self.nu] = np.eye(self.nu)      # all controls go straight in
+        # just map physical controls straight in
+        Vu[self.nx:self.nx + self.nu_phys, :self.nu_phys] = np.eye(self.nu_phys)
+        if self.add_cbf:
+            # slack maps into the cost input part (last entry)
+            Vu[self.nx + self.nu_phys, self.nu_phys] = 1.0  # maps delta into the cost input block     # all controls go straight in
+
         ocp.cost.Vx = Vx
         ocp.cost.Vu = Vu
         ocp.cost.Vx_e = np.eye(self.nx)
@@ -100,10 +181,30 @@ class SpacecraftRateMPC():
 
         # set constraints
         ocp.constraints.x0 = np.zeros((self.nx,))
-        ocp.constraints.idxbu = np.arange(self.nu)
-        ocp.constraints.lbu = self.model.u_lb
-        ocp.constraints.ubu = self.model.u_ub
 
+        #ocp.constraints.idxbu = np.arange(self.nu)
+        #ocp.constraints.lbu = self.model.u_lb
+        #ocp.constraints.ubu = self.model.u_ub
+        idxbu = np.arange(self.nu)   # includes slack at the end when add_cbf True
+        ocp.constraints.idxbu = idxbu
+
+        lbu = np.zeros((self.nu,))
+        ubu = np.zeros((self.nu,))
+
+        # set physical bounds on first nu_phys elements:
+        lbu[:self.nu_phys] = self.model.u_lb.ravel()
+        ubu[:self.nu_phys] = self.model.u_ub.ravel()
+
+        if self.add_cbf:
+            # slack delta bound: delta >= 0, and give reasonable upper bound (avoid extreme values)
+            lbu[self.nu_phys] = 0.0
+            ubu[self.nu_phys] = 1000  # finite upper bound; small enough to keep numerics sane
+        else:
+            # if no cbf, there is no extra slack dimension and we already set bounds above
+            pass
+        
+        ocp.constraints.lbu = lbu
+        ocp.constraints.ubu = ubu
 
         ocp.solver_options.qp_solver = "PARTIAL_CONDENSING_HPIPM"
         ocp.solver_options.nlp_solver_type = "SQP_RTI"
@@ -135,6 +236,7 @@ class SpacecraftRateMPC():
         self.solver.set(0, "lbx", x0)
         self.solver.set(0, "ubx", x0)
 
+        # set references over the horizon
         xref = np.hstack(setpoints)
         for k in range(self.N):
             yref = np.concatenate([xref[:, k], np.zeros(self.nu)])  # we only penalize state deviation
@@ -160,8 +262,24 @@ class SpacecraftRateMPC():
         if selectors is None:
             selectors = np.zeros((self.N+1))
         
-        for k in range(self.N):
-            self.solver.set(k, "p", np.array([selectors[k]]))
+        if not self.add_cbf:
+            # If no CBF our parameter vector is just the selector
+            for k in range(self.N):
+                self.solver.set(k, "p", np.array([selectors[k]]))
+        
+        elif xobj is not None and self.add_cbf:
+            X_o = xobj  # object state
+            U_o = np.zeros((self.nu_phys,)) # assume object is not actuated
+            OffSwitch = 0.0 if enable_cbf else 10000.0
+            for k in range(self.N):
+                # Make sure everything is 1D
+                sel = np.array([selectors[k]]).ravel()
+                X_o_flat = np.array(X_o).ravel()
+                U_o_flat = np.array(U_o).ravel()
+                off = np.array([OffSwitch]).ravel()
+
+                p_vec = np.concatenate((sel, X_o_flat, U_o_flat, off))
+                self.solver.set(k, "p", p_vec)
 
         # set setpoints parameter
         try:

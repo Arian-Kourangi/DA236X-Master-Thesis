@@ -286,7 +286,7 @@ class SpacecraftImpactMPC(Node):
             inter_idx = -1
         return inter_idx
 
-    def get_setpoints(self):
+    def get_setpoints(self,dist):
         #current time in seconds, compared to start_time
         t = (Clock().now().nanoseconds / 1000 - self.start_time) / 1e6
         setpoints = []
@@ -317,7 +317,7 @@ class SpacecraftImpactMPC(Node):
                 selectors.append(1 if plani['id']=='inter' else 0)
             
             # Check if no interaction on Horizon and next interaction is ours
-            if all(selectors[i]==0 for i in range(len(selectors))) and self.plan_object['other_names'][self.get_object_next_inter(t)] in self.robot_name:
+            if all(selectors[i]==0 for i in range(len(selectors))) and self.plan_object['other_names'][self.get_object_next_inter(t)] in self.robot_name and dist > 0.5:
                 #self.get_logger().info('Calling Replanning Service in ff_rate_mpc_impact')
 
                 #Cooldown for the replanner so we don't spam it
@@ -370,9 +370,10 @@ class SpacecraftImpactMPC(Node):
                          self.object_local_velocity[0], self.object_local_velocity[1], self.object_local_velocity[2],
                          1,0,0,0]).reshape(10, 1)
         # print(f"x0: {x0}")
-
+        #Don't want to replan if we are too close to the object already
+        dist = np.linalg.norm(self.vehicle_local_position[0:3] - self.object_local_position[0:3])
         # get the reference states and corresponding times in the horizon
-        setpoints, selectors, weights, tI = self.get_setpoints()
+        setpoints, selectors, weights, tI = self.get_setpoints(dist)
         # self.get_logger().info(f"setpoints: {setpoints[0][0:2].T}, pos: {self.vehicle_local_position[0:2].T}")
         #self.get_logger().info(f"selectors: {selectors}")
         # solve the mpc

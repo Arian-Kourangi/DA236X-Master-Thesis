@@ -322,7 +322,7 @@ class RePlanner(Node):
         
         ##### PARAMS BASED ON ORIGINAL PLAN #####
         # Time of interaction, not used currently
-        #self.opti.set_value(self.params['tI'] ,self.original_rob_plan['hvar'][pre_idx][0,-1])
+        self.opti.set_value(self.params['tI'] ,self.original_rob_plan['hvar'][pre_idx][0,-1])
         # Planned End time of the interaction curve 
         self.opti.set_value(self.params['tf'],self.original_rob_plan['hvar'][pre_idx+1][0,-1])
         # Desired position of the object at the end of the interaction (we use robot plan since the object and robot coincide according to the precomputed plan)
@@ -575,10 +575,10 @@ class RePlanner(Node):
         
         # --- Soft penalties for final targets (relax exact equalities) ---
         # Weights (tune as needed)
-        w_r = 1e3
-        w_dr = 1e3
-        w_h = 1e1
-        w_dh = 1e3
+        w_r = 1e5
+        w_dr = 1e4
+        w_h = 1e0
+        w_dh = 1e4
         # We also want the end of the itneraction to be as close as possible to the planned end of interaction
         try:
             # target_* were prepared earlier (CasADi DM or floats)
@@ -586,7 +586,7 @@ class RePlanner(Node):
             J += w_r * cs.sumsqr(object_pos- x_end)
             J += w_dr * cs.sumsqr(drvars[-1][:,-1] - dr_end)
             J += w_h * (hvars[-1][0,-1] - tf)**2
-            #J += w_h * (t_I - tI )**2  # also penalize deviation from t_I at start of interaction curve
+            J += w_h * (t_I - tI )**2  # also penalize deviation from t_I at start of interaction curve
             J += w_dh * (dhvars[-1][0,-1] - dh_end)**2
         except NameError:
             # If targets are not defined (shouldn't happen), skip adding penalties
