@@ -562,9 +562,9 @@ class RePlanner(Node):
         J = 0
         ## For pre curve we can have smaller weights
         for i in range(ddrvars[0].shape[1]):
-            J += 0.1*cs.sumsqr(ddrvars[0][:,i])
+            J += 10*cs.sumsqr(ddrvars[0][:,i])
         for i in range(ddhvars[0].shape[1]):
-            J += 0.1*cs.sumsqr(ddhvars[0][0,i])
+            J += 10*cs.sumsqr(ddhvars[0][0,i])
     
         # For interaction curve we want to minimize acceleration more
         w_acc = 1e2
@@ -575,10 +575,10 @@ class RePlanner(Node):
         
         # --- Soft penalties for final targets (relax exact equalities) ---
         # Weights (tune as needed)
-        w_r = 1e5
-        w_dr = 1e4
+        w_r = 1e3
+        w_dr = 1e3
         w_h = 1e1
-        w_dh = 1e4
+        w_dh = 1e3
         # We also want the end of the itneraction to be as close as possible to the planned end of interaction
         try:
             # target_* were prepared earlier (CasADi DM or floats)
