@@ -1,3 +1,5 @@
+__author__ = "Arian Kourangi"
+__contact__ = "arianke@kth.se"
 import casadi as ca
 from utilities.beziers import get_derivative_control_points_gurobi, eval_bezier, value_bezier, eval_t
 from utilities.read_write_plan import csv_to_plan, plan_to_csv

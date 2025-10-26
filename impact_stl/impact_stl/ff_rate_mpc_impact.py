@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-__author__ = "Joris Verhagen"
-__contact__ = "jorisv@kth.se"
+__author__ = "Arian Kourangi"
+__contact__ = "arianke@kth.se"
 
 import rclpy
 import numpy as np
@@ -166,7 +166,8 @@ class SpacecraftImpactMPC(Node):
 
         # Create Spacecraft and controller objects
         self.model = SpacecraftRateModel()
-        self.mpc = SpacecraftRateMPC(self.model,Tf=1.0,N=10,add_cbf=self.enable_cbf) # N = 10 for rape_mpc, 100 for rate_mpc_acados
+        self.mpc = SpacecraftRateMPC(self.model,Tf=1.0,N=10,add_cbf=self.enable_cbf) # N = 10 for rate_mpc, 100 for rate_mpc_acados
+        self.inter_mpc = SpacecraftRateMPC(self.model,Tf=1.0,N=10,add_cbf=self.enable_cbf)
         self.initial_guess = {'X': None, 'U': None}
 
         self.vehicle_attitude = np.array([1.0, 0.0, 0.0, 0.0])
@@ -387,12 +388,23 @@ class SpacecraftImpactMPC(Node):
         if selectors is not None and self.enable_cbf:
             if all(s == 0 for s in selectors):
                 enable_cbf = True
-        x_pred, u_pred = self.mpc.solve(x0,setpoints,
-                                        weights=weights,
-                                        initial_guess=self.initial_guess,
-                                        xobj=xobj,enable_cbf=enable_cbf,
-                                        logger=self.get_logger(),
-                                        verbose=False,selectors=selectors)
+        # if we have not started yet (selectors is None), or we are not on an interaction right now (selectors[0]==0)
+        # we solve the mpc as normal
+        if selectors is None or selectors[0] == 0:
+            x_pred, u_pred = self.mpc.solve(x0,setpoints,
+                                            weights=weights,
+                                            initial_guess=self.initial_guess,
+                                            xobj=xobj,enable_cbf=enable_cbf,
+                                            logger=self.get_logger(),
+                                            verbose=False,selectors=selectors)
+        else:
+            # We are on an interaction right now, solve with interaction MPC
+            x_pred, u_pred = self.inter_mpc.solve(x0,setpoints,
+                                            weights=weights,
+                                            initial_guess=self.initial_guess,
+                                            xobj=xobj,enable_cbf=enable_cbf,
+                                            logger=self.get_logger(),
+                                            verbose=False,selectors=selectors)
         
         self.initial_guess = {'X': x_pred, 'U': u_pred}
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-__author__ = "Joris Verhagen"
-__contact__ = "jorisv@kth.se"
+__author__ = "Arian Kourangi"
+__contact__ = "arianke@kth.se"
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription

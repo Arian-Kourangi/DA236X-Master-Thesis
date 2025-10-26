@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-__author__ = "Joris Verhagen"
-__contact__ = "jorisv@kth.se"
+__author__ = "Arian Kourangi"
+__contact__ = "arianke@kth.se"
 
 import numpy as np
 import casadi as cs
@@ -26,6 +26,7 @@ class SpacecraftRateMPC():
         self.add_cbf = add_cbf
 
         self.nx = 10 # Number of state variables
+        
         self.nu = 6 # Number of control inputs
         self.nu_phys = self.nu   # keep physical input size
         if self.add_cbf:
@@ -90,7 +91,7 @@ class SpacecraftRateMPC():
 
         # split u into physics and slack
         u_phys = u[:self.nu_phys]               # first 6 elements
-        u_delta = u[self.nu_phys]               # slack delta (scalar)
+        u_delta = u[self.nu_phys] if self.add_cbf else None               # slack delta (scalar)
 
 
         f_normal = self.model.get_casadi_dx(x, u_phys)
@@ -289,7 +290,7 @@ class SpacecraftRateMPC():
             for k in range(self.N+1):
                 X_pred[:, k] = self.solver.get(k, "x")
             for k in range(self.N):
-                U_pred[:, k] = self.solver.get(k, "u")
+                U_pred[:, k] = self.solver.get(k, "u") # including slack if any
 
         except Exception as e:
             print(f"Optimization failed: {e}")

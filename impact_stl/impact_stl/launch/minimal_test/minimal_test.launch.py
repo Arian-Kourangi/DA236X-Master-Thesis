@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-__author__ = "Joris Verhagen"
-__contact__ = "jorisv@kth.se"
+__author__ = "Arian Kourangi"
+__contact__ = "arianke@kth.se"
 
 from launch import LaunchDescription
 from launch_ros.actions import Node, PushRosNamespace

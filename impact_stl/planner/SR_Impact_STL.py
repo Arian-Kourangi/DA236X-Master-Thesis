@@ -1,3 +1,5 @@
+__author__ = "Arian Kourangi"
+__contact__ = "arianke@kth.se"
 import gurobipy as gp
 # scs = {v: k for k, v in vars(gp.StatusConstClass).items() if k[0].isupper()}
 scs = {getattr(gp.GRB.status,k): k for k in dir(gp.GRB.status) if k[0].isupper()}
