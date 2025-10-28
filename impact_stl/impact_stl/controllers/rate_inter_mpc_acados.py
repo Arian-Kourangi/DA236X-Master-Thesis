@@ -54,12 +54,10 @@ class SpacecraftInterMPC():
         x = cs.SX.sym('x',self.nx)
         u = cs.SX.sym('u',self.nu)
         xdot = cs.SX.sym('xdot', self.nx) 
-        s = cs.SX.sym('s') # selector for switching between two sets of dynamics
 
-        f_normal = self.model.get_casadi_dx(x, u)
         f_alt    = self.model.get_casadi_dx(x, u, True)
 
-        f_expl = f_normal * (1 - s) + f_alt * s
+        f_expl =f_alt 
         f_impl = xdot - f_expl
 
         model_ac = AcadosModel()
@@ -69,10 +67,8 @@ class SpacecraftInterMPC():
         model_ac.u = u
         model_ac.xdot = xdot
         model_ac.name = 'spacecraft_inter_model_acados'
-        model_ac.p = s
 
         ocp = AcadosOcp()
-        ocp.parameter_values = np.zeros(1)
         ocp.model = model_ac
         ocp.dims.N = self.N
         ocp.solver_options.tf = self.Tf
@@ -155,13 +151,6 @@ class SpacecraftInterMPC():
         if initial_guess['U'] is not None:
             for k in range(self.N):
                 self.solver.set(k, "u", initial_guess['U'][:, k])    # guessed controls
-
-        #set selectors for a setpoint being on the an inter curve or not
-        if selectors is None:
-            selectors = np.zeros((self.N+1))
-        
-        for k in range(self.N):
-            self.solver.set(k, "p", np.array([selectors[k]]))
 
         # set setpoints parameter
         try:
