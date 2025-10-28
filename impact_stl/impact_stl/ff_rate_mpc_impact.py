@@ -35,6 +35,7 @@ from impact_stl.models.spacecraft_rate_model import SpacecraftRateModel
 from impact_stl.planners.main_planner import plan_to_plan_msg
 # from impact_stl.controller.rate_mpc import SpacecraftRateMPC
 from impact_stl.controllers.rate_mpc_acados import SpacecraftRateMPC
+from impact_stl.controllers.rate_inter_mpc_acados import SpacecraftInterMPC
 
 from impact_stl.helpers.helpers import vector2PoseMsg, BezierCurve2NumpyArray, \
                             BezierPlan2NumpyArray, interpolate_bezier, VerboseBezierPlan2NumpyArray,\
@@ -167,7 +168,7 @@ class SpacecraftImpactMPC(Node):
         # Create Spacecraft and controller objects
         self.model = SpacecraftRateModel()
         self.mpc = SpacecraftRateMPC(self.model,Tf=1.0,N=10,add_cbf=self.enable_cbf) # N = 10 for rate_mpc, 100 for rate_mpc_acados
-        self.inter_mpc = SpacecraftRateMPC(self.model,Tf=1.0,N=10,add_cbf=self.enable_cbf)
+        self.inter_mpc = SpacecraftInterMPC(self.model,Tf=1.0,N=10,add_cbf=self.enable_cbf)
         self.initial_guess = {'X': None, 'U': None}
 
         self.vehicle_attitude = np.array([1.0, 0.0, 0.0, 0.0])
@@ -391,6 +392,11 @@ class SpacecraftImpactMPC(Node):
         # if we have not started yet (selectors is None), or we are not on an interaction right now (selectors[0]==0)
         # we solve the mpc as normal
         if selectors is None or selectors[0] == 0:
+            # Check i u_pred is right size, will be one less if we just had an interaction since the intermpc doesn't use the cbf delta
+            if self.initial_guess['U'] is not None and self.initial_guess['U'].shape[0] == self.mpc.nu:
+                pass
+            else:
+                self.initial_guess['U'] = np.concatenate((self.initial_guess['U'], np.zeros((1, self.initial_guess['U'].shape[1]))), axis=0) if self.initial_guess['U'] is not None else None
             x_pred, u_pred = self.mpc.solve(x0,setpoints,
                                             weights=weights,
                                             initial_guess=self.initial_guess,
@@ -399,10 +405,13 @@ class SpacecraftImpactMPC(Node):
                                             verbose=False,selectors=selectors)
         else:
             # We are on an interaction right now, solve with interaction MPC
+            # Remove the last entry in u_pred since we don't have a delta for the cbf
+            if self.initial_guess['U'].shape[0] == self.inter_mpc.nu +1:
+                self.initial_guess['U'] = self.initial_guess['U'][:-1,::]
             x_pred, u_pred = self.inter_mpc.solve(x0,setpoints,
                                             weights=weights,
                                             initial_guess=self.initial_guess,
-                                            xobj=xobj,enable_cbf=enable_cbf,
+                                            xobj=xobj,enable_cbf=False,
                                             logger=self.get_logger(),
                                             verbose=False,selectors=selectors)
         

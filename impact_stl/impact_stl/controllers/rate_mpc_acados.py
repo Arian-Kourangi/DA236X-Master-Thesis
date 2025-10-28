@@ -281,7 +281,11 @@ class SpacecraftRateMPC():
 
                 p_vec = np.concatenate((sel, X_o_flat, U_o_flat, off))
                 self.solver.set(k, "p", p_vec)
-
+            # Only set the cbf for the first 4 stages, the rest we relax. (lh and uh are set for all stages at setup)
+            #for k in range(self.N//2,self.N):
+            #    self.solver.constraints_set(k, "lh", np.array([-1e6]))
+            #    self.solver.constraints_set(k, "uh", np.array([1e6]))
+               
         # set setpoints parameter
         try:
             X_pred = np.zeros((self.nx, self.N+1))
