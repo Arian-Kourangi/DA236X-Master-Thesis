@@ -30,6 +30,8 @@ class SpacecraftInterMPC():
 
         self.params = {}
         self.vars = {}
+        self.r_robot = 0.20
+        self.r_object = 0.20
 
         # cost matrices (SITL)
         # self.Q = np.diag([10e0, 10e0, 10e0, 10e-1, 10e-1, 10e-1, 8e-1])
@@ -45,7 +47,8 @@ class SpacecraftInterMPC():
         self.Q = np.diag([5e1, 5e1, 5e1, 5e1, 5e1, 5e1, 8e3, 8e3, 8e3, 8e3])
         self.Q_e = 10 * self.Q
         self.R = 2*np.diag([1e-2, 1e-2, 1e-2, 2e0, 2e0, 2e0])
-
+        self.pos_w = np.diag([1e5, 1e5, 1e5])
+        self.acc_w = 1e5
         
         self.solver = self.setup()
 
@@ -55,7 +58,7 @@ class SpacecraftInterMPC():
         u = cs.SX.sym('u',self.nu)
         xdot = cs.SX.sym('xdot', self.nx) 
 
-        f_alt    = self.model.get_casadi_dx(x, u, True)
+        f_alt= self.model.get_casadi_dx(x, u, True)
 
         f_expl =f_alt 
         f_impl = xdot - f_expl
@@ -67,15 +70,40 @@ class SpacecraftInterMPC():
         model_ac.u = u
         model_ac.xdot = xdot
         model_ac.name = 'spacecraft_inter_model_acados'
+        yref = cs.SX.sym('yref', self.nx)
+        x_obj = cs.SX.sym('x_obj', self.nx)
+        v_des = cs.SX.sym('v_des', 3)
+        model_ac.p = cs.vertcat(yref, x_obj, v_des)
+
+        error = x - yref
+        
+        delta_V = v_des- x_obj[3:6]
+        u_push = delta_V / (cs.norm_2(delta_V))
+        des_pos = x_obj[0:3] - (self.r_robot + self.r_object) * u_push
+        
+        pos_error = x[0:3] - des_pos
+        pos_cost = cs.mtimes([pos_error.T, self.pos_w, pos_error])
+
+        acc = self.model.get_casadi_dx(x, u, True)[3:6]
+
+        acc_cost = self.acc_w * cs.sumsqr((cs.DM.eye(3)- u_push@u_push.T) @ acc)
+
+        #_new = self.R.copy()
+        #_new[3:,3:] = 100 * R_new[3:,3:] # Don't want it to rotate during interaction
+        model_ac.cost_expr_ext_cost_0 =  cs.mtimes([u.T, self.R, u])  + cs.mtimes([error.T, self.Q, error]) #pos_cost + acc_cost +
+        model_ac.cost_expr_ext_cost = cs.mtimes([error.T, self.Q, error]) + cs.mtimes([u.T, self.R, u]) 
+        model_ac.cost_expr_ext_cost_e = cs.mtimes([error.T, self.Q_e, error])
+
 
         ocp = AcadosOcp()
         ocp.model = model_ac
         ocp.dims.N = self.N
         ocp.solver_options.tf = self.Tf
+        ocp.parameter_values = np.zeros(ocp.model.p.size()[0])
+        ocp.cost.cost_type = "EXTERNAL"
+        ocp.cost.cost_type_e = "EXTERNAL"
 
-        ocp.cost.cost_type = "LINEAR_LS"
-        ocp.cost.cost_type_e = "LINEAR_LS"
-
+        """
         #set cost matrices
         W = np.zeros((self.nx + self.nu, self.nx + self.nu))
         W[:self.nx, :self.nx] = self.Q
@@ -93,7 +121,7 @@ class SpacecraftInterMPC():
         ocp.cost.Vx_e = np.eye(self.nx)
         ocp.cost.yref = np.zeros((self.nx + self.nu,))
         ocp.cost.yref_e = np.zeros((self.nx,))
-
+        """
         # set constraints
         ocp.constraints.x0 = np.zeros((self.nx,))
         ocp.constraints.idxbu = np.arange(self.nu)
@@ -124,23 +152,21 @@ class SpacecraftInterMPC():
     def solve(self, x0, setpoints=None,
               weights={'Q': None, 'Q_e': None, 'R': None},
               initial_guess={'X': None, 'U': None},
-              xobj=None, enable_cbf=True,
-              logger=None, verbose=False, selectors=None):
+              xobj=None,
+              logger=None, verbose=False, v_des = None):
         t0 = time.time()
 
         self.solver.set(0, "lbx", x0)
         self.solver.set(0, "ubx", x0)
 
         xref = np.hstack(setpoints)
-        for k in range(self.N):
-            yref = np.concatenate([xref[:, k], np.zeros(self.nu)])  # we only penalize state deviation
-            self.solver.set(k, "yref", yref)
+        for k in range(self.N+1):
+            yref = xref[:, k].ravel()
+            x_obj = xobj.ravel()
+            v_des = v_des.ravel()
+            p_stacked = np.concatenate((yref, x_obj, v_des))
 
-        # set terminal cost reference
-        yref_e = xref[:, self.N]
-        self.solver.set(self.N, "y_ref", yref_e)
-
-        # set weights if provided
+            self.solver.set(k, "p", p_stacked)
         
         
         # set initial guess if we are getting any

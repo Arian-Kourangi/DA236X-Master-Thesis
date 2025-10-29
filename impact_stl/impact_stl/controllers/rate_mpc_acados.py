@@ -127,11 +127,23 @@ class SpacecraftRateMPC():
 
             # append the new parameters to model_ac.p
             # order: s, X_o, U_o, OffSwitch
-            model_ac.p = cs.vertcat(s, X_o, U_o, OffSwitch)
+            y_ref = cs.SX.sym('yref', self.nx)
+            model_ac.p = cs.vertcat(s, X_o, U_o, OffSwitch, y_ref)
         else:
-            model_ac.p = s
+            y_ref = cs.SX.sym('yref', self.nx)
+            model_ac.p = cs.vertcat(s,y_ref)
         
+        error = x - y_ref
+        cost_p = cs.mtimes([error.T, self.Q, error])
+        cost_u = cs.mtimes([u_phys.T, self.R, u_phys])
+        if self.add_cbf:
+            cost_delta = 1e2 * u_delta  # penalize slack
+        else:
+            cost_delta = 0.0
         
+        #model_ac.cost_expr_ext_cost_0 =  cost_u + cost_p + cost_delta
+        model_ac.cost_expr_ext_cost = cost_p + cost_u + cost_delta
+        model_ac.cost_expr_ext_cost_e = cs.mtimes([error.T, self.Q_e, error])
         
         ocp = AcadosOcp()
         ocp.model = model_ac
@@ -144,48 +156,13 @@ class SpacecraftRateMPC():
         ocp.dims.N = self.N
         ocp.solver_options.tf = self.Tf
 
-        ocp.cost.cost_type = "LINEAR_LS"
-        ocp.cost.cost_type_e = "LINEAR_LS"
-
-        #set cost matrices
-        W = np.zeros((self.nx + self.nu, self.nx + self.nu))
-        W[:self.nx, :self.nx] = self.Q
-        #W[self.nx:, self.nx:] = self.R
-        
-        # expand R to full size if we have slack variable
-        R_full = np.zeros((self.nu, self.nu))
-        R_orig = self.R # this is nu_phys x nu_phys
-        R_full[:self.nu_phys, :self.nu_phys] = R_orig
-
-        if self.add_cbf:
-            # penalize slack strongly (last row/col)
-            R_full[self.nu_phys, self.nu_phys] = 1e3   # choose a large weight
-        W[self.nx:, self.nx:] = R_full
-        ocp.cost.W = W
-        ocp.cost.W_e = self.Q_e
-
-        Vx = np.zeros((self.nx + self.nu, self.nx))
-        Vx[0:self.nx, 0:self.nx] = np.eye(self.nx)     # all states go straight in
-
-        Vu = np.zeros((self.nx + self.nu, self.nu))
-        # just map physical controls straight in
-        Vu[self.nx:self.nx + self.nu_phys, :self.nu_phys] = np.eye(self.nu_phys)
-        if self.add_cbf:
-            # slack maps into the cost input part (last entry)
-            Vu[self.nx + self.nu_phys, self.nu_phys] = 1.0  # maps delta into the cost input block     # all controls go straight in
-
-        ocp.cost.Vx = Vx
-        ocp.cost.Vu = Vu
-        ocp.cost.Vx_e = np.eye(self.nx)
-        ocp.cost.yref = np.zeros((self.nx + self.nu,))
-        ocp.cost.yref_e = np.zeros((self.nx,))
+        #ocp.cost.cost_type_0 = "EXTERNAL"
+        ocp.cost.cost_type = "EXTERNAL"
+        ocp.cost.cost_type_e = "EXTERNAL"
 
         # set constraints
         ocp.constraints.x0 = np.zeros((self.nx,))
 
-        #ocp.constraints.idxbu = np.arange(self.nu)
-        #ocp.constraints.lbu = self.model.u_lb
-        #ocp.constraints.ubu = self.model.u_ub
         idxbu = np.arange(self.nu)   # includes slack at the end when add_cbf True
         ocp.constraints.idxbu = idxbu
 
@@ -199,7 +176,7 @@ class SpacecraftRateMPC():
         if self.add_cbf:
             # slack delta bound: delta >= 0, and give reasonable upper bound (avoid extreme values)
             lbu[self.nu_phys] = 0.0
-            ubu[self.nu_phys] = 1000  # finite upper bound; small enough to keep numerics sane
+            ubu[self.nu_phys] = 1e6  # finite upper bound; small enough to keep numerics sane
         else:
             # if no cbf, there is no extra slack dimension and we already set bounds above
             pass
@@ -230,26 +207,13 @@ class SpacecraftRateMPC():
     def solve(self, x0, setpoints=None,
               weights={'Q': None, 'Q_e': None, 'R': None},
               initial_guess={'X': None, 'U': None},
-              xobj=None, enable_cbf=True,
+              xobj=None,
               logger=None, verbose=False, selectors=None):
         t0 = time.time()
 
         self.solver.set(0, "lbx", x0)
         self.solver.set(0, "ubx", x0)
-
-        # set references over the horizon
-        xref = np.hstack(setpoints)
-        for k in range(self.N):
-            yref = np.concatenate([xref[:, k], np.zeros(self.nu)])  # we only penalize state deviation
-            self.solver.set(k, "yref", yref)
-
-        # set terminal cost reference
-        yref_e = xref[:, self.N]
-        self.solver.set(self.N, "y_ref", yref_e)
-
-        # set weights if provided
-        
-        
+           
         # set initial guess if we are getting any
         if initial_guess['X'] is not None:
             for k in range(self.N+1):
@@ -263,26 +227,36 @@ class SpacecraftRateMPC():
         if selectors is None:
             selectors = np.zeros((self.N+1))
         
+        xref = np.hstack(setpoints)     
         if not self.add_cbf:
             # If no CBF our parameter vector is just the selector
-            for k in range(self.N):
-                self.solver.set(k, "p", np.array([selectors[k]]))
+            for k in range(self.N+1):
+                s = np.array([selectors[k]]).ravel()
+                yref = xref[:, k].ravel()
+                p_stacked = np.concatenate((s, yref))
+                self.solver.set(k, "p", p_stacked)
         
         elif xobj is not None and self.add_cbf:
             X_o = xobj  # object state
             U_o = np.zeros((self.nu_phys,)) # assume object is not actuated
-            OffSwitch = 0.0 if enable_cbf else 10000.0
-            for k in range(self.N):
-                # Make sure everything is 1D
+            
+            for k in range(self.N+1):
+                # Check if setpoint is on inter curve or not, if not we turn On the CBF constraint (offswitch =0)
                 sel = np.array([selectors[k]]).ravel()
+                if sel[0] == 0:
+                    OffSwitch = 0.0
+                else:
+                    OffSwitch = 10000.0  # large value to turn off the CBF constraint
+                # Make sure everything is 1D
                 X_o_flat = np.array(X_o).ravel()
                 U_o_flat = np.array(U_o).ravel()
                 off = np.array([OffSwitch]).ravel()
-
-                p_vec = np.concatenate((sel, X_o_flat, U_o_flat, off))
+                yref = xref[:, k].ravel()
+                p_vec = np.concatenate((sel, X_o_flat, U_o_flat, off, yref))
                 self.solver.set(k, "p", p_vec)
-            # Only set the cbf for the first 4 stages, the rest we relax. (lh and uh are set for all stages at setup)
-            #for k in range(self.N//2,self.N):
+            
+            # Only set the cbf for the first 1 stages, the rest we relax. (lh and uh are set for all stages at setup)
+            #for k in range(1,self.N):
             #    self.solver.constraints_set(k, "lh", np.array([-1e6]))
             #    self.solver.constraints_set(k, "uh", np.array([1e6]))
                

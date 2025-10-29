@@ -304,7 +304,6 @@ class SpacecraftImpactMPC(Node):
             for i in range(self.mpc.N+1):
                 ti = t+i*self.mpc.dt
                 setpoints.append(setpoint)
-            
             return setpoints, None, weights, tI
         # we started the simulation
         else:
@@ -385,10 +384,6 @@ class SpacecraftImpactMPC(Node):
             self.initial_guess['X'] = self.initial_guess['X'][:,1::] if self.initial_guess['X'].shape[1] > self.mpc.N+1 else self.initial_guess['X']    
             self.initial_guess['U'] = self.initial_guess['U'][:,1::] if self.initial_guess['U'].shape[1] > self.mpc.N else self.initial_guess['U']
     
-        enable_cbf = False
-        if selectors is not None and self.enable_cbf:
-            if all(s == 0 for s in selectors):
-                enable_cbf = True
         # if we have not started yet (selectors is None), or we are not on an interaction right now (selectors[0]==0)
         # we solve the mpc as normal
         if selectors is None or selectors[0] == 0:
@@ -400,7 +395,7 @@ class SpacecraftImpactMPC(Node):
             x_pred, u_pred = self.mpc.solve(x0,setpoints,
                                             weights=weights,
                                             initial_guess=self.initial_guess,
-                                            xobj=xobj,enable_cbf=enable_cbf,
+                                            xobj=xobj,
                                             logger=self.get_logger(),
                                             verbose=False,selectors=selectors)
         else:
@@ -408,12 +403,17 @@ class SpacecraftImpactMPC(Node):
             # Remove the last entry in u_pred since we don't have a delta for the cbf
             if self.initial_guess['U'].shape[0] == self.inter_mpc.nu +1:
                 self.initial_guess['U'] = self.initial_guess['U'][:-1,::]
+
+            # Get the desired end velocity
+            _,inter_idx = self.get_pre_inter_idx((Clock().now().nanoseconds / 1000 - self.start_time) / 1e6)
+            v_des = self.plan['drvar'][inter_idx][:, -1]/self.plan['dhvar'][inter_idx][0, -1]
+            #print(f"v_des: {v_des.T}")
             x_pred, u_pred = self.inter_mpc.solve(x0,setpoints,
                                             weights=weights,
                                             initial_guess=self.initial_guess,
-                                            xobj=xobj,enable_cbf=False,
+                                            xobj=xobj,
                                             logger=self.get_logger(),
-                                            verbose=False,selectors=selectors)
+                                            verbose=False,v_des = v_des)
         
         self.initial_guess = {'X': x_pred, 'U': u_pred}
 
@@ -462,7 +462,7 @@ class SpacecraftImpactMPC(Node):
             path_id = 'entire'
         else:
             t = (Clock().now().nanoseconds / 1000 - self.start_time) / 1e6
-            start = self.get_pre_idx(t)
+            start,_ = self.get_pre_inter_idx(t)
             stop = start +1
             pub = self.replanned_path_pub
             path_id = 'replanned'
@@ -493,7 +493,7 @@ class SpacecraftImpactMPC(Node):
                 self.started = True
                 self.start_time = Clock().now().nanoseconds / 1000
         
-    def get_pre_idx(self,t):
+    def get_pre_inter_idx(self,t):
         """
         Get the index of the next pre-impact bezier segment and the impact time tI.
         Args:
@@ -510,7 +510,16 @@ class SpacecraftImpactMPC(Node):
             pre_idx = next((pre_indices[i] for i, tI in enumerate(pre_tIs) if tI > t), len(pre_tIs)-1)
         except:
             pre_idx = -1
-        return pre_idx
+        try:
+            # Get all indices where the id is 'inter'
+            inter_indices = [i for i, x in enumerate(self.plan['ids']) if x == 'inter']
+            # Get the end times of all pre-impact beziers
+            inter_tIs = [self.plan['hvar'][i][0,-1] for i in inter_indices]
+            # impacts may only occur in the future, so we find the first for which tI > t
+            inter_idx = next((inter_indices[i] for i, tI in enumerate(inter_tIs) if tI > t), len(inter_tIs)-1)
+        except:
+            inter_idx = -1
+        return pre_idx, inter_idx
 
 def main(args=None):
     rclpy.init(args=args)
