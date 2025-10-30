@@ -76,21 +76,8 @@ class SpacecraftInterMPC():
         model_ac.p = cs.vertcat(yref, x_obj, v_des)
 
         error = x - yref
-        
-        delta_V = v_des- x_obj[3:6]
-        u_push = delta_V / (cs.norm_2(delta_V))
-        des_pos = x_obj[0:3] - (self.r_robot + self.r_object) * u_push
-        
-        pos_error = x[0:3] - des_pos
-        pos_cost = cs.mtimes([pos_error.T, self.pos_w, pos_error])
 
-        acc = self.model.get_casadi_dx(x, u, True)[3:6]
-
-        acc_cost = self.acc_w * cs.sumsqr((cs.DM.eye(3)- u_push@u_push.T) @ acc)
-
-        #_new = self.R.copy()
-        #_new[3:,3:] = 100 * R_new[3:,3:] # Don't want it to rotate during interaction
-        model_ac.cost_expr_ext_cost_0 =  cs.mtimes([u.T, self.R, u])  + cs.mtimes([error.T, self.Q, error]) #pos_cost + acc_cost +
+        model_ac.cost_expr_ext_cost_0 =  cs.mtimes([u.T, self.R, u])  + cs.mtimes([error.T, self.Q, error]) 
         model_ac.cost_expr_ext_cost = cs.mtimes([error.T, self.Q, error]) + cs.mtimes([u.T, self.R, u]) 
         model_ac.cost_expr_ext_cost_e = cs.mtimes([error.T, self.Q_e, error])
 

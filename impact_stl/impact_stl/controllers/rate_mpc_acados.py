@@ -61,7 +61,7 @@ class SpacecraftRateMPC():
             q_o = cs.SX.sym('q_o', 4)
             u_o = cs.SX.sym('u_o', self.nu_phys)
 
-            h = cs.sumsqr(p_r[0:2] - p_o[0:2]) - (0.2 + 0.2 + 0.1)**2
+            h = cs.sumsqr(p_r[0:2] - p_o[0:2]) - (0.2 + 0.2 + 0.05)**2
             x = cs.vertcat(p_r, p_o)
             dx = cs.vertcat(v_r, v_o)
 
@@ -113,8 +113,7 @@ class SpacecraftRateMPC():
             U_o = cs.SX.sym('U_o', self.nu_phys)
             OffSwitch = cs.SX.sym('OffSwitch')
 
-            # recreate the CBF pieces as in rate_mpc.py but using the symbolic x split
-            # assume your self.h, self.dh, self.ddh are available (created in __init__)
+            # CBF expression
             cbf_stage = self.ddh(x, X_o, u_phys, U_o)[0] \
                         + self.alpha * self.dh(x, X_o)[0] \
                         + self.beta * self.h(x, X_o)[0] \
@@ -134,7 +133,13 @@ class SpacecraftRateMPC():
             model_ac.p = cs.vertcat(s,y_ref)
         
         error = x - y_ref
-        cost_p = cs.mtimes([error.T, self.Q, error])
+        cost_p = cs.mtimes([error[0:6].T, self.Q[0:6,0:6], error[0:6]])
+        q = x[6:10].reshape((4,1))
+        q_ref = y_ref[6:10].reshape((4,1))
+        
+        eq = 1 - (q.T @ q_ref)**2 
+        cost_eq = eq.T @ self.Q[6,6].reshape((1, 1)) @ eq
+
         cost_u = cs.mtimes([u_phys.T, self.R, u_phys])
         if self.add_cbf:
             cost_delta = 1e2 * u_delta  # penalize slack
@@ -142,8 +147,8 @@ class SpacecraftRateMPC():
             cost_delta = 0.0
         
         #model_ac.cost_expr_ext_cost_0 =  cost_u + cost_p + cost_delta
-        model_ac.cost_expr_ext_cost = cost_p + cost_u + cost_delta
-        model_ac.cost_expr_ext_cost_e = cs.mtimes([error.T, self.Q_e, error])
+        model_ac.cost_expr_ext_cost = cost_p + cost_u + cost_eq + cost_delta
+        model_ac.cost_expr_ext_cost_e = cs.mtimes([error[0:6].T, self.Q_e[0:6,0:6], error[0:6]]) + eq.T @ self.Q_e[6,6].reshape((1, 1)) @ eq
         
         ocp = AcadosOcp()
         ocp.model = model_ac
@@ -256,9 +261,9 @@ class SpacecraftRateMPC():
                 self.solver.set(k, "p", p_vec)
             
             # Only set the cbf for the first 1 stages, the rest we relax. (lh and uh are set for all stages at setup)
-            #for k in range(1,self.N):
-            #    self.solver.constraints_set(k, "lh", np.array([-1e6]))
-            #    self.solver.constraints_set(k, "uh", np.array([1e6]))
+            for k in range(2,self.N):
+                self.solver.constraints_set(k, "lh", np.array([-1e6]))
+                self.solver.constraints_set(k, "uh", np.array([1e6]))
                
         # set setpoints parameter
         try:
