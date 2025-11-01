@@ -61,7 +61,7 @@ class SpacecraftRateMPC():
             q_o = cs.SX.sym('q_o', 4)
             u_o = cs.SX.sym('u_o', self.nu_phys)
 
-            h = cs.sumsqr(p_r[0:2] - p_o[0:2]) - (0.2 + 0.2 + 0.05)**2
+            h = cs.sumsqr(p_r[0:2] - p_o[0:2]) - (0.2 + 0.2 + 0.1)**2
             x = cs.vertcat(p_r, p_o)
             dx = cs.vertcat(v_r, v_o)
 
@@ -77,8 +77,8 @@ class SpacecraftRateMPC():
             self.h = cs.Function('h', [X_r, X_o], [h])
             self.dh = cs.Function('dh', [X_r, X_o], [dh])
             self.ddh = cs.Function('ddh', [X_r, X_o, u_r, u_o], [ddh])
-            self.alpha = 2.0
-            self.beta = 1.0
+            self.alpha = 4.0
+            self.beta = 2.0
         
         self.solver = self.setup()
 
@@ -261,7 +261,7 @@ class SpacecraftRateMPC():
                 self.solver.set(k, "p", p_vec)
             
             # Only set the cbf for the first 1 stages, the rest we relax. (lh and uh are set for all stages at setup)
-            for k in range(2,self.N):
+            for k in range(3,self.N):
                 self.solver.constraints_set(k, "lh", np.array([-1e6]))
                 self.solver.constraints_set(k, "uh", np.array([1e6]))
                

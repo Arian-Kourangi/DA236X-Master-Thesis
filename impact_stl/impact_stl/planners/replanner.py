@@ -334,6 +334,16 @@ class RePlanner(Node):
         self.opti.set_value(self.params['dh_end'], self.original_rob_plan['dhvar'][pre_idx+1][0,-1])
         # Desired position of the object at the start of the next interaction/end of the next pre curve
         self.opti.set_value(self.params['next_obj_int_pos'], self.obj_rvars[obj_next_pre][0:2,-1])
+        
+        # Set weights, if end vel is 0 then vel weight should be higher
+        if np.linalg.norm(self.original_rob_plan['drvar'][pre_idx+1][0:2,-1]) < 1e-2:
+            w_s_val = np.array([1e3, 0, 0, 0])
+            self.opti.set_value(self.params['s'], 1.0)
+            #self.get_logger().info("Using higher end velocity weight since desired end velocity is 0")
+        else:
+            w_s_val = np.array([1e3, 1e4, 1e0, 1e4])
+            self.opti.set_value(self.params['s'], 0.0)
+        self.opti.set_value(self.params['w_s'], w_s_val)
 
         # Set initial guesses
         for idx in range(len(self.vars['rvars'])):
@@ -400,7 +410,7 @@ class RePlanner(Node):
             opti.subject_to(dhvars[0][0,i] >= 1*1e-1)
         ## Tigher constraing for interaction curve to minimize acceleration
         for i in range(dhvars[1].shape[1]):
-            opti.subject_to(dhvars[1][0,i] >= 30*1e-1)
+            opti.subject_to(dhvars[1][0,i] >= 80*1e-1)
 
         #Contuinuity constraints between pre and interaction curve
         opti.subject_to(rvars[0][:,-1] == rvars[-1][:,0])
@@ -509,7 +519,9 @@ class RePlanner(Node):
         # Thats why we subtract the radii times unit_push_dir
         
         ## Also add that the vectors are parallel
-        
+        s = opti.parameter()
+        self.params['s'] = s
+
         next_obj_int_pos = opti.parameter(2)
         self.params['next_obj_int_pos'] = next_obj_int_pos
         
@@ -522,7 +534,7 @@ class RePlanner(Node):
         #Create a vector between the replanned end of interaction and the next object interaction position
         new_v = next_obj_int_pos - object_end
         #Make sure these are parallel
-        opti.subject_to(new_v[0] * v[1] - new_v[1] * v[0] == 0) # cross product = 0 means they are colinear/parallel
+        opti.subject_to((1-s)*(new_v[0] * v[1] - new_v[1] * v[0]) == 0) # cross product = 0 means they are colinear/parallel
 
 
         # Directional constraints on velocity changes during interaction curve
@@ -543,20 +555,26 @@ class RePlanner(Node):
 
         # Make sure the ratio of change in y velocity to change in x velocity is the same as the desired delta_V
         # This ensures that the robot pushes in the direction of desired velocity i.e the interaction angle is constant
-        #for i in range(drvars[1].shape[1]-1):
-        #    d_x = drvars[1][0,cp+1] - drvars[1][0,cp]
-        #    d_y = drvars[1][1,cp+1] - drvars[1][1,cp]
-        #    opti.subject_to(d_x * delta_V[1] - d_y * delta_V[0] == 0) # cross product = 0 means they are colinear
+        for cp in range(drvars[1].shape[1]-1):
+            d_x = drvars[1][0,cp+1] - drvars[1][0,cp]
+            d_y = drvars[1][1,cp+1] - drvars[1][1,cp]
+            opti.subject_to(d_x * delta_V[1] - d_y * delta_V[0] == 0) # cross product = 0 means they are colinear
         
         #Constant change of velocity
-        for i in range(drvars[1].shape[1]-2):
-            opti.subject_to(drvars[1][0,i+2] - 2*drvars[1][0,i+1] + drvars[1][0,i] == 0)
-            opti.subject_to(drvars[1][1,i+2] - 2*drvars[1][1,i+1] + drvars[1][1,i] == 0)
+        #for i in range(drvars[1].shape[1]-2):
+        #    opti.subject_to(drvars[1][0,i+2] - 2*drvars[1][0,i+1] + drvars[1][0,i] == 0)
+        #    opti.subject_to(drvars[1][1,i+2] - 2*drvars[1][1,i+1] + drvars[1][1,i] == 0)
+        
 
         # Ensure paralelle final velocity, since dh is constant we can ignore it
-        dq_end = dr_end/dh_end
-        replanned_dq_end = drvars[1][:,-1]
-        opti.subject_to(dq_end[0] * replanned_dq_end[1] - dq_end[1] * replanned_dq_end[0] == 0) # cross product = 0 means they are colinear/parallel
+        dq_end = dr_end/(dh_end + 1e-6)  # avoid division by zero
+        replanned_dq_end = drvars[1][:,-1] #/ dhvars[1][0,-1]
+        opti.subject_to((1-s)*(dq_end[0] * replanned_dq_end[1] - dq_end[1] * replanned_dq_end[0]) == 0) # cross product = 0 means they are colinear/parallel
+
+        opti.subject_to(s*replanned_dq_end[0] <= 1e-6*dhvars[1][0,-1] )
+        opti.subject_to(s*replanned_dq_end[1] <= 1e-6 *dhvars[1][0,-1])
+        opti.subject_to(s*replanned_dq_end[0] >= -1e-6*dhvars[1][0,-1])
+        opti.subject_to(s*replanned_dq_end[1] >= -1e-6*dhvars[1][0,-1])
 
         # Minimize the acceleration
         J = 0
@@ -567,7 +585,7 @@ class RePlanner(Node):
             J += 10*cs.sumsqr(ddhvars[0][0,i])
     
         # For interaction curve we want to minimize acceleration more
-        w_acc = 1e2
+        w_acc = 2*1e2
         for i in range(ddrvars[1].shape[1]):
             J += w_acc*cs.sumsqr(ddrvars[1][:,i])
         for i in range(ddhvars[1].shape[1]):
@@ -575,10 +593,12 @@ class RePlanner(Node):
         
         # --- Soft penalties for final targets (relax exact equalities) ---
         # Weights (tune as needed)
-        w_r = 1e5
-        w_dr = 1e4
-        w_h = 1e0
-        w_dh = 1e4
+        w_s = opti.parameter(4)
+        w_r = w_s[0]
+        w_dr = w_s[1]
+        w_h = w_s[2]
+        w_dh = w_s[3]
+        self.params['w_s'] = w_s
         # We also want the end of the itneraction to be as close as possible to the planned end of interaction
         try:
             # target_* were prepared earlier (CasADi DM or floats)
@@ -604,7 +624,7 @@ class RePlanner(Node):
         }
 
         sqp_opts = {
-            'max_iter': 100,
+            'max_iter': 1000,
             'qpsol': 'osqp',
             'convexify_margin': 1e-4,
             'print_header': False,

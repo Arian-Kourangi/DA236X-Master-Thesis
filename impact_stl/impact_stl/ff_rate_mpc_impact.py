@@ -392,6 +392,9 @@ class SpacecraftImpactMPC(Node):
                 pass
             else:
                 self.initial_guess['U'] = np.concatenate((self.initial_guess['U'], np.zeros((1, self.initial_guess['U'].shape[1]))), axis=0) if self.initial_guess['U'] is not None else None
+            
+            if self.initial_guess['X'] is not None and self.initial_guess['X'].shape[0] != self.mpc.nx:
+                self.initial_guess['X'] = None
             x_pred, u_pred = self.mpc.solve(x0,setpoints,
                                             weights=weights,
                                             initial_guess=self.initial_guess,
@@ -404,9 +407,16 @@ class SpacecraftImpactMPC(Node):
             if self.initial_guess['U'].shape[0] == self.inter_mpc.nu +1:
                 self.initial_guess['U'] = self.initial_guess['U'][:-1,::]
 
+            if self.initial_guess['X'].shape[0] != self.inter_mpc.nx*2:
+                self.initial_guess['X'] = np.concatenate((self.initial_guess['X'], np.zeros((self.inter_mpc.nx, self.initial_guess['X'].shape[1]))), axis=0) if self.initial_guess['X'] is not None else None
+
             # Get the desired end velocity
             _,inter_idx = self.get_pre_inter_idx((Clock().now().nanoseconds / 1000 - self.start_time) / 1e6)
-            v_des = self.plan['drvar'][inter_idx][:, -1]/self.plan['dhvar'][inter_idx][0, -1]
+            if self.plan['dhvar'][inter_idx][0,-1] == 0:
+                v_des = np.array([0.0,0.0,0.0])
+            else:
+                v_des = self.plan['drvar'][inter_idx][:, -1]/self.plan['dhvar'][inter_idx][0, -1]
+                self.get_logger().info(f"v_des: {v_des.T}") 
             #print(f"v_des: {v_des.T}")
             x_pred, u_pred = self.inter_mpc.solve(x0,setpoints,
                                             weights=weights,
