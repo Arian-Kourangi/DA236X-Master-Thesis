@@ -337,7 +337,7 @@ class RePlanner(Node):
         
         # Set weights, if end vel is 0 then vel weight should be higher
         if np.linalg.norm(self.original_rob_plan['drvar'][pre_idx+1][0:2,-1]) < 1e-2:
-            w_s_val = np.array([1e3, 0, 0, 0])
+            w_s_val = np.array([1e4, 0, 0, 0])
             self.opti.set_value(self.params['s'], 1.0)
             #self.get_logger().info("Using higher end velocity weight since desired end velocity is 0")
         else:
@@ -436,10 +436,10 @@ class RePlanner(Node):
         #Velocity constraints - keep the velocity within bounds for the interaction curve, 
         # now we want the max velocity to half of actual max, since the robot is also pushing the object
         for i in range(drvars[1].shape[1]):
-            opti.subject_to(drvars[1][0,i] <= 0.5*self.dq_ub[0]*dhvars[1][0,i])
-            opti.subject_to(drvars[1][0,i] >= 0.5*self.dq_lb[0]*dhvars[1][0,i])
-            opti.subject_to(drvars[1][1,i] <= 0.5*self.dq_ub[1]*dhvars[1][0,i])
-            opti.subject_to(drvars[1][1,i] >= 0.5*self.dq_lb[1]*dhvars[1][0,i])
+            opti.subject_to(drvars[1][0,i] <= self.dq_ub[0]*dhvars[1][0,i])
+            opti.subject_to(drvars[1][0,i] >= self.dq_lb[0]*dhvars[1][0,i])
+            opti.subject_to(drvars[1][1,i] <= self.dq_ub[1]*dhvars[1][0,i])
+            opti.subject_to(drvars[1][1,i] >= self.dq_lb[1]*dhvars[1][0,i])
         
 
         ###### FROM PLANNED TRAJECTORY ######
@@ -580,9 +580,9 @@ class RePlanner(Node):
         J = 0
         ## For pre curve we can have smaller weights
         for i in range(ddrvars[0].shape[1]):
-            J += 10*cs.sumsqr(ddrvars[0][:,i])
+            J += 1*cs.sumsqr(ddrvars[0][:,i])
         for i in range(ddhvars[0].shape[1]):
-            J += 10*cs.sumsqr(ddhvars[0][0,i])
+            J += 1*cs.sumsqr(ddhvars[0][0,i])
     
         # For interaction curve we want to minimize acceleration more
         w_acc = 2*1e2

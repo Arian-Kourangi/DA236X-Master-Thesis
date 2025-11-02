@@ -127,13 +127,13 @@ class SpacecraftInterMPC():
 
         cost_u = cs.mtimes([u.T, self.R, u])
 
-        cost_p_r_e = cs.mtimes([e_robot.T, self.Q_e, e_robot])
+        cost_p_r_e = cs.mtimes([e_robot[0:6].T, self.Q_e[0:6,0:6], e_robot[0:6]])
         cost_eq_r_e = eq_r.T @ self.Q_e[6,6].reshape((1, 1)) @ eq_r
-        cost_p_o_e = cs.mtimes([e_object.T, self.Q_e, e_object])
+        cost_p_o_e = cs.mtimes([e_object[0:6].T, self.Q_e[0:6,0:6], e_object[0:6]])
         cost_eq_o_e = eq_o.T @ self.Q_e[6,6].reshape((1, 1)) @ eq_o
 
         tangent = cs.SX.eye(3) - cs.mtimes(contact_norm, contact_norm.T)
-        tangent_cost= 1e2 *cs.dot(cs.mtimes(tangent, x_robot[3:6]), cs.mtimes(tangent, x_robot[3:6])) 
+        tangent_cost= 1e1 *cs.dot(cs.mtimes(tangent, f_robot[3:6]), cs.mtimes(tangent, f_robot[3:6])) 
         
         model_ac.cost_expr_ext_cost = cost_p_r + cost_eq_r + cost_p_o + cost_eq_o + cost_u + tangent_cost
         model_ac.cost_expr_ext_cost_e = cost_p_r_e + cost_eq_r_e + cost_p_o_e + cost_eq_o_e
@@ -146,8 +146,9 @@ class SpacecraftInterMPC():
         ocp.parameter_values = np.zeros(ocp.model.p.size()[0])
         ocp.cost.cost_type = "EXTERNAL"
         ocp.cost.cost_type_e = "EXTERNAL"
-        g_pull = cs.mtimes(contact_norm.T, f_robot[3:6]) 
-        model_ac.con_h_expr = g_pull
+
+        #g_pull = cs.mtimes(contact_norm.T, f_robot[3:6]) 
+        model_ac.con_h_expr = proj_scalar
         
         ocp.constraints.lh = np.array([0.0]) # lower bound >= 0
         ocp.constraints.uh = np.array([1e6]) # big upper bound
