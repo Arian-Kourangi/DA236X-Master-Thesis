@@ -263,9 +263,19 @@ class SpacecraftRateMPC():
                 self.solver.set(k, "u", initial_guess['U'][:, k])    # guessed controls
 
         #set selectors for a setpoint being on the an inter curve or not
-        if selectors is None:
+        if selectors is None: # We haven't started yet, and the object and robot might be on top of eachother so don't enforce any constraint
             selectors = np.zeros((self.N+1))
-        
+        else:
+            for k in range(1,self.N):
+                if selectors[k] == 0:
+                    # Non-interaction step, enforce CBF and not interaction constraint
+                    self.solver.constraints_set(k, "lh", np.array([0, -1e6]))
+                    self.solver.constraints_set(k, "uh", np.array([1e6, 1e6]))
+                else:
+                    # Interaction step, enforce interaction constraint and not CBF
+                    self.solver.constraints_set(k, "lh", np.array([-1e6, 0]))
+                    self.solver.constraints_set(k, "uh", np.array([1e6, 1e6]))    
+    
         xref = np.hstack(setpoints)     
 
         for k in range(self.N+1):
@@ -275,16 +285,6 @@ class SpacecraftRateMPC():
             p_stacked = np.concatenate((s, yref, v_des))
             self.solver.set(k, "p", p_stacked)
 
-        
-        for k in range(1,self.N):
-            if selectors[k] == 0:
-                # Non-interaction step, enforce CBF and not projection constraint
-                self.solver.constraints_set(k, "lh", np.array([0, -1e6]))
-                self.solver.constraints_set(k, "uh", np.array([1e6, 1e6]))
-            else:
-                # Interaction step, enforce projection constraint and not CBF
-                self.solver.constraints_set(k, "lh", np.array([-1e6, 0]))
-                self.solver.constraints_set(k, "uh", np.array([1e6, 1e6]))
                
         # set setpoints parameter
         try:
