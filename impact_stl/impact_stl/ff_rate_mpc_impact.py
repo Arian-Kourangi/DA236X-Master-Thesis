@@ -167,8 +167,8 @@ class SpacecraftImpactMPC(Node):
 
         # Create Spacecraft and controller objects
         self.model = SpacecraftRateModel()
-        self.mpc = SpacecraftRateMPC(self.model,Tf=1.0,N=10,add_cbf=self.enable_cbf) # N = 10 for rate_mpc, 100 for rate_mpc_acados
-        self.inter_mpc = SpacecraftInterMPC(self.model,Tf=1.0,N=10,add_cbf=self.enable_cbf)
+        self.mpc = SpacecraftRateMPC(self.model,Tf=1.0,N=10) # N = 10 for rate_mpc, 100 for rate_mpc_acados
+        #self.inter_mpc = SpacecraftInterMPC(self.model,Tf=1.0,N=10,add_cbf=self.enable_cbf)
         self.initial_guess = {'X': None, 'U': None}
 
         self.vehicle_attitude = np.array([1.0, 0.0, 0.0, 0.0])
@@ -338,13 +338,13 @@ class SpacecraftImpactMPC(Node):
                 # since the replanner won't change the pos directly after the interaction
                 # so the MPC might slam into the newly released object.
 
-            if any(selectors[i] ==1 for i in range(len(selectors)-1)) and selectors[-1]==0:
-
-                # Make all the setpoints after the interaction equal to the last interaction setpoint
-                # We do this so the MPC focuses on the interaction and not on going to some random place afterwards
-                end_idx = next(i for i in range(len(selectors)) if selectors[i]==0)
-                for point in range(end_idx, len(setpoints)):
-                    setpoints[point] = setpoints[end_idx-1]
+            #if any(selectors[i] ==1 for i in range(len(selectors)-1)) and selectors[-1]==0:
+#
+            #    # Make all the setpoints after the interaction equal to the last interaction setpoint
+            #    # We do this so the MPC focuses on the interaction and not on going to some random place afterwards
+            #    end_idx = next(i for i in range(len(selectors)) if selectors[i]==0)
+            #    for point in range(end_idx, len(setpoints)):
+            #        setpoints[point] = setpoints[end_idx-1]
 
             return setpoints, selectors, weights, tI
 
@@ -383,47 +383,23 @@ class SpacecraftImpactMPC(Node):
         if self.initial_guess['X'] is not None:
             self.initial_guess['X'] = self.initial_guess['X'][:,1::] if self.initial_guess['X'].shape[1] > self.mpc.N+1 else self.initial_guess['X']    
             self.initial_guess['U'] = self.initial_guess['U'][:,1::] if self.initial_guess['U'].shape[1] > self.mpc.N else self.initial_guess['U']
-    
-        # if we have not started yet (selectors is None), or we are not on an interaction right now (selectors[0]==0)
-        # we solve the mpc as normal
-        if selectors is None or selectors[0] == 0:
-            # Check i u_pred is right size, will be one less if we just had an interaction since the intermpc doesn't use the cbf delta
-            if self.initial_guess['U'] is not None and self.initial_guess['U'].shape[0] == self.mpc.nu:
-                pass
-            else:
-                self.initial_guess['U'] = np.concatenate((self.initial_guess['U'], np.zeros((1, self.initial_guess['U'].shape[1]))), axis=0) if self.initial_guess['U'] is not None else None
-            
-            if self.initial_guess['X'] is not None and self.initial_guess['X'].shape[0] != self.mpc.nx:
-                self.initial_guess['X'] = None
-            x_pred, u_pred = self.mpc.solve(x0,setpoints,
-                                            weights=weights,
-                                            initial_guess=self.initial_guess,
-                                            xobj=xobj,
-                                            logger=self.get_logger(),
-                                            verbose=False,selectors=selectors)
-        else:
-            # We are on an interaction right now, solve with interaction MPC
-            # Remove the last entry in u_pred since we don't have a delta for the cbf
-            if self.initial_guess['U'].shape[0] == self.inter_mpc.nu +1:
-                self.initial_guess['U'] = self.initial_guess['U'][:-1,::]
-
-            if self.initial_guess['X'].shape[0] != self.inter_mpc.nx*2:
-                self.initial_guess['X'] = np.concatenate((self.initial_guess['X'], np.zeros((self.inter_mpc.nx, self.initial_guess['X'].shape[1]))), axis=0) if self.initial_guess['X'] is not None else None
-
-            # Get the desired end velocity
+        if self.started:
+                # Get the desired end velocity
             _,inter_idx = self.get_pre_inter_idx((Clock().now().nanoseconds / 1000 - self.start_time) / 1e6)
             if self.plan['dhvar'][inter_idx][0,-1] == 0:
                 v_des = np.array([0.0,0.0,0.0])
             else:
                 v_des = self.plan['drvar'][inter_idx][:, -1]/self.plan['dhvar'][inter_idx][0, -1]
-                self.get_logger().info(f"v_des: {v_des.T}") 
-            #print(f"v_des: {v_des.T}")
-            x_pred, u_pred = self.inter_mpc.solve(x0,setpoints,
-                                            weights=weights,
-                                            initial_guess=self.initial_guess,
-                                            xobj=xobj,
-                                            logger=self.get_logger(),
-                                            verbose=False,v_des = v_des)
+                #self.get_logger().info(f"v_des: {v_des.T}") 
+        else:
+            v_des = np.array([0.0,0.0,0.0])
+        #print(f"v_des: {v_des.T}")
+        x_pred, u_pred = self.mpc.solve(x0,setpoints,
+                                        weights=weights,
+                                        initial_guess=self.initial_guess,
+                                        xobj=xobj,
+                                        logger=self.get_logger(),
+                                        verbose=False,selectors=selectors,v_des=v_des)
         
         self.initial_guess = {'X': x_pred, 'U': u_pred}
 
