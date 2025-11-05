@@ -633,13 +633,13 @@ class SR_Impact_STL:
                                                      name=f"collision_{r}_{bzr}_{o}_{bzo}_11")
                                 self.prog.addConstr(self.robots_dhvar[r][bzr-1][0,-1] <= self.objects_dhvar[o][bzo][0,0] + self.bigM*(1-zs[o][bzr,bzo]) + eps,
                                                      name=f"collision_{r}_{bzr}_{o}_{bzo}_12")
-                            # The pre curve of the robot has to be smaller than 5 seconds
-                            self.prog.addConstr(self.robots_hvar[r][bzr-1][0,-1] - self.robots_hvar[r][bzr-1][0,0] <= 5 + self.bigM*(1-zs[o][bzr,bzo]),
-                                                 name=f"collision_{r}_{bzr}_{o}_{bzo}_13")
-                            
-                            # The free curve of the object after the interaction has to be larger than 7 seconds
-                            self.prog.addConstr(self.objects_hvar[o][bzo+1][0,-1] - self.objects_hvar[o][bzo+1][0,0] >= 7 - self.bigM*(1-zs[o][bzr,bzo]),
-                                                 name=f"collision_{r}_{bzr}_{o}_{bzo}_14")
+                            ## The pre curve of the robot has to be smaller than 5 seconds
+                            #self.prog.addConstr(self.robots_hvar[r][bzr-1][0,-1] - self.robots_hvar[r][bzr-1][0,0] <= 5 + self.bigM*(1-zs[o][bzr,bzo]),
+                            #                     name=f"collision_{r}_{bzr}_{o}_{bzo}_13")
+                            #
+                            ## The free curve of the object after the interaction has to be larger than 7 seconds
+                            #self.prog.addConstr(self.objects_hvar[o][bzo+1][0,-1] - self.objects_hvar[o][bzo+1][0,0] >= 7 - self.bigM*(1-zs[o][bzr,bzo]),
+                            #                     name=f"collision_{r}_{bzr}_{o}_{bzo}_14")
                         except Exception as e:
                             print(f"Error in {o} {bzo} {r} {bzr} if interaction constraint: {e}")
 

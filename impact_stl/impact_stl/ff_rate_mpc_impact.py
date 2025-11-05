@@ -163,6 +163,7 @@ class SpacecraftImpactMPC(Node):
         
         self.cooldown_replanner = 0.1  # seconds
         self.last_replan_time = -np.inf
+        self.interaction_time = -np.inf
         self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
 
         # Create Spacecraft and controller objects
@@ -208,7 +209,9 @@ class SpacecraftImpactMPC(Node):
 
             # Also shift the object plan, here we don't care about current time or dhvars, just the timing
             for idx in range(len(self.plan_object['hvar'])):
-                self.plan_object['hvar'][idx][0,:] += msg.time_shift
+                for cp in range(self.plan_object['hvar'][idx].shape[1]):
+                    if self.plan_object['hvar'][idx][0,cp] > (Clock().now().nanoseconds/ 1e3 - self.start_time)/1e6:
+                        self.plan_object['hvar'][idx][0,cp] += msg.time_shift
 
 
     def global_reset_callback(self, msg):
@@ -320,17 +323,18 @@ class SpacecraftImpactMPC(Node):
             # Check if no interaction on Horizon and next interaction is ours
             if all(selectors[i]==0 for i in range(len(selectors))) and self.plan_object['other_names'][self.get_object_next_inter(t)] in self.robot_name and dist > 0.5:
                 #self.get_logger().info('Calling Replanning Service in ff_rate_mpc_impact')
-
-                #Cooldown for the replanner so we don't spam it
-                if Clock().now().nanoseconds/1e9 - self.last_replan_time > self.cooldown_replanner:
-                    self.last_replan_time = Clock().now().nanoseconds/1e9
-                    msg = Replan()
-                    msg.starttime = int(self.start_time)
-                    msg.robot_plan = plan_to_plan_msg(self.plan['rvar'], self.plan['hvar'], self.plan['ids'], self.plan['other_names'])
-                    msg.object_plan = plan_to_plan_msg(self.plan_object['rvar'], self.plan_object['hvar'], self.plan_object['ids'], self.plan_object['other_names'])
-                    #self.get_logger().info(f"next interaction index of the object: {self.get_object_next_inter(t)}")
-                    #self.get_logger().info(f"type of next interaction index of the object: {type(self.get_object_next_inter(t))}")
-                    self.publisher_recompute_local_plan.publish(msg)
+                #If we just interacted the other robot might publish a time shift that would cause us to replan the prvious plan again
+                if Clock().now().nanoseconds/1e9  - self.interaction_time > 100.0: # Temporary set to 100 as the timing is still broken
+                    #Cooldown for the replanner so we don't spam it
+                    if Clock().now().nanoseconds/1e9 - self.last_replan_time > self.cooldown_replanner:
+                        self.last_replan_time = Clock().now().nanoseconds/1e9
+                        msg = Replan()
+                        msg.starttime = int(self.start_time)
+                        msg.robot_plan = plan_to_plan_msg(self.plan['rvar'], self.plan['hvar'], self.plan['ids'], self.plan['other_names'])
+                        msg.object_plan = plan_to_plan_msg(self.plan_object['rvar'], self.plan_object['hvar'], self.plan_object['ids'], self.plan_object['other_names'])
+                        #self.get_logger().info(f"next interaction index of the object: {self.get_object_next_inter(t)}")
+                        #self.get_logger().info(f"type of next interaction index of the object: {type(self.get_object_next_inter(t))}")
+                        self.publisher_recompute_local_plan.publish(msg)
 
 
             #Checking if we are on an interaction and the end of the interaction is on the horizon
@@ -378,7 +382,8 @@ class SpacecraftImpactMPC(Node):
         # self.get_logger().info(f"setpoints: {setpoints[0][0:2].T}, pos: {self.vehicle_local_position[0:2].T}")
         #self.get_logger().info(f"selectors: {selectors}")
         # solve the mpc
-
+        if selectors is not None and selectors[0] == 1:
+            self.interaction_time = Clock().now().nanoseconds / 1e9
         # now the initial guess has to be x_pred again, but check the size!
         if self.initial_guess['X'] is not None:
             self.initial_guess['X'] = self.initial_guess['X'][:,1::] if self.initial_guess['X'].shape[1] > self.mpc.N+1 else self.initial_guess['X']    
@@ -393,6 +398,11 @@ class SpacecraftImpactMPC(Node):
                 #self.get_logger().info(f"v_des: {v_des.T}") 
         else:
             v_des = np.array([0.0,0.0,0.0])
+        #if selectors is not None and selectors[0] == 0:
+        #    #If we are not on an interaction, we want to go to the desired velocity smoothly
+        #    self.delta_V = v_des - x0[3:6,0]
+        #elif selectors is None:
+        #    self.delta_V = np.array([0.0,0.0,0.0])
         #print(f"v_des: {v_des.T}")
         x_pred, u_pred = self.mpc.solve(x0,setpoints,
                                         weights=weights,

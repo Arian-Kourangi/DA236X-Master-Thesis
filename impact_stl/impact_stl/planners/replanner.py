@@ -108,7 +108,7 @@ class RePlanner(Node):
 
         #Size of world
         self.world_lb = np.array([0,0])
-        self.world_ub = np.array([10,20])
+        self.world_ub = np.array([30,30])
         self.dq_lb = np.array([-2,-2])
         self.dq_ub = np.array([2,2])  
 
