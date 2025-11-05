@@ -67,7 +67,7 @@ class SpacecraftRateModel():
         
         """
         if inter:
-            mass = copy.deepcopy(self.mass + self.object_mass)
+            mass = 1
         else:
             mass = copy.deepcopy(self.mass)
         p = x[0:3]
