@@ -101,7 +101,7 @@ class SpacecraftRateMPC():
         contact_norm = dist / dist_norm
 
         k = 150 # Gain for sigmoid
-        delta = dist_norm - (self.r_robot + self.r_object + 0.02)
+        delta = dist_norm - (self.r_robot + self.r_object + 0.05)
         switch = k * delta  # no need to clamp
         # acitvate can only be on when we are on interaction curve
         activate = s * self.safe_sigmoid(switch)  # smooth activation between 0 and 1
@@ -205,7 +205,7 @@ class SpacecraftRateMPC():
         # Tangent acceleration cost, only active when s = 1
         tangent = cs.SX.eye(3) - cs.mtimes(contact_norm, contact_norm.T)
         # Tangen cost is only active if we are close to tne object, otherwise go ahead and use tangential forces so you can move around
-        tangent_cost= 0.25*(s_dec + activate)*1e3 * cs.dot(cs.mtimes(tangent, f_robot[3:6]), cs.mtimes(tangent, f_robot[3:6])) 
+        tangent_cost= 0.20*(s_dec + activate)*1e3 * cs.dot(cs.mtimes(tangent, f_robot[3:6]), cs.mtimes(tangent, f_robot[3:6])) 
         
 
         w_s  = 1e0  # encourage s to be small unless helpful
@@ -262,12 +262,12 @@ class SpacecraftRateMPC():
         ocp.solver_options.nlp_solver_tol_stat = 1e-6
         ocp.solver_options.nlp_solver_tol_eq   = 1e-6
         ocp.solver_options.nlp_solver_tol_ineq = 1e-6
-        ocp.solver_options.nlp_solver_max_iter = 50
+        ocp.solver_options.nlp_solver_max_iter = 200
         
         ocp.solver_options.qp_solver_tol_stat = 1e-8
         ocp.solver_options.qp_solver_tol_eq   = 1e-8
         ocp.solver_options.qp_solver_tol_ineq = 1e-8
-        ocp.solver_options.qp_solver_iter_max = 200
+        ocp.solver_options.qp_solver_iter_max = 500
 
         # regularization helps numeric stability
         ocp.solver_options.levenberg_marquardt = 1e-4
