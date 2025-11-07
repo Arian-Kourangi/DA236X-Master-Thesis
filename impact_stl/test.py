@@ -27,3 +27,8 @@ import casadi as cs
 #x[-1] = 0
 #if all(x[i]==1 for i in range(len(x))):
 #    print("all ones")
+
+x = 1/(1+ np.exp(1000*(0.40-0.45)))
+print(x)
+y = 0.5 * (1 - cs.tanh(0.5 * 1000*(0.40-0.45)))
+print(y)

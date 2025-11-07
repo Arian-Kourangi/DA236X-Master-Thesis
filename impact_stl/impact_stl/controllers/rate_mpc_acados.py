@@ -25,11 +25,10 @@ class SpacecraftRateMPC():
 
         self.nx = 10 # Number of state variables
         
-        self.nu = 6 # Number of control inputs
-        self.nu_phys = self.nu   # keep physical input size
+        self.nu_phys = 6   # keep physical input size
 
         #Add another input for slack variable
-        self.nu = self.nu_phys + 1 
+        self.nu = self.nu_phys + 2 
 
         self.r_robot = 0.20
         self.r_object = 0.20
@@ -57,7 +56,7 @@ class SpacecraftRateMPC():
         v_o = cs.SX.sym('v_o', 3)
         q_o = cs.SX.sym('q_o', 4)
         f_o = cs.SX.sym('u_o', self.nx)
-        h = cs.sumsqr(p_r[0:2] - p_o[0:2]) - (self.r_object + self.r_robot +0.02)**2
+        h = cs.sumsqr(p_r[0:2] - p_o[0:2]) - (self.r_object + self.r_robot +0.05)**2
         x = cs.vertcat(p_r, p_o)
         dx = cs.vertcat(v_r, v_o)
         X_r = cs.vertcat(p_r, v_r, q_r)
@@ -86,6 +85,9 @@ class SpacecraftRateMPC():
         u_phys = u[:self.nu_phys]               # first 6 elements
         u_delta = u[self.nu_phys]              # slack delta (scalar)
 
+        # Decision varible to deactivate contact force
+        s_dec = u[self.nu_phys+1]
+
         x_robot = x[0:self.nx]
         x_object = x[self.nx:self.nx*2]
 
@@ -93,22 +95,24 @@ class SpacecraftRateMPC():
         # With inter = True this now outputs the force instead of acceleration
         f_robot = self.model.get_casadi_dx(x_robot, u_phys, inter=True)
 
-        dist =x_object[0:3] - x_robot[0:3]  
+        dist = x_object[0:3] - x_robot[0:3]  
 
         dist_norm = cs.sqrt(cs.dot(dist, dist)+ 1e-8)
         contact_norm = dist / dist_norm
 
-        k = 50
-        # include selector s to turn on/off interaction dynamics, the object state is always included in the state vector
-        # But accelerations are only possible when s = 1, and ofcourse the activation function is on
-        switch = cs.fmin(k*(dist_norm - (self.r_robot + self.r_object)), 30.0)
-        switch = cs.fmax(switch, 0)  # limit from below to avoid overflow
-        alpha = 2
-        activate = s*alpha/(1 + cs.exp(switch))        
+        k = 150 # Gain for sigmoid
+        delta = dist_norm - (self.r_robot + self.r_object + 0.02)
+        switch = k * delta  # no need to clamp
+        # acitvate can only be on when we are on interaction curve
+        activate = s * self.safe_sigmoid(switch)  # smooth activation between 0 and 1
 
+        # projection of robot force in contact normal direction, only when in contact
+        proj_scalar = activate*cs.dot(contact_norm, f_robot[3:6])   # 1x1
+        
+        # only consider positive projections (pushing into the object), negative projections set to zero
+        proj_plus = 0.5 * (proj_scalar + cs.sqrt(proj_scalar**2 + 1e-15))
+        F_contact = s_dec*cs.mtimes(contact_norm, proj_plus)
 
-        proj_scalar = cs.dot(contact_norm, f_robot[3:6])   # 1x1
-        F_contact = activate * cs.mtimes(contact_norm, proj_scalar)
 
 
         f_object = cs.vertcat(
@@ -145,16 +149,25 @@ class SpacecraftRateMPC():
                     + u_delta  # δ enters additively
         # attach to model as a path constraint expression (h >= 0)
         #We can have two different h constraints, one for interaction and one for non interaction
-        model_ac.con_h_expr_0 = cs.vertcat(cbf_stage, proj_scalar)
-        model_ac.con_h_expr = cs.vertcat(cbf_stage, proj_scalar)
+
+        # Big M constraint, when proj scalar is largar then zero s_dec has to be on (1) and thus force can be applied
+        # Cannot have positive proj scalar and s_dec = 0 at the same time
+        con1 = proj_scalar - 2*s_dec
+        # make s_dec track activate.  helps with tangential weighting
+        con2 = s_dec - activate
+
+        model_ac.con_h_expr_0 = cs.vertcat(cbf_stage, con1, con2)
+        model_ac.con_h_expr = cs.vertcat(cbf_stage, con1, con2)
 
         v_des = cs.SX.sym('v_des', 3)
+
+        
         xref_r = cs.SX.sym('yref', self.nx)
         model_ac.p = cs.vertcat(s,xref_r,v_des)
 
 
-        delta_V = v_des - x_object[3:6]
-        des_norm = delta_V / (cs.sqrt(cs.fmax(cs.dot(delta_V, delta_V), 1e-8)) + 1e-6)
+        delta_V = v_des #- x_object[3:6] # Desired change in velocity, is constant from the planner
+        des_norm = delta_V / (cs.sqrt(cs.dot(delta_V, delta_V)) + 1e-8)
         d_c = self.r_robot + self.r_object
 
         xref_o = cs.vertcat( xref_r[0:3] + des_norm * d_c,
@@ -192,9 +205,13 @@ class SpacecraftRateMPC():
         # Tangent acceleration cost, only active when s = 1
         tangent = cs.SX.eye(3) - cs.mtimes(contact_norm, contact_norm.T)
         # Tangen cost is only active if we are close to tne object, otherwise go ahead and use tangential forces so you can move around
-        tangent_cost= activate * 1e1 *cs.dot(cs.mtimes(tangent, f_robot[3:6]), cs.mtimes(tangent, f_robot[3:6])) 
+        tangent_cost= 0.25*(s_dec + activate)*1e3 * cs.dot(cs.mtimes(tangent, f_robot[3:6]), cs.mtimes(tangent, f_robot[3:6])) 
         
-        model_ac.cost_expr_ext_cost = cost_p_r + cost_eq_r  + cost_u + s*cost_p_o + s*cost_eq_o + s*tangent_cost + (1-s)*cost_delta
+
+        w_s  = 1e0  # encourage s to be small unless helpful
+        cost_contact =  + w_s * s_dec**2
+
+        model_ac.cost_expr_ext_cost = cost_p_r + cost_eq_r  + cost_u + s*cost_p_o + s*cost_eq_o + s*tangent_cost + (1-s)*cost_delta + s*cost_contact
         model_ac.cost_expr_ext_cost_e = cost_p_r_e + cost_eq_r_e + s*cost_p_o_e + s*cost_eq_o_e
 
         ocp = AcadosOcp()
@@ -225,15 +242,17 @@ class SpacecraftRateMPC():
         lbu[self.nu_phys] = 0.0
         ubu[self.nu_phys] = 1e6  # finite upper bound; small enough to keep numerics sane
 
+        lbu[self.nu_phys+1] = 0
+        ubu[self.nu_phys+1] = 1 # S_dec
         
         ocp.constraints.lbu = lbu
         ocp.constraints.ubu = ubu
         # Setting the CBF / interaction constraint bounds
-        ocp.constraints.lh = np.array([-1e6, -1e6])
-        ocp.constraints.uh = np.array([1e6, 1e6]) 
+        ocp.constraints.lh = np.array([-1e6,-1e6, -1e6])
+        ocp.constraints.uh = np.array([1e6, 1e6, 1e6]) 
 
-        ocp.constraints.lh_0 = np.array([-1e6, -1e6])
-        ocp.constraints.uh_0 = np.array([1e6, 1e6])
+        ocp.constraints.lh_0 = np.array([-1e6, -1e6, -1e6])
+        ocp.constraints.uh_0 = np.array([1e6, 1e6, 1e6])
 
         ocp.solver_options.qp_solver = "FULL_CONDENSING_HPIPM"
         ocp.solver_options.nlp_solver_type = "SQP_RTI"
@@ -284,18 +303,22 @@ class SpacecraftRateMPC():
                 if k == 0:
                     if selectors[k] == 0:
                         # Non-interaction step, enforce CBF and not interaction constraint
-                        self.solver.constraints_set(k, "lh", np.array([0, -1e6]))
+                        self.solver.constraints_set(k, "lh", np.array([0, -1e6, -1e6]))
+                        self.solver.constraints_set(k, "uh", np.array([1e6, 1e6, 0]))
                     else:
                         # Interaction step, enforce interaction constraint and not CBF
-                        self.solver.constraints_set(k, "lh", np.array([-1e6, -1e6]))
-                        pass
+                        self.solver.constraints_set(k, "lh", np.array([-1e6, -1e6,-1e6]))
+                        self.solver.constraints_set(k, "uh", np.array([1e6, 0, 0]))
                         
                 elif k != 0 and selectors[k] == 1:
                     # Interaction step, enforce interaction constraint and not CBF
-                    self.solver.constraints_set(k, "lh", np.array([-1e6, -1e6]))
-                    self.solver.constraints_set(k, "uh", np.array([1e6, 0]))  
-                    pass
-                #self.solver.constraints_set(k, "uh", np.array([1e6, 1e6]))    
+                    self.solver.constraints_set(k, "lh", np.array([-1e6,-1e6, -1e6]))
+                    self.solver.constraints_set(k, "uh", np.array([1e6, 0, 0]))  
+                
+                elif k!= 0 and selectors[k] == 0:
+                    # No interaction, turn off interaction constraints
+                    self.solver.constraints_set(k, "lh", np.array([-1e6 , -1e6, -1e6]))
+                    self.solver.constraints_set(k, "uh", np.array([1e6, 1e6, 0]))
     
         xref = np.hstack(setpoints)     
 
@@ -312,6 +335,7 @@ class SpacecraftRateMPC():
             X_pred = np.zeros((self.nx*2, self.N+1))
             U_pred = np.zeros((self.nu, self.N))
             sol = self.solver.solve()
+            #self.solver.get_status()
             for k in range(self.N+1):
                 X_pred[:, k] = self.solver.get(k, "x")
             for k in range(self.N):
@@ -324,4 +348,5 @@ class SpacecraftRateMPC():
 
         return X_pred, U_pred
 
-
+    def safe_sigmoid(self,x):
+        return 0.5 * (1 - cs.tanh(0.5 * x))

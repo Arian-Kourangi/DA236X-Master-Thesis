@@ -342,13 +342,19 @@ class SpacecraftImpactMPC(Node):
                 # since the replanner won't change the pos directly after the interaction
                 # so the MPC might slam into the newly released object.
 
-            #if any(selectors[i] ==1 for i in range(len(selectors)-1)) and selectors[-1]==0:
-#
-            #    # Make all the setpoints after the interaction equal to the last interaction setpoint
-            #    # We do this so the MPC focuses on the interaction and not on going to some random place afterwards
-            #    end_idx = next(i for i in range(len(selectors)) if selectors[i]==0)
-            #    for point in range(end_idx, len(setpoints)):
-            #        setpoints[point] = setpoints[end_idx-1]
+            if any(selectors[i] ==1 for i in range(len(selectors)-1)) and selectors[-1]==0:
+
+                # Make all the setpoints after the interaction equal a linear propgation of the last interaction point
+                # We do this so the MPC focuses on the interaction and not on going to some random place afterwards
+                end_idx = next(i for i in range(len(selectors)) if selectors[i]==0)
+                for point in range(end_idx, len(setpoints)):
+                    # artificially extend the interaction to make the MPC focus on the interaction
+                    # Propogate position linearly
+                    setpoints[point][0:3] = setpoints[point-1][0:3] + self.mpc.dt*setpoints[end_idx-1][3:6]  # keep position from last interaction point
+                    # Constant velocity
+                    setpoints[point][3:6] = setpoints[end_idx-1][3:6]  # keep velocity from last interaction point
+                    # Mark as interaction to allow MPC to use interaction controller
+                    selectors[point] = 1  # keep using interaction controller
 
             return setpoints, selectors, weights, tI
 
@@ -398,18 +404,18 @@ class SpacecraftImpactMPC(Node):
                 #self.get_logger().info(f"v_des: {v_des.T}") 
         else:
             v_des = np.array([0.0,0.0,0.0])
-        #if selectors is not None and selectors[0] == 0:
-        #    #If we are not on an interaction, we want to go to the desired velocity smoothly
-        #    self.delta_V = v_des - x0[3:6,0]
-        #elif selectors is None:
-        #    self.delta_V = np.array([0.0,0.0,0.0])
+        if selectors is not None and selectors[0] == 0:
+            #If we are not on an interaction, we want to go to the desired velocity smoothly
+            self.delta_V = v_des - x0[3:6,0]
+        elif selectors is None:
+            self.delta_V = np.array([0.0,0.0,0.0])
         #print(f"v_des: {v_des.T}")
         x_pred, u_pred = self.mpc.solve(x0,setpoints,
                                         weights=weights,
                                         initial_guess=self.initial_guess,
                                         xobj=xobj,
                                         logger=self.get_logger(),
-                                        verbose=False,selectors=selectors,v_des=v_des)
+                                        verbose=False,selectors=selectors,v_des=self.delta_V)
         
         self.initial_guess = {'X': x_pred, 'U': u_pred}
 
