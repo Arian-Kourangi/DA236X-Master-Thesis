@@ -100,8 +100,8 @@ class SpacecraftRateMPC():
         dist_norm = cs.sqrt(cs.dot(dist, dist)+ 1e-8)
         contact_norm = dist / dist_norm
 
-        k = 150 # Gain for sigmoid
-        delta = dist_norm - (self.r_robot + self.r_object + 0.05)
+        k = 100 # Gain for sigmoid
+        delta = dist_norm - (self.r_robot + self.r_object + 0.02)
         switch = k * delta  # no need to clamp
         # acitvate can only be on when we are on interaction curve
         activate = s * self.safe_sigmoid(switch)  # smooth activation between 0 and 1
@@ -205,18 +205,20 @@ class SpacecraftRateMPC():
         # Tangent acceleration cost, only active when s = 1
         tangent = cs.SX.eye(3) - cs.mtimes(contact_norm, contact_norm.T)
         # Tangen cost is only active if we are close to tne object, otherwise go ahead and use tangential forces so you can move around
-        tangent_cost= 0.20*(s_dec + activate)*1e3 * cs.dot(cs.mtimes(tangent, f_robot[3:6]), cs.mtimes(tangent, f_robot[3:6])) 
+        tangent_cost= 0.3*(s_dec+ activate)*1e3 * cs.dot(cs.mtimes(tangent, f_robot[3:6]), cs.mtimes(tangent, f_robot[3:6])) 
         
 
         w_s  = 1e0  # encourage s to be small unless helpful
         cost_contact =  + w_s * s_dec**2
 
-        model_ac.cost_expr_ext_cost = cost_p_r + cost_eq_r  + cost_u + s*cost_p_o + s*cost_eq_o + s*tangent_cost + (1-s)*cost_delta + s*cost_contact
-        model_ac.cost_expr_ext_cost_e = cost_p_r_e + cost_eq_r_e + s*cost_p_o_e + s*cost_eq_o_e
+        model_ac.cost_expr_ext_cost = (1-s)*cost_p_r + s*(s_dec)*cost_p_r + cost_eq_r  + cost_u + s*cost_p_o + s*cost_eq_o + s*tangent_cost + (1-s)*cost_delta + s*cost_contact
+        model_ac.cost_expr_ext_cost_e = (1-s)*cost_p_r_e + s*0.7*cost_p_r_e + cost_eq_r_e + s*cost_p_o_e + s*cost_eq_o_e
 
         ocp = AcadosOcp()
         ocp.model = model_ac
         # initialize parameters
+
+
         ocp.parameter_values = np.zeros(ocp.model.p.size()[0])
         ocp.dims.N = self.N
         ocp.solver_options.tf = self.Tf
