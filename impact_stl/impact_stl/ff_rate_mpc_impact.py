@@ -321,7 +321,7 @@ class SpacecraftImpactMPC(Node):
                 selectors.append(1 if plani['id']=='inter' else 0)
             
             # Check if no interaction on Horizon and next interaction is ours
-            if all(selectors[i]==0 for i in range(len(selectors))) and self.plan_object['other_names'][self.get_object_next_inter(t)] in self.robot_name and dist > 0.5:
+            if all(selectors[i]==0 for i in range(len(selectors))) and self.plan_object['other_names'][self.get_object_next_inter(t)] in self.robot_name and dist > 0.6:
                 #self.get_logger().info('Calling Replanning Service in ff_rate_mpc_impact')
                 #If we just interacted the other robot might publish a time shift that would cause us to replan the prvious plan again
                 if Clock().now().nanoseconds/1e9  - self.interaction_time > 100.0: # Temporary set to 100 as the timing is still broken

@@ -56,7 +56,7 @@ class SpacecraftRateMPC():
         v_o = cs.SX.sym('v_o', 3)
         q_o = cs.SX.sym('q_o', 4)
         f_o = cs.SX.sym('u_o', self.nx)
-        h = cs.sumsqr(p_r[0:2] - p_o[0:2]) - (self.r_object + self.r_robot +0.05)**2
+        h = cs.sumsqr(p_r[0:2] - p_o[0:2]) - (self.r_object + self.r_robot +0.03)**2
         x = cs.vertcat(p_r, p_o)
         dx = cs.vertcat(v_r, v_o)
         X_r = cs.vertcat(p_r, v_r, q_r)
@@ -69,7 +69,7 @@ class SpacecraftRateMPC():
         self.h = cs.Function('h', [X_r, X_o], [h])
         self.dh = cs.Function('dh', [X_r, X_o], [dh])
         self.ddh = cs.Function('ddh', [X_r, X_o, f_r, f_o], [ddh])
-        self.alpha = 1
+        self.alpha = 2
         self.beta = 2
         
         self.solver = self.setup()
