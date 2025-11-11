@@ -207,11 +207,13 @@ class SpacecraftImpactMPC(Node):
             # Make sure to recompute the dhvars so it fits the new timing
             self.plan['dhvar'] = [get_derivative_control_points_gurobi(hvar,1) for hvar in self.plan['hvar']]
 
-            # Also shift the object plan, here we don't care about current time or dhvars, just the timing
-            for idx in range(len(self.plan_object['hvar'])):
-                for cp in range(self.plan_object['hvar'][idx].shape[1]):
-                    if self.plan_object['hvar'][idx][0,cp] > (Clock().now().nanoseconds/ 1e3 - self.start_time)/1e6:
-                        self.plan_object['hvar'][idx][0,cp] += msg.time_shift
+            self.plan_object = VerboseBezierPlan2NumpyArray(msg.object_plan)
+
+            ## Also shift the object plan, here we don't care about current time or dhvars, just the timing
+            #for idx in range(len(self.plan_object['hvar'])):
+            #    for cp in range(self.plan_object['hvar'][idx].shape[1]):
+            #        if self.plan_object['hvar'][idx][0,cp] > (Clock().now().nanoseconds/ 1e3 - self.start_time)/1e6:
+            #            self.plan_object['hvar'][idx][0,cp] += msg.time_shift
 
 
     def global_reset_callback(self, msg):
@@ -324,7 +326,7 @@ class SpacecraftImpactMPC(Node):
             if all(selectors[i]==0 for i in range(len(selectors))) and self.plan_object['other_names'][self.get_object_next_inter(t)] in self.robot_name and dist > 0.6:
                 #self.get_logger().info('Calling Replanning Service in ff_rate_mpc_impact')
                 #If we just interacted the other robot might publish a time shift that would cause us to replan the prvious plan again
-                if Clock().now().nanoseconds/1e9  - self.interaction_time > 100.0: # Temporary set to 100 as the timing is still broken
+                if Clock().now().nanoseconds/1e9  - self.interaction_time > 0: # Temporary set to 100 as the timing is still broken
                     #Cooldown for the replanner so we don't spam it
                     if Clock().now().nanoseconds/1e9 - self.last_replan_time > self.cooldown_replanner:
                         self.last_replan_time = Clock().now().nanoseconds/1e9

@@ -22,7 +22,7 @@ from my_msgs.msg import StampedBool, Replan, TimeShift
 
 from ament_index_python.packages import get_package_share_directory
 
-from impact_stl.planners.main_planner import MinimalClientAsync
+from impact_stl.planners.main_planner import MinimalClientAsync, plan_to_plan_msg
 from impact_stl.helpers.beziers import get_derivative_control_points_gurobi, get_derivative_control_points_cvxpy
 from impact_stl.helpers.read_write_plan import csv_to_plan, plan_to_csv
 #from impact_stl.helpers.solve_two_body_impact import solve_two_body_impact
@@ -242,6 +242,7 @@ class RePlanner(Node):
             msg = TimeShift()
             msg.time_shift = float(self.new_time_shift)
             msg.robot_name = self.robot_name
+            msg.object_plan = plan_to_plan_msg(self.obj_rvars, self.obj_hvars, self.obj_idvars, self.obj_other_names)
             self.time_shift_pub.publish(msg)
             
             #self.get_logger().info(f"Published time shift: {self.new_time_shift} seconds")
