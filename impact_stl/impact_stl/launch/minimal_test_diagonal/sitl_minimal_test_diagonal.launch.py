@@ -21,21 +21,21 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(
             [get_package_share_directory('impact_stl'), '/px4.launch.py']),
 
-        launch_arguments={'id':'0', 'pose':'-4,1,0', 'name':'snap', 'delay':'0', 'headless':'0', 'world' : 'frictionless_kth'}.items()
+        launch_arguments={'id':'0', 'pose':'-4,1,0', 'name':'snap', 'delay':'0', 'headless':'0', 'world' : 'frictionless_kth_diagonal'}.items()
     )
 
     lf_2 = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [get_package_share_directory('impact_stl'), '/px4.launch.py']),
 
-        launch_arguments={'id':'1', 'pose':'-9,2,0', 'name':'crackle', 'delay':'5', 'headless':'0', 'world' : 'frictionless_kth'}.items()
+        launch_arguments={'id':'1', 'pose':'-9,2,0', 'name':'crackle', 'delay':'5', 'headless':'0', 'world' : 'frictionless_kth_diagonal'}.items()
     )
 
     lf_3 = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [get_package_share_directory('impact_stl'), '/px4.launch.py']),
 
-        launch_arguments={'id':'2', 'pose':'-3,3,0', 'name':'pop', 'delay':'10', 'headless':'0','world' : 'frictionless_kth'}.items()
+        launch_arguments={'id':'2', 'pose':'-3,3,0', 'name':'pop', 'delay':'10', 'headless':'0','world' : 'frictionless_kth_diagonal'}.items()
     )
 
     ld.add_action(lf_1)
