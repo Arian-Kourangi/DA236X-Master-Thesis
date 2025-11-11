@@ -17,27 +17,12 @@ setup(
         # launch files
         (os.path.join('share', package_name), glob(os.path.join('impact_stl/launch', '*launch.[pxy][yma]*'))),
         (os.path.join('share', package_name), glob(os.path.join('impact_stl/launch/platforms', '*launch.[pxy][yma]*'))),
-        (os.path.join('share', package_name), glob(os.path.join('impact_stl/launch/throw_and_catch', '*launch.[pxy][yma]*'))),
-        (os.path.join('share', package_name), glob(os.path.join('impact_stl/launch/obstacle_avoidance', '*launch.[pxy][yma]*'))),
         (os.path.join('share', package_name), glob(os.path.join('impact_stl/launch/minimal_test', '*launch.[pxy][yma]*'))),
         (os.path.join('share', package_name), glob(os.path.join('impact_stl/launch/minimal_test_diagonal', '*launch.[pxy][yma]*'))),
-        (os.path.join('share', package_name), glob(os.path.join('impact_stl/launch/throw_and_catch_exp', '*launch.[pxy][yma]*'))),
-        (os.path.join('share', package_name), glob(os.path.join('impact_stl/launch/pong', '*launch.[pxy][yma]*'))),
-        (os.path.join('share', package_name), glob(os.path.join('impact_stl/launch/pingpong', '*launch.[pxy][yma]*'))),
 
-        # data files (csv of motion plan)
-        (os.path.join('share', package_name), glob(os.path.join('impact_stl/planners/plans/throw_and_catch/SR', '*.csv'))),
-        (os.path.join('share', package_name), glob(os.path.join('impact_stl/planners/plans/obstacle_avoidance/SR', '*.csv'))),
+        # data files (csv of motion plan),
         (os.path.join('share', package_name), glob(os.path.join('impact_stl/planners/plans/minimal_test', '*.csv'))),
-        (os.path.join('share', package_name), glob(os.path.join('impact_stl/planners/plans/minimal_test_diagonal'
-        '', '*.csv'))),
-        (os.path.join('share', package_name), glob(os.path.join('impact_stl/planners/plans/throw_and_catch_exp/SR', '*.csv'))),
-        (os.path.join('share', package_name), glob(os.path.join('impact_stl/planners/plans/pong/SR', '*.csv'))),
-        (os.path.join('share', package_name), glob(os.path.join('impact_stl/planners/plans/pingpong/SR', '*.csv'))),
-
-        # (os.path.join('share', package_name), glob(os.path.join('impact_stl/planners/plans/throw_and_catch/IR', '*.csv'))),
-        # (os.path.join('share', package_name), glob(os.path.join('impact_stl/planners/plans/obstacle_avoidance/IR', '*.csv'))),
-        # (os.path.join('share', package_name), glob(os.path.join('impact_stl/planners/plans/throw_and_catch_exp/IR', '*.csv'))),
+        (os.path.join('share', package_name), glob(os.path.join('impact_stl/planners/plans/minimal_test_diagonal', '*.csv'))),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -55,21 +40,11 @@ setup(
                 'reset = impact_stl.reset:main',
 
                 # controllers
-                'ff_rate_mpc = impact_stl.ff_rate_mpc:main',
                 'ff_rate_mpc_impact = impact_stl.ff_rate_mpc_impact:main',
-                'ff_wrench_mpc_impact = impact_stl.ff_wrench_mpc_impact:main',
-                'ff_rate_mpc_velocity_keeping = impact_stl.ff_rate_mpc_velocity_keeping:main',
-                'ff_rate_qp_velocity_keeping = impact_stl.ff_rate_qp_velocity_keeping:main',
-
                 # helpers
-                'impact_detector = impact_stl.helpers.impact_detector:main',
                 'odom_to_vehicle_local_position = impact_stl.helpers.odom_to_vehicle_local_position:main',
                 'odom_to_vehicle_angular_velocity = impact_stl.helpers.odom_to_vehicle_angular_velocity:main',
                 'odom_to_vehicle_attitude = impact_stl.helpers.odom_to_vehicle_attitude:main',
-
-                # test
-                'test_replanner = impact_stl.tests.test_replanner:main',
-                'sim_test = impact_stl.tests.sim_test:main',
         ],
     },
 )
