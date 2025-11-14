@@ -509,6 +509,8 @@ class RePlanner(Node):
         
         # match its velocity
         opti.subject_to(drvars[0][:,-1] == vel_meas*dhvars[0][0,-1])
+        opti.subject_to(drvars[0][:,-2] == 0.90*vel_meas*dhvars[0][0,-2])
+        #opti.subject_to(drvars[0][:,-3] == 0.5*vel_meas*dhvars[0][0,-3])
 
 
         ###### Interaction curve constraints

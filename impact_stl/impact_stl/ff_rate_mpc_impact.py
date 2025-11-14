@@ -163,7 +163,6 @@ class SpacecraftImpactMPC(Node):
         
         self.cooldown_replanner = 0.1  # seconds
         self.last_replan_time = -np.inf
-        self.interaction_time = -np.inf
         self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
 
         # Create Spacecraft and controller objects
@@ -322,21 +321,21 @@ class SpacecraftImpactMPC(Node):
                                             1.0, 0.0, 0.0, 0.0]).reshape(10,1))
                 selectors.append(1 if plani['id']=='inter' else 0)
             
-            # Check if no interaction on Horizon and next interaction is ours
-            if all(selectors[i]==0 for i in range(len(selectors))) and self.plan_object['other_names'][self.get_object_next_inter(t)] in self.robot_name and dist > 0.6:
+            # Check if no interaction on Horizon and next interaction is ours, dist is to not get stuck in replann - CBF loop
+            if all(selectors[i]==0 for i in range(len(selectors))) \
+                and self.plan_object['other_names'][self.get_object_next_inter(t)] in self.robot_name \
+                and dist > 0.6:
                 #self.get_logger().info('Calling Replanning Service in ff_rate_mpc_impact')
-                #If we just interacted the other robot might publish a time shift that would cause us to replan the prvious plan again
-                if Clock().now().nanoseconds/1e9  - self.interaction_time > 0: # Temporary set to 100 as the timing is still broken
-                    #Cooldown for the replanner so we don't spam it
-                    if Clock().now().nanoseconds/1e9 - self.last_replan_time > self.cooldown_replanner:
-                        self.last_replan_time = Clock().now().nanoseconds/1e9
-                        msg = Replan()
-                        msg.starttime = int(self.start_time)
-                        msg.robot_plan = plan_to_plan_msg(self.plan['rvar'], self.plan['hvar'], self.plan['ids'], self.plan['other_names'])
-                        msg.object_plan = plan_to_plan_msg(self.plan_object['rvar'], self.plan_object['hvar'], self.plan_object['ids'], self.plan_object['other_names'])
-                        #self.get_logger().info(f"next interaction index of the object: {self.get_object_next_inter(t)}")
-                        #self.get_logger().info(f"type of next interaction index of the object: {type(self.get_object_next_inter(t))}")
-                        self.publisher_recompute_local_plan.publish(msg)
+                #Cooldown for the replanner so we don't spam it
+                if Clock().now().nanoseconds/1e9 - self.last_replan_time > self.cooldown_replanner:
+                    self.last_replan_time = Clock().now().nanoseconds/1e9
+                    msg = Replan()
+                    msg.starttime = int(self.start_time)
+                    msg.robot_plan = plan_to_plan_msg(self.plan['rvar'], self.plan['hvar'], self.plan['ids'], self.plan['other_names'])
+                    msg.object_plan = plan_to_plan_msg(self.plan_object['rvar'], self.plan_object['hvar'], self.plan_object['ids'], self.plan_object['other_names'])
+                    #self.get_logger().info(f"next interaction index of the object: {self.get_object_next_inter(t)}")
+                    #self.get_logger().info(f"type of next interaction index of the object: {type(self.get_object_next_inter(t))}")
+                    self.publisher_recompute_local_plan.publish(msg)
 
 
             #Checking if we are on an interaction and the end of the interaction is on the horizon
@@ -390,34 +389,63 @@ class SpacecraftImpactMPC(Node):
         # self.get_logger().info(f"setpoints: {setpoints[0][0:2].T}, pos: {self.vehicle_local_position[0:2].T}")
         #self.get_logger().info(f"selectors: {selectors}")
         # solve the mpc
-        if selectors is not None and selectors[0] == 1:
-            self.interaction_time = Clock().now().nanoseconds / 1e9
         # now the initial guess has to be x_pred again, but check the size!
         if self.initial_guess['X'] is not None:
             self.initial_guess['X'] = self.initial_guess['X'][:,1::] if self.initial_guess['X'].shape[1] > self.mpc.N+1 else self.initial_guess['X']    
             self.initial_guess['U'] = self.initial_guess['U'][:,1::] if self.initial_guess['U'].shape[1] > self.mpc.N else self.initial_guess['U']
+        
+        #Collision avoidance flag
+        col_avoid = False
         if self.started:
-                # Get the desired end velocity
+            # Get the desired end velocity
             _,inter_idx = self.get_pre_inter_idx((Clock().now().nanoseconds / 1000 - self.start_time) / 1e6)
             if self.plan['dhvar'][inter_idx][0,-1] == 0:
                 v_des = np.array([0.0,0.0,0.0])
             else:
                 v_des = self.plan['drvar'][inter_idx][:, -1]/self.plan['dhvar'][inter_idx][0, -1]
                 #self.get_logger().info(f"v_des: {v_des.T}") 
+            # Check if we are far from the interaction point in time and space to enable collision avoidance
+            if np.linalg.norm(self.plan['rvar'][inter_idx][0:2,0] - x0[0:2]) > 5.0 and \
+                self.plan['hvar'][inter_idx][0,0] - (Clock().now().nanoseconds / 1000 - self.start_time) / 1e6 > 10.0:
+                col_avoid = True
         else:
             v_des = np.array([0.0,0.0,0.0])
+        
         if selectors is not None and selectors[0] == 0:
-            #If we are not on an interaction, we want to go to the desired velocity smoothly
-            self.delta_V = v_des - x0[3:6,0]
+            # During the time before the interaction we want to set the delta_V and decide if its
+            # Straight line pushing or not
+            # We don't have an else statement here, we keep the previous values if we are on an interaction
+            v = xobj[3:6,0]
+            self.delta_V = v_des - v
+            
+            v_norm = np.linalg.norm(v)
+            dv_norm = np.linalg.norm(self.delta_V)
+            # If the object is almost still, we consider it a straight push
+            if v_norm < 0.05:
+                self.straight = True
+            else:
+                # Project delta_V onto v to get the parallel component
+                p = v * np.dot(self.delta_V ,v )/(v_norm**2 + 1e-15)
+                # Get the tangential component
+                t = self.delta_V - p
+                ratio = np.linalg.norm(t)/(dv_norm + 1e-15)
+                # If the tangential component is more than 10% of the total, we consider it not straight
+                if ratio > 0.1:
+                    self.straight = False
+                else:
+                    self.straight = True
+
         elif selectors is None:
+            # We have not started yet
             self.delta_V = np.array([0.0,0.0,0.0])
+            self.straight = True
         #print(f"v_des: {v_des.T}")
         x_pred, u_pred = self.mpc.solve(x0,setpoints,
                                         weights=weights,
                                         initial_guess=self.initial_guess,
                                         xobj=xobj,
                                         logger=self.get_logger(),
-                                        verbose=False,selectors=selectors,v_des=self.delta_V)
+                                        verbose=False,selectors=selectors,delta_V=self.delta_V, v_des=v_des, straight = self.straight, col_avoid=col_avoid)
         
         self.initial_guess = {'X': x_pred, 'U': u_pred}
 
