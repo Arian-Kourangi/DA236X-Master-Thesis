@@ -142,9 +142,9 @@ class SpacecraftRateMPC():
 
         # symbolic parameter placeholders for object state/input and OffSwitch
         # CBF expression
-        cbf_stage = self.ddh(x_robot,x_object, f_robot, f_object,0.02)[0] \
-                    + self.alpha * self.dh(x_robot, x_object,0.02)[0] \
-                    + self.beta * self.h(x_robot, x_object,0.02)[0] \
+        cbf_stage = self.ddh(x_robot,x_object, f_robot, f_object,0.03)[0] \
+                    + self.alpha * self.dh(x_robot, x_object,0.03)[0] \
+                    + self.beta * self.h(x_robot, x_object,0.03)[0] \
                     + u_delta  # δ enters additively
         cbf_stage_aggresive = self.ddh(x_robot,x_object, f_robot, f_object,2)[0] \
                     + self.alpha * self.dh(x_robot, x_object,2)[0] \
@@ -196,14 +196,14 @@ class SpacecraftRateMPC():
         cost_u = cs.mtimes([u_phys.T, self.R, u_phys])
         # Slack error only when s = 0
         cost_delta = 1e6 * u_delta  # penalize slack
-        cost_delta += 1e4 * u_delta2  # penalize slack
+        cost_delta += 1e5 * u_delta2  # penalize slack
 
         # Tangent acceleration cost, only active when s = 1
         tangent = cs.SX.eye(3) - cs.mtimes(contact_norm, contact_norm.T)
         # Tangen cost is only active if we are close to tne object, otherwise go ahead and use tangential forces so you can move around
         tangent_cost= (activate)*1e-1 * cs.dot(cs.mtimes(tangent, f_robot_t[3:6]), cs.mtimes(tangent, f_robot_t[3:6])) 
         
-        tangent_cost = 3*s_k * tangent_cost  + (1 - s_k) * tangent_cost * 3
+        tangent_cost = 2*s_k * tangent_cost  + (1 - s_k) * tangent_cost * 10
 
         # non-colinear terminal velocity cost, only used for straight pushes
         tmp = cs.cross(x_object[3:6], v_des)
@@ -276,7 +276,7 @@ class SpacecraftRateMPC():
               weights={'Q': None, 'Q_e': None, 'R': None},
               initial_guess={'X': None, 'U': None},
               xobj=None,
-              logger=None, verbose=False, selectors=None, delta_V = None, v_des=None, straight = None, col_avoid = None):
+              logger=None, verbose=False, selectors=None, delta_V = None, v_des=None, straight = None, col_avoid = None, approach = None):
         t0 = time.time()
         
         x_0 = np.concatenate((x0.ravel(), xobj.ravel()))  # initial state for both spacecraft
@@ -302,8 +302,12 @@ class SpacecraftRateMPC():
                     #Enforce aggressive CBF constraint to avoid collision
                     self.solver.constraints_set(0, "lh", np.array([-1e6,0]))
                     self.solver.constraints_set(0, "uh", np.array([1e6, 1e6]))
-                else:
+                elif approach:
                     self.solver.constraints_set(0, "lh", np.array([0, -1e6]))
+                    self.solver.constraints_set(0, "uh", np.array([1e6, 1e6]))
+                else:
+                    # No interaction, no CBF
+                    self.solver.constraints_set(0, "lh", np.array([-1e6, -1e6]))
                     self.solver.constraints_set(0, "uh", np.array([1e6, 1e6]))
             else:
                 # Interaction step, enforce interaction constraint and not CBF

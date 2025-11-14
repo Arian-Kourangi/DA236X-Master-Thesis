@@ -396,6 +396,7 @@ class SpacecraftImpactMPC(Node):
         
         #Collision avoidance flag
         col_avoid = False
+        approach = False
         if self.started:
             # Get the desired end velocity
             _,inter_idx = self.get_pre_inter_idx((Clock().now().nanoseconds / 1000 - self.start_time) / 1e6)
@@ -408,6 +409,8 @@ class SpacecraftImpactMPC(Node):
             if np.linalg.norm(self.plan['rvar'][inter_idx][0:2,0] - x0[0:2]) > 5.0 and \
                 self.plan['hvar'][inter_idx][0,0] - (Clock().now().nanoseconds / 1000 - self.start_time) / 1e6 > 10.0:
                 col_avoid = True
+            if self.plan['hvar'][inter_idx][0,0] - (Clock().now().nanoseconds / 1000 - self.start_time) / 1e6 > 2:
+                approach = True
         else:
             v_des = np.array([0.0,0.0,0.0])
         
@@ -445,7 +448,7 @@ class SpacecraftImpactMPC(Node):
                                         initial_guess=self.initial_guess,
                                         xobj=xobj,
                                         logger=self.get_logger(),
-                                        verbose=False,selectors=selectors,delta_V=self.delta_V, v_des=v_des, straight = self.straight, col_avoid=col_avoid)
+                                        verbose=False,selectors=selectors,delta_V=self.delta_V, v_des=v_des, straight = self.straight, col_avoid=col_avoid, approach=approach)
         
         self.initial_guess = {'X': x_pred, 'U': u_pred}
 
