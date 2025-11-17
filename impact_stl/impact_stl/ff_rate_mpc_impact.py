@@ -297,8 +297,8 @@ class SpacecraftImpactMPC(Node):
         t = (Clock().now().nanoseconds / 1000 - self.start_time) / 1e6
         setpoints = []
         selectors = []
-        tI = None
         weights = {'Q': None, 'Q_e': None, 'R': None}
+        end_of_int = False
 
         # if we haven't started the simulation, we just keep position at the setpoint
         if not self.started:
@@ -308,7 +308,7 @@ class SpacecraftImpactMPC(Node):
             for i in range(self.mpc.N+1):
                 ti = t+i*self.mpc.dt
                 setpoints.append(setpoint)
-            return setpoints, None, weights, tI
+            return setpoints, None, weights, end_of_int
         # we started the simulation
         else:
             # compute the nominal plan via interpolating the bezier curve
@@ -356,8 +356,9 @@ class SpacecraftImpactMPC(Node):
                     setpoints[point][3:6] = setpoints[end_idx-1][3:6]  # keep velocity from last interaction point
                     # Mark as interaction to allow MPC to use interaction controller
                     selectors[point] = 1  # keep using interaction controller
+                end_of_int = True
 
-            return setpoints, selectors, weights, tI
+            return setpoints, selectors, weights, end_of_int
 
 
     def offboard_callback(self):
@@ -385,7 +386,7 @@ class SpacecraftImpactMPC(Node):
         #Don't want to replan if we are too close to the object already
         dist = np.linalg.norm(self.vehicle_local_position[0:3] - self.object_local_position[0:3])
         # get the reference states and corresponding times in the horizon
-        setpoints, selectors, weights, tI = self.get_setpoints(dist)
+        setpoints, selectors, weights, end_of_int = self.get_setpoints(dist)
         # self.get_logger().info(f"setpoints: {setpoints[0][0:2].T}, pos: {self.vehicle_local_position[0:2].T}")
         #self.get_logger().info(f"selectors: {selectors}")
         # solve the mpc
@@ -443,6 +444,8 @@ class SpacecraftImpactMPC(Node):
             self.delta_V = np.array([0.0,0.0,0.0])
             self.straight = True
         #print(f"v_des: {v_des.T}")
+        elif end_of_int:
+            self.straight = True  # Focus on achieving paralelle velocity at the end of itneraction even if not straight pushing
         x_pred, u_pred = self.mpc.solve(x0,setpoints,
                                         weights=weights,
                                         initial_guess=self.initial_guess,

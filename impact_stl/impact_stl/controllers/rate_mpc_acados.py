@@ -203,7 +203,7 @@ class SpacecraftRateMPC():
         # Tangen cost is only active if we are close to tne object, otherwise go ahead and use tangential forces so you can move around
         tangent_cost= (activate)*1e-1 * cs.dot(cs.mtimes(tangent, f_robot_t[3:6]), cs.mtimes(tangent, f_robot_t[3:6])) 
         
-        tangent_cost = 2*s_k * tangent_cost  + (1 - s_k) * tangent_cost * 10
+        tangent_cost = 2*s_k * tangent_cost  + (1 - s_k) * tangent_cost * 7
 
         # non-colinear terminal velocity cost, only used for straight pushes
         tmp = cs.cross(x_object[3:6], v_des)
@@ -211,7 +211,7 @@ class SpacecraftRateMPC():
 
         model_ac.cost_expr_ext_cost = cost_p_r + cost_p_r + cost_eq_r \
             + cost_u + s*cost_p_o + s*cost_eq_o + s*tangent_cost + (1-s)*cost_delta
-        model_ac.cost_expr_ext_cost_e = (1-s)*cost_p_r_e + s*cost_p_r_e*(s_k*0.3 + (1-s_k)*0.3) + cost_eq_r_e + s*cost_p_o_e + s*cost_eq_o_e + s*v_cost_e
+        model_ac.cost_expr_ext_cost_e = (1-s)*cost_p_r_e + s*cost_p_r_e*(s_k*0.2 + (1-s_k)*0.3) + cost_eq_r_e + s*cost_p_o_e + s*cost_eq_o_e + s*v_cost_e
 
         ocp = AcadosOcp()
         ocp.model = model_ac
