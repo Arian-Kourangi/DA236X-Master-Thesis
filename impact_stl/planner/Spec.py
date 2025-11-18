@@ -412,3 +412,42 @@ def spatial_specifications(world: Object ,specification: str) -> None:
 
         # Area's of interest
         world.areas = [area1]
+    elif specification == "debug_diagonal":
+        tf = 60
+
+        world.spec = Spec(t0=0,tf=tf)
+        bz = 6
+        
+        robot1 = Robot(name="snap",
+                       x0=np.array([2,2]),
+                       dx0=np.array([0,0]),
+                       xf=None,
+                       dxf=None,nbz=bz, dq_lb=np.array([-2,-2]),dq_ub=np.array([2,2]))
+        
+        robot2 = Robot(name="crackle",
+                       x0=np.array([20,20]),
+                       dx0=np.array([0,0]),
+                       xf=None,
+                       dxf=None,nbz=bz, dq_lb=np.array([-2,-2]),dq_ub=np.array([2,2]))
+        
+        object1 = Object(name="pop",
+                         x0=np.array([4,4]),
+                         dx0=np.array([0,0]),
+                         xf=np.array([25,25]),
+                         dxf=np.array([0,0]),nbz=bz, dq_lb=np.array([-2,-2]),dq_ub=np.array([2,2]))
+        
+        area1 = Area(x_min=np.array([24.5,24.5]),x_max=np.array([25.5,25.5]))
+
+        world.dim = 2
+        world.robots = [robot1,robot2]
+        world.objects = [object1]
+
+        # World bounding box
+        world.x_lb = np.array([0,0])
+        world.x_ub = np.array([30,30])
+
+        # Obstacles
+        world.obstacles= []
+
+        # Area's of interest
+        world.areas = [area1]

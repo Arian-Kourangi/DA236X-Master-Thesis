@@ -19,10 +19,12 @@ setup(
         (os.path.join('share', package_name), glob(os.path.join('impact_stl/launch/platforms', '*launch.[pxy][yma]*'))),
         (os.path.join('share', package_name), glob(os.path.join('impact_stl/launch/minimal_test', '*launch.[pxy][yma]*'))),
         (os.path.join('share', package_name), glob(os.path.join('impact_stl/launch/minimal_test_diagonal', '*launch.[pxy][yma]*'))),
+        (os.path.join('share', package_name), glob(os.path.join('impact_stl/launch/debug_diagonal', '*launch.[pxy][yma]*'))),
 
         # data files (csv of motion plan),
         (os.path.join('share', package_name), glob(os.path.join('impact_stl/planners/plans/minimal_test', '*.csv'))),
         (os.path.join('share', package_name), glob(os.path.join('impact_stl/planners/plans/minimal_test_diagonal', '*.csv'))),
+        (os.path.join('share', package_name), glob(os.path.join('impact_stl/planners/plans/debug_diagonal', '*.csv'))),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
