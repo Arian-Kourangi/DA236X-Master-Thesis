@@ -19,8 +19,8 @@ def generate_launch_description():
             name='snap_mpc',
             output='screen',
             emulate_tty=True,
-            parameters=[{'x0':5.0, 'y0':0.0, 'z0':0.0, 'vx0':0.0, 'vy0':0.0, 'vz0':0.0},
-                        {'scenario_name':'minimal_test'},
+            parameters=[{'x0':1.0, 'y0':4.0, 'z0':0.0, 'vx0':0.0, 'vy0':0.0, 'vz0':0.0},
+                        {'scenario_name':'test4'},
                         {'object_ns':'/pop'},
                         {'enable_cbf':True}]
         ),
@@ -31,8 +31,8 @@ def generate_launch_description():
             name='crackle_mpc',
             # output='screen',
             emulate_tty=True,
-            parameters=[{'x0':5.0, 'y0':20.0, 'z0':0.0, 'vx0':0.0, 'vy0':0.0, 'vz0':0.0},
-                        {'scenario_name':'minimal_test'},
+            parameters=[{'x0':2.0, 'y0':9.0, 'z0':0.0, 'vx0':0.0, 'vy0':0.0, 'vz0':0.0},
+                        {'scenario_name':'test4'},
                         {'object_ns':'/pop'},
                         {'enable_cbf':True}]
         ),
@@ -45,7 +45,7 @@ def generate_launch_description():
             name='snap_planner',
             output='screen',
             emulate_tty=True,
-            parameters=[{'scenario_name':'minimal_test'}]
+            parameters=[{'scenario_name':'test4'}]
         ),
         Node(
             package='impact_stl',
@@ -54,7 +54,7 @@ def generate_launch_description():
             name='crackle_planner',
             # output='screen',
             emulate_tty=True,
-            parameters=[{'scenario_name':'minimal_test'}]
+            parameters=[{'scenario_name':'test4'}]
         ),
 
         # Replanner
@@ -65,7 +65,7 @@ def generate_launch_description():
             name='snap_replanner',
             output='screen',
             parameters=[{'object_ns':'/pop'},
-                        {'scenario_name':'minimal_test'}]
+                        {'scenario_name':'test4'}]
         ),
         # Replanner
         Node(
@@ -75,7 +75,7 @@ def generate_launch_description():
             name='crackle_replanner',
             # output='screen',
             parameters=[{'object_ns':'/pop'},
-                        {'scenario_name':'minimal_test'}]
+                        {'scenario_name':'test4'}]
         ),
 
     ])

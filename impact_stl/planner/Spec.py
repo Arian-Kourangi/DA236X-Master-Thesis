@@ -323,7 +323,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         # Area's of interest
         world.areas = [area1]
 
-    elif specification == "minimal_test_diagonal":
+    elif specification == "test4":
         tf = 90
 
         #just so I can mark the final location of the object, not actually used in an stl spec
@@ -373,7 +373,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         world.areas = [area1]
 
 
-    elif specification == "minimal_test":
+    elif specification == "test1":
         tf = 50
 
         world.spec = Spec(t0=0,tf=tf)
@@ -412,10 +412,10 @@ def spatial_specifications(world: Object ,specification: str) -> None:
 
         # Area's of interest
         world.areas = [area1]
-    elif specification == "debug_diagonal":
-        tf = 60
-
+    elif specification == "test2":
+        tf = 50
         world.spec = Spec(t0=0,tf=tf)
+
         bz = 6
         
         robot1 = Robot(name="snap",
@@ -451,9 +451,57 @@ def spatial_specifications(world: Object ,specification: str) -> None:
 
         # Area's of interest
         world.areas = [area1]
+    elif specification == "test3":
+        tf = 100
+
+        obs1 = Area(x_min=np.array([0,10]),x_max=np.array([18,16]))
+        phi31 = Pred(type="NEG",preds=obs1) 
+        phi3 = Pred(type="G",I=[0,tf],preds=[phi31])
+        
+        world.spec = Spec(t0=0,tf=tf)
+        world.spec.add_pred(phi3, name='crackle')
+        world.spec.add_pred(phi3, name='snap')
+        world.spec.add_pred(phi3, name='pop')
+
+
+        bz = 8
+        
+        robot1 = Robot(name="snap",
+                       x0=np.array([2,2]),
+                       dx0=np.array([0,0]),
+                       xf=None,
+                       dxf=None,nbz=bz, dq_lb=np.array([-2,-2]),dq_ub=np.array([2,2]))
+        
+        robot2 = Robot(name="crackle",
+                       x0=np.array([20,20]),
+                       dx0=np.array([0,0]),
+                       xf=None,
+                       dxf=None,nbz=bz, dq_lb=np.array([-2,-2]),dq_ub=np.array([2,2]))
+        
+        object1 = Object(name="pop",
+                         x0=np.array([4,4]),
+                         dx0=np.array([0,0]),
+                         xf=np.array([25,25]),
+                         dxf=np.array([0,0]),nbz=bz*2, dq_lb=np.array([-2,-2]),dq_ub=np.array([2,2]))
+        
+        area1 = Area(x_min=np.array([24.5,24.5]),x_max=np.array([25.5,25.5]))
+
+        world.dim = 2
+        world.robots = [robot1,robot2]
+        world.objects = [object1]
+
+        # World bounding box
+        world.x_lb = np.array([0,0])
+        world.x_ub = np.array([30,30])
+
+        # Obstacles
+        world.obstacles= [obs1]
+
+        # Area's of interest
+        world.areas = [area1]
 
     elif specification == "final_test":
-        tf = 130
+        tf = 120
 
         #just so I can mark the final location of the object, not actually used in an stl spec
         area1 = Area(x_min=np.array([24.5,24.5]),x_max=np.array([25.5,25.5]))
@@ -474,18 +522,18 @@ def spatial_specifications(world: Object ,specification: str) -> None:
                        x0=np.array([25,2]),
                        dx0=np.array([0,0]),
                        xf=None,
-                       dxf=None,nbz=bz)
+                       dxf=None,nbz=bz, dq_lb=np.array([-3,-3]),dq_ub=np.array([3,3]))
         robot2 = Robot(name="crackle",
                        x0=np.array([5,15]),
                        dx0=np.array([0,0]),
                        xf=None,
-                       dxf=None,nbz=bz)
+                       dxf=None,nbz=bz, dq_lb=np.array([-3,-3]),dq_ub=np.array([3,3]))
         
         object1 = Object(name="pop",
                          x0=np.array([20,5]),
                          dx0=np.array([0,0]),
                          xf=np.array([25,25]),
-                         dxf=np.array([0,0]),nbz=2*bz)
+                         dxf=np.array([0,0]),nbz=2*bz, dq_lb=np.array([-2,-2]),dq_ub=np.array([2,2]))
 
         world.dim = 2
         world.robots = [robot1,robot2]

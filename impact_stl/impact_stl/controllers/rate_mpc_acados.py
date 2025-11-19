@@ -211,7 +211,7 @@ class SpacecraftRateMPC():
 
         model_ac.cost_expr_ext_cost = cost_p_r + cost_p_r + cost_eq_r \
             + cost_u + s*cost_p_o + s*cost_eq_o + s*tangent_cost + (1-s)*cost_delta
-        model_ac.cost_expr_ext_cost_e = (1-s)*cost_p_r_e + s*cost_p_r_e*(s_k*0.2 + (1-s_k)*0.3) + cost_eq_r_e + s*cost_p_o_e + s*cost_eq_o_e + s*v_cost_e
+        model_ac.cost_expr_ext_cost_e = (1-s)*cost_p_r_e + s*cost_p_r_e*(s_k*0.2 + (1-s_k)*0.0) + cost_eq_r_e + s*cost_p_o_e + s*cost_eq_o_e + s*v_cost_e
 
         ocp = AcadosOcp()
         ocp.model = model_ac

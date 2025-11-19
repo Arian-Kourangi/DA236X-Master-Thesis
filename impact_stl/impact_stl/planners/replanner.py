@@ -108,7 +108,7 @@ class RePlanner(Node):
 
         #Size of world
         self.world_lb = np.array([0,0])
-        self.world_ub = np.array([30,30])
+        self.world_ub = np.array([100,100])
         self.dq_lb = np.array([-2,-2])
         self.dq_ub = np.array([2,2])  
 
@@ -342,7 +342,7 @@ class RePlanner(Node):
             self.opti.set_value(self.params['s'], 1.0)
             #self.get_logger().info("Using higher end velocity weight since desired end velocity is 0")
         else:
-            w_s_val = np.array([1e3, 1e4, 1e0, 1e4])
+            w_s_val = np.array([1e1, 1e4, 1e0, 1e4])
             self.opti.set_value(self.params['s'], 0.0)
         self.opti.set_value(self.params['w_s'], w_s_val)
 
