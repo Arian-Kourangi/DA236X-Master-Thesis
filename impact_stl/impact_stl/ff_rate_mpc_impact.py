@@ -444,14 +444,12 @@ class SpacecraftImpactMPC(Node):
             self.delta_V = np.array([0.0,0.0,0.0])
             self.straight = True
         #print(f"v_des: {v_des.T}")
-        elif end_of_int:
-            self.straight = True  # Focus on achieving paralelle velocity at the end of itneraction even if not straight pushing
         x_pred, u_pred = self.mpc.solve(x0,setpoints,
                                         weights=weights,
                                         initial_guess=self.initial_guess,
                                         xobj=xobj,
                                         logger=self.get_logger(),
-                                        verbose=False,selectors=selectors,delta_V=self.delta_V, v_des=v_des, straight = self.straight, col_avoid=col_avoid, approach=approach)
+                                        verbose=False,selectors=selectors,delta_V=self.delta_V, v_des=v_des, straight = self.straight, col_avoid=col_avoid, approach=approach, end_of_int=end_of_int)
         
         self.initial_guess = {'X': x_pred, 'U': u_pred}
 

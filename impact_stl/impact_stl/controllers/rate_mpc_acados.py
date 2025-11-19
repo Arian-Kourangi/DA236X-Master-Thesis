@@ -157,8 +157,9 @@ class SpacecraftRateMPC():
         v_des = cs.SX.sym('v_des', 3)
         delta_V = cs.SX.sym('delta_V', 3)
         s_k = cs.SX.sym('s_k')  # selector for if its straight pushing or not
+        s_z = cs.SX.sym('s_z')  # selector for if end of interaction or not
         xref_r = cs.SX.sym('yref', self.nx)
-        model_ac.p = cs.vertcat(s, xref_r, delta_V, v_des, s_k)
+        model_ac.p = cs.vertcat(s, xref_r, delta_V, v_des, s_k, s_z)
 
 
         
@@ -207,7 +208,7 @@ class SpacecraftRateMPC():
 
         # non-colinear terminal velocity cost, only used for straight pushes
         tmp = cs.cross(x_object[3:6], v_des)
-        v_cost_e = s_k*1e5*cs.dot(tmp, tmp)
+        v_cost_e = s_z*1e5*cs.dot(tmp, tmp)
 
         model_ac.cost_expr_ext_cost = cost_p_r + cost_p_r + cost_eq_r \
             + cost_u + s*cost_p_o + s*cost_eq_o + s*tangent_cost + (1-s)*cost_delta
@@ -276,7 +277,7 @@ class SpacecraftRateMPC():
               weights={'Q': None, 'Q_e': None, 'R': None},
               initial_guess={'X': None, 'U': None},
               xobj=None,
-              logger=None, verbose=False, selectors=None, delta_V = None, v_des=None, straight = None, col_avoid = None, approach = None):
+              logger=None, verbose=False, selectors=None, delta_V = None, v_des=None, straight = None, col_avoid = None, approach = None, end_of_int = False):
         t0 = time.time()
         
         x_0 = np.concatenate((x0.ravel(), xobj.ravel()))  # initial state for both spacecraft
@@ -319,16 +320,22 @@ class SpacecraftRateMPC():
         # Constants
         v_des = v_des.ravel()
         delta_V = delta_V.ravel()
+        if end_of_int:
+            s_z = 1
+        else:
+            s_z = 0
         if straight:
             s_k = 1
+            s_z = 1
         else:
             s_k = 0
         s_k = np.array([s_k]).ravel()
+        s_z = np.array([s_z]).ravel()
         
         for k in range(self.N+1):
             s = np.array([selectors[k]]).ravel()
             yref = xref[:, k].ravel()
-            p_stacked = np.concatenate((s, yref, delta_V, v_des, s_k))
+            p_stacked = np.concatenate((s, yref, delta_V, v_des, s_k,s_z))
             self.solver.set(k, "p", p_stacked)
 
                

@@ -251,7 +251,21 @@ class RePlanner(Node):
             self.minimal_client.send_request(self.robot_rvars, self.robot_hvars, self.robot_idvars, self.robot_other_names,
                                            self.obj_rvars, self.obj_hvars, self.obj_idvars, self.obj_other_names)
         else:
-            pass
+            success = self.solve(reset=True)
+            if success:
+                #Send out timeshift to all robots
+                msg = TimeShift()
+                msg.time_shift = float(self.new_time_shift)
+                msg.robot_name = self.robot_name
+                msg.object_plan = plan_to_plan_msg(self.obj_rvars, self.obj_hvars, self.obj_idvars, self.obj_other_names)
+                self.time_shift_pub.publish(msg)
+                
+                #self.get_logger().info(f"Published time shift: {self.new_time_shift} seconds")
+                #Sending the new plan to the ff_rate_mpc_impact node
+                self.get_logger().info('Replanning with reset succeeded, sending new plan to MPC node')
+                self.minimal_client.send_request(self.robot_rvars, self.robot_hvars, self.robot_idvars, self.robot_other_names,
+                                               self.obj_rvars, self.obj_hvars, self.obj_idvars, self.obj_other_names)
+
             #self.get_logger().error("Replanning failed, keeping old plan")
             
     
@@ -282,7 +296,7 @@ class RePlanner(Node):
         return rob_pre_idx, obj_pre_idx, obj_next_pre_idx
 
 
-    def solve(self):
+    def solve(self, reset = False):
         start = time.time()
         t_meas = (self.object_local_position_time_stack[0,-1] - self.start_time) / 1e6 # Convert from microseconds to seconds
 
@@ -342,16 +356,19 @@ class RePlanner(Node):
             self.opti.set_value(self.params['s'], 1.0)
             #self.get_logger().info("Using higher end velocity weight since desired end velocity is 0")
         else:
-            w_s_val = np.array([1e1, 1e4, 1e0, 1e4])
+            w_s_val = np.array([1e3, 1e4, 1e0, 1e4])
+            if reset:
+                w_s_val = np.array([1e1, 1e1, 1e0, 1e1])
             self.opti.set_value(self.params['s'], 0.0)
         self.opti.set_value(self.params['w_s'], w_s_val)
 
         # Set initial guesses
-        for idx in range(len(self.vars['rvars'])):
-            for k in range(self.vars['rvars'][idx].shape[0]):
-                for i in range(self.vars['rvars'][idx].shape[1]):
-                    self.opti.set_initial(self.vars['rvars'][idx][k,i], self.robot_rvars[pre_idx+idx][k,i])
-                    self.opti.set_initial(self.vars['hvars'][idx][0,i], self.robot_hvars[pre_idx+idx][0,i])
+        if not reset:
+            for idx in range(len(self.vars['rvars'])):
+                for k in range(self.vars['rvars'][idx].shape[0]):
+                    for i in range(self.vars['rvars'][idx].shape[1]):
+                        self.opti.set_initial(self.vars['rvars'][idx][k,i], self.robot_rvars[pre_idx+idx][k,i])
+                        self.opti.set_initial(self.vars['hvars'][idx][0,i], self.robot_hvars[pre_idx+idx][0,i])
         try:
             sol = self.opti.solve()
         except Exception as e:
