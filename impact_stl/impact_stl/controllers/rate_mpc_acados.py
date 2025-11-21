@@ -42,7 +42,9 @@ class SpacecraftRateMPC():
         # self.Q_e = 10 * self.Q
         # self.R = np.diag([1e-3] * 6)
 
-        # px4-mpc 
+        # px4-mpc
+        # To test the normal MPC without the reactive part, double the weights 
+        #self.Q = 2*np.diag([5e1, 5e1, 5e1, 5e1, 5e1, 5e1, 8e2, 8e2, 8e2, 8e2])
         self.Q = np.diag([5e1, 5e1, 5e1, 5e1, 5e1, 5e1, 8e2, 8e2, 8e2, 8e2])
         self.Q_e = 10 * self.Q
         self.R = 2*np.diag([1e-2, 1e-2, 1e-2, 2e0, 2e0, 2e0])
@@ -181,7 +183,7 @@ class SpacecraftRateMPC():
 
         # Object error
         e_object = x_object - xref_o
-        cost_p_o =  cs.mtimes([e_object[0:6].T, 50*self.Q[0:6,0:6], e_object[0:6]])
+        cost_p_o =  cs.mtimes([e_object[0:6].T, 25*self.Q[0:6,0:6], e_object[0:6]])
         q_o = x_object[6:10]
         qref_o = xref_o[6:10]
         eq_o = 1 - (q_o.T @ qref_o)**2
@@ -210,7 +212,7 @@ class SpacecraftRateMPC():
         tmp = cs.cross(x_object[3:6], v_des)
         v_cost_e = s_z*1e5*cs.dot(tmp, tmp)
 
-        model_ac.cost_expr_ext_cost = cost_p_r + cost_p_r + cost_eq_r \
+        model_ac.cost_expr_ext_cost = cost_p_r + cost_eq_r \
             + cost_u + s*cost_p_o + s*cost_eq_o + s*tangent_cost + (1-s)*cost_delta
         model_ac.cost_expr_ext_cost_e = (1-s)*cost_p_r_e + s*cost_p_r_e*(s_k*0.2 + (1-s_k)*0.0) + cost_eq_r_e + s*cost_p_o_e + s*cost_eq_o_e + s*v_cost_e
 
@@ -302,6 +304,8 @@ class SpacecraftRateMPC():
                 if col_avoid:
                     #Enforce aggressive CBF constraint to avoid collision
                     self.solver.constraints_set(0, "lh", np.array([-1e6,0]))
+                    # For test1 disable the col avoidance completely, use the below line instead
+                    #self.solver.constraints_set(0, "lh", np.array([-1e6, -1e6]))
                     self.solver.constraints_set(0, "uh", np.array([1e6, 1e6]))
                 elif approach:
                     self.solver.constraints_set(0, "lh", np.array([0, -1e6]))
@@ -334,6 +338,8 @@ class SpacecraftRateMPC():
         
         for k in range(self.N+1):
             s = np.array([selectors[k]]).ravel()
+            # To turn off the reactive MPC, use s = 0 for all k
+            #s = np.array([0.0]).ravel()
             yref = xref[:, k].ravel()
             p_stacked = np.concatenate((s, yref, delta_V, v_des, s_k,s_z))
             self.solver.set(k, "p", p_stacked)
