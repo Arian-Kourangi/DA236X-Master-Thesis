@@ -1,7 +1,7 @@
 import numpy as np
 import scipy as sp
 from scipy import special, optimize
-import cvxpy as cp
+#import cvxpy as cp
 
 
 def bernstein_poly(i,n,t):

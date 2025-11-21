@@ -40,6 +40,8 @@ from impact_stl.controllers.rate_inter_mpc_acados import SpacecraftInterMPC
 from impact_stl.helpers.helpers import vector2PoseMsg, BezierCurve2NumpyArray, \
                             BezierPlan2NumpyArray, interpolate_bezier, VerboseBezierPlan2NumpyArray,\
                             Quaternion2Euler, Euler2Quaternion
+RUN_NR = 1
+
 
 class SpacecraftImpactMPC(Node):
 
@@ -48,6 +50,15 @@ class SpacecraftImpactMPC(Node):
         self.get_logger().info('Creating SpacecraftImpactMPC node')
         # the object is an actual robot, so it has a namespace that we need 
         # for properly timing the replanning
+
+
+        self.log_data = {
+            "t": [],
+            "x": [],
+            "xobj": [],
+            "inter": [],
+        }
+
         self.robot_name = self.get_namespace()
         self.object_ns = self.declare_parameter('object_ns', '/crackle').value
         self.scenario_name = self.declare_parameter('scenario_name', 'throw_and_catch').value
@@ -165,6 +176,11 @@ class SpacecraftImpactMPC(Node):
         self.last_replan_time = -np.inf
         self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
 
+        self.save_logs_sub = self.create_subscription(
+            StampedBool,
+            '/impact_stl/save_logs',
+            self.save_logs_callback,
+            RELIABLE_QOS)
         # Create Spacecraft and controller objects
         self.model = SpacecraftRateModel()
         self.mpc = SpacecraftRateMPC(self.model,Tf=1.0,N=10) # N = 10 for rate_mpc, 100 for rate_mpc_acados
@@ -453,6 +469,13 @@ class SpacecraftImpactMPC(Node):
         
         self.initial_guess = {'X': x_pred, 'U': u_pred}
 
+        # log data
+        if self.started:
+            self.log_data['t'].append((Clock().now().nanoseconds / 1000 - self.start_time) / 1e6)
+            self.log_data['x'].append(x0.flatten())
+            self.log_data['xobj'].append(xobj.flatten())
+            self.log_data['inter'].append(selectors[0] if selectors is not None else -1)
+
         # predicted_path_msg = Path()
         # for idx in range(x_pred.shape[1]):
         #     # print(f"idx: {idx}, x_pred: {x_pred[:,idx]}")
@@ -557,6 +580,29 @@ class SpacecraftImpactMPC(Node):
             inter_idx = -1
         return pre_idx, inter_idx
 
+    def save_logs_callback(self, msg):
+        self.get_logger().info("Saving log data")
+        # base directory for this scenario
+        base_dir = os.path.expanduser(
+            f"~/space_ws/src/impact_stl/impact_stl/saved_logs/{self.scenario_name}"
+        )
+        os.makedirs(base_dir, exist_ok=True)
+
+        # robot name without the leading slash
+        robot = self.robot_name[1:]
+
+        # final path
+        path = os.path.join(base_dir, f"{robot}_{RUN_NR}.npz")
+
+        try:
+            np.savez(path, **self.log_data)
+            self.get_logger().info(f"Saved log to {path}")
+            # saving the plan as well
+            plan_path = os.path.join(base_dir, f"{robot}_replan_{RUN_NR}.npz")
+            np.savez(plan_path, rvars=self.plan['rvar'], hvars=self.plan['hvar'],drvars = self.plan['drvar'], dhvars=self.plan['dhvar'], ids=self.plan['ids'], other_names=self.plan['other_names'])
+            self.get_logger().info(f"Saved plan to {plan_path}")
+        except Exception as e:
+            self.get_logger().error(f"Failed to save log, {e}")
 def main(args=None):
     rclpy.init(args=args)
     spacecraft_mpc = SpacecraftImpactMPC()

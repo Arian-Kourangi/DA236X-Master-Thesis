@@ -148,6 +148,7 @@ class SpacecraftRateMPC():
                     + self.alpha * self.dh(x_robot, x_object,0.03)[0] \
                     + self.beta * self.h(x_robot, x_object,0.03)[0] \
                     + u_delta  # δ enters additively
+        # For test1 set the distance to 1 m instead of 2
         cbf_stage_aggresive = self.ddh(x_robot,x_object, f_robot, f_object,2)[0] \
                     + self.alpha * self.dh(x_robot, x_object,2)[0] \
                     + self.beta * self.h(x_robot, x_object,2)[0] \
@@ -304,8 +305,6 @@ class SpacecraftRateMPC():
                 if col_avoid:
                     #Enforce aggressive CBF constraint to avoid collision
                     self.solver.constraints_set(0, "lh", np.array([-1e6,0]))
-                    # For test1 disable the col avoidance completely, use the below line instead
-                    #self.solver.constraints_set(0, "lh", np.array([-1e6, -1e6]))
                     self.solver.constraints_set(0, "uh", np.array([1e6, 1e6]))
                 elif approach:
                     self.solver.constraints_set(0, "lh", np.array([0, -1e6]))
