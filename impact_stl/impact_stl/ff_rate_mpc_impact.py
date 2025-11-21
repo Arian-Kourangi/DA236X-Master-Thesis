@@ -428,6 +428,9 @@ class SpacecraftImpactMPC(Node):
                 col_avoid = True
             if self.plan['hvar'][inter_idx][0,0] - (Clock().now().nanoseconds / 1000 - self.start_time) / 1e6 > 2:
                 approach = True
+            if inter_idx == len(self.plan['ids']) -1:
+                # Last interaction, no need for collision avoidance
+                col_avoid = True
         else:
             v_des = np.array([0.0,0.0,0.0])
         
@@ -566,7 +569,7 @@ class SpacecraftImpactMPC(Node):
             # Get the end times of all pre-impact beziers
             pre_tIs = [self.plan['hvar'][i][0,-1] for i in pre_indices]
             # impacts may only occur in the future, so we find the first for which tI > t
-            pre_idx = next((pre_indices[i] for i, tI in enumerate(pre_tIs) if tI > t), len(pre_tIs)-1)
+            pre_idx = next((pre_indices[i] for i, tI in enumerate(pre_tIs) if tI > t), -1)
         except:
             pre_idx = -1
         try:
@@ -575,7 +578,7 @@ class SpacecraftImpactMPC(Node):
             # Get the end times of all pre-impact beziers
             inter_tIs = [self.plan['hvar'][i][0,-1] for i in inter_indices]
             # impacts may only occur in the future, so we find the first for which tI > t
-            inter_idx = next((inter_indices[i] for i, tI in enumerate(inter_tIs) if tI > t), len(inter_tIs)-1)
+            inter_idx = next((inter_indices[i] for i, tI in enumerate(inter_tIs) if tI > t), -1)
         except:
             inter_idx = -1
         return pre_idx, inter_idx
