@@ -40,7 +40,6 @@ from impact_stl.controllers.rate_inter_mpc_acados import SpacecraftInterMPC
 from impact_stl.helpers.helpers import vector2PoseMsg, BezierCurve2NumpyArray, \
                             BezierPlan2NumpyArray, interpolate_bezier, VerboseBezierPlan2NumpyArray,\
                             Quaternion2Euler, Euler2Quaternion
-RUN_NR = 1
 
 
 class SpacecraftImpactMPC(Node):
@@ -584,6 +583,7 @@ class SpacecraftImpactMPC(Node):
         return pre_idx, inter_idx
 
     def save_logs_callback(self, msg):
+        run_nr = int(msg.timestamp)
         self.get_logger().info("Saving log data")
         # base directory for this scenario
         base_dir = os.path.expanduser(
@@ -595,13 +595,13 @@ class SpacecraftImpactMPC(Node):
         robot = self.robot_name[1:]
 
         # final path
-        path = os.path.join(base_dir, f"{robot}_{RUN_NR}.npz")
+        path = os.path.join(base_dir, f"{robot}_{run_nr}.npz")
 
         try:
             np.savez(path, **self.log_data)
             self.get_logger().info(f"Saved log to {path}")
             # saving the plan as well
-            plan_path = os.path.join(base_dir, f"{robot}_replan_{RUN_NR}.npz")
+            plan_path = os.path.join(base_dir, f"{robot}_replan_{run_nr}.npz")
             np.savez(plan_path, rvars=self.plan['rvar'], hvars=self.plan['hvar'],drvars = self.plan['drvar'], dhvars=self.plan['dhvar'], ids=self.plan['ids'], other_names=self.plan['other_names'])
             self.get_logger().info(f"Saved plan to {plan_path}")
         except Exception as e:
