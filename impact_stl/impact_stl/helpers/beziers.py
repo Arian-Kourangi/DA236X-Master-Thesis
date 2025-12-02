@@ -1,7 +1,7 @@
 import numpy as np
 import scipy as sp
 from scipy import special, optimize
-import cvxpy as cp
+#import cvxpy as cp
 
 
 def bernstein_poly(i,n,t):
@@ -26,6 +26,12 @@ def eval_bezier(cps, N=100):
         return vals
 
 def value_bezier(cps, t):
+    """
+    Evaluates a bezier curve at time t.
+    cps: control points of shape (d, n) where d is the dimension and n is the number of control points
+    t: time to evaluate at (0 <= t <= 1) ( this is a normalized time, not the actual time, t=0 is the start of the curve, t=1 is the end of the curve)
+    returns: value of the bezier curve at time t of shape (d,)
+    """
     if len(cps.shape) == 3:
         # if cps has three dimensions we consider the parallel beziers
         vals = np.zeros(cps.shape)
@@ -42,11 +48,25 @@ def value_bezier(cps, t):
         return vals
 
 def eval_t(hvars, t):
-    t_array = np.array([hvar[0,0] for hvar in hvars])
-    idx = np.where(t_array <= t)[0][-1]
+    """
+    Evaluates the bezier curves in hvars at time t to find the segment index and a local parameter s that maps 
+    the time t to the bezier segment.
+    Args:
+        hvars: list of numpy arrays, each of shape (1, n) where n is the number of control points
+        t: time to evaluate at
+    Returns:
+        idx: index of the bezier segment
 
+    """
+    # First time of every curve
+    t_array = np.array([hvar[0,0] for hvar in hvars])
+    # find which bezier segments contains the time t
+    idx = np.where(t_array <= t)[0][-1]
+    
+    # if t is after the last bezier segment we return s=1
     if t > hvars[-1][0,-1] - 1e-3:
         s = 1
+    # if not we have to find where on the curve t is
     else:
         error = lambda s: value_bezier(hvars[idx],s)[0] - t
         s = optimize.root_scalar(error, bracket=[0,1]).root

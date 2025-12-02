@@ -6,19 +6,26 @@ import numpy as np
 import casadi as cs
 import time
 
-from impact_stl.models.spacecraft_rate_model import SpacecraftRateModel
+#from impact_stl.models.spacecraft_rate_model import SpacecraftRateModel
 
 class SpacecraftRateMPC():
     def __init__(self, model, Tf=1.0, N=10, add_cbf=False):
+        """ Model predictive controller for the spacecraft rate model.
+        Args:
+            model (SpacecraftRateModel): spacecraft rate model
+            Tf (float): time horizon
+            N (int): number of discretization steps
+            add_cbf (bool): whether to add control barrier function constraints
+        """
         self.model = model
         self.Tf = Tf
-        self.N = N
+        self.N = N # number of discretization steps in the horizon
         self.dt = self.Tf/self.N
 
         self.add_cbf = add_cbf
 
-        self.nx = 10
-        self.nu = 6
+        self.nx = 10 # Number of state variables
+        self.nu = 6 # Number of control inputs
 
         self.params = {}
         self.vars = {}
@@ -34,7 +41,7 @@ class SpacecraftRateMPC():
         # self.R = np.diag([1e-3] * 6)
 
         # px4-mpc 
-        self.Q = np.diag([5e0, 5e0, 5e0, 8e-1, 8e-1, 8e-1, 8e3])
+        self.Q = np.diag([5e1, 5e1, 5e1, 5e1, 5e1, 5e1, 8e3])
         self.Q_e = 10 * self.Q
         self.R = 2*np.diag([1e-2, 1e-2, 1e-2, 2e0, 2e0, 2e0])
 
@@ -47,7 +54,7 @@ class SpacecraftRateMPC():
             v_o = cs.SX.sym('v_o', 3)
             q_o = cs.SX.sym('q_o', 4)
             u_o = cs.SX.sym('u_o', self.nu)
-            h = cs.sumsqr(p_r[0:2] - p_o[0:2]) - (0.2+0.2+0.1)**2 # 2 times the radius of the object + 0.1 m
+            h = cs.sumsqr(p_r[0:2] - p_o[0:2]) - (0.2+0.2)**2 # 2 times the radius of the object + 0.1 m
             x = cs.vertcat(p_r,p_o)
             dx = cs.vertcat(v_r,v_o)
 
@@ -79,20 +86,55 @@ class SpacecraftRateMPC():
     def setup(self):
         # create casadi optimization problem
         ocp = cs.Opti()
+        # State and input variables (over the whole horizon)
         X = ocp.variable(self.nx,self.N+1)
         U = ocp.variable(self.nu,self.N)
 
+        # parameters (initial state and reference state over the whole horizon)
         x0 = ocp.parameter(self.nx)
         xref = ocp.parameter(self.nx,self.N+1)
+        S = ocp.parameter(self.N+1)  # selector for switching between two sets of dynamics
 
         # set initial state
         ocp.subject_to(X[:,0] == x0)
 
-        # set dynamics constraints
-        for i in range(self.N):
-            ocp.subject_to(self.model.get_casadi_ode(X[:,i],U[:,i],self.dt) == X[:,i+1])
-            # ocp.subject_to(self.model.get_casadi_rk4(X[:,i],U[:,i],self.dt) == X[:,i+1])
+        ## set dynamics constraints
+        #for i in range(self.N):
+        #    ocp.subject_to(self.model.get_casadi_ode(X[:,i],U[:,i],self.dt)*(1-S[i]) + self.model.get_casadi_ode(X[:,i],U[:,i],self.dt, True)*S[i] == X[:,i+1])
+        #    # ocp.subject_to(self.model.get_casadi_rk4(X[:,i],U[:,i],self.dt) == X[:,i+1])
+        
+        ######## THIS PART REPLACES THE FOR LOOP ABOVE TO SPEED UP THE CONSTRUCTION OF THE OCP ########
+        # --- define symbols for a single step ---
+        Xk = cs.SX.sym('Xk', self.nx)
+        Uk = cs.SX.sym('Uk', self.nu)
+        Sk = cs.SX.sym('Sk')   # scalar selector
 
+        # --- get both modes once ---
+        f_normal = self.model.get_casadi_ode(Xk, Uk, self.dt)
+        f_alt    = self.model.get_casadi_ode(Xk, Uk, self.dt, True)
+
+        # --- combine using S ---
+        f_dyn = f_normal * (1 - Sk) + f_alt * Sk
+
+        # --- make a function for one integration step ---
+        self.f_step = cs.Function('f_step', [Xk, Uk, Sk], [f_dyn])
+
+
+        self.f_map = self.f_step.map(self.N, "thread")  # "thread" enables parallel eval
+
+        # X has shape (nx, N+1)
+        # U has shape (nu, N)
+        # S has shape (1, N+1)
+
+        # Apply f_map to get all next states in one go
+        X_next = self.f_map(X[:, :-1], U, S[:-1])
+
+        # Add single constraint for all steps
+        ocp.subject_to(X[:, 1:] == X_next)
+
+        ##### END REPLACEMENT PART ########
+
+        
         # control input constraints
         for i in range(self.N):
             ocp.subject_to(self.model.u_lb <= U[:,i])
@@ -144,7 +186,15 @@ class SpacecraftRateMPC():
             'print_time': False,
             'verbose': False,
         }
-        ocp.solver('ipopt',ipopt_opts)
+        ocp.solver('ipopt', {
+            **ipopt_opts,
+            'expand': True,       # inline the graph for faster code
+            'jit': True,          # JIT-compile CasADi generated code
+            'jit_options': {
+                'compiler': 'gcc',  # or 'clang' if preferred
+                'flags': '-O3 -march=native -mtune=native -fopenmp'     # optimize aggressively
+            }
+        })
 
         # SQP:
         # qp_opts = {
@@ -171,6 +221,7 @@ class SpacecraftRateMPC():
         self.params['Q'] = Q
         self.params['Q_e'] = Q_e
         self.params['R'] = R
+        self.params['S'] = S
 
         self.vars['X'] = X
         self.vars['U'] = U
@@ -186,7 +237,10 @@ class SpacecraftRateMPC():
         # quaternion cost
         q = x[6:10].reshape((4,1))
         qref = xref[6:10].reshape((4,1))
-        eq = 1 - (q.T @ qref)**2 
+        dot = cs.dot(q, qref)
+
+        eq = 1-dot*dot
+        #eq = 1 - (q.T @ qref)**2 
         cost_eq = eq.T @ Q[6,6].reshape((1, 1)) @ eq
 
         return cost_eq + cost_es
@@ -195,7 +249,7 @@ class SpacecraftRateMPC():
               weights={'Q': None, 'Q_e': None, 'R': None},
               initial_guess={'X': None, 'U': None},
               xobj=None, enable_cbf=True,
-              logger=None, verbose=False):
+              logger=None, verbose=False, selectors=None):
         t0 = time.time()
 
         # print(f"x0: {x0}")
@@ -208,6 +262,12 @@ class SpacecraftRateMPC():
 
         # set x0 parameter
         self.ocp.set_value(self.params['x0'], x0)
+        
+        #set selectors for a setpoint being on the an inter curve or not
+        if selectors is None:
+            selectors = np.zeros((self.N+1))
+        
+        self.ocp.set_value(self.params['S'], selectors)
 
         # set setpoints parameter
         xref = np.hstack(setpoints)
@@ -233,9 +293,9 @@ class SpacecraftRateMPC():
                 self.ocp.set_value(self.params['OffSwitch'], 0)
             else:
                 self.ocp.set_value(self.params['OffSwitch'], 10000) # make it a trivial constraint
-            print(f"h: {self.h(x0,xobj)}")
-            print(f"dh: {self.dh(x0,xobj)}")
-            print(f"ddh: {self.ddh(x0,xobj,np.zeros((self.nu,1)),np.zeros((self.nu,1)))}")
+            #print(f"h: {self.h(x0,xobj)}")
+            #print(f"dh: {self.dh(x0,xobj)}")
+            #print(f"ddh: {self.ddh(x0,xobj,np.zeros((self.nu,1)),np.zeros((self.nu,1)))}")
 
         try:
             sol = self.ocp.solve()
@@ -252,74 +312,3 @@ class SpacecraftRateMPC():
         return X_pred, U_pred
 
 
-#! Impact detector with direction information
-# __author__ = "Joris Verhagen"
-# __contact__ = "jorisv@kth.se"
-# import numpy as np
-# import rclpy
-# from rclpy.clock import Clock
-# from rclpy.node import Node
-# from impact_stl.helpers.qos_profiles import RELIABLE_QOS, NORMAL_QOS
-# from px4_msgs.msg import VehicleLocalPosition
-# from my_msgs.msg import StampedBool
-# class ImpactDetector(Node):
-#     def __init__(self):
-#         super().__init__('impact_detector')
-#         self.threshold = self.declare_parameter('threshold', 1.0).value # 1.0 for sim, 3.0 for hw
-#         self.gz = self.declare_parameter('gz', True).value
-#         if self.gz:
-#             self.local_position_sub = self.create_subscription(
-#                 VehicleLocalPosition,
-#                 'fmu/out/vehicle_local_position_gz',
-#                 self.vehicle_local_position_callback,
-#                 NORMAL_QOS)
-#         else:
-#             self.local_position_sub = self.create_subscription(
-#                 VehicleLocalPosition,
-#                 'fmu/out/vehicle_local_position',
-#                 self.vehicle_local_position_callback,
-#                 NORMAL_QOS)
-#         self.publisher_impact = self.create_publisher(StampedBool, 'impact_stl/impact_detected', RELIABLE_QOS)
-#         self.publisher_impact_direction = self.create_publisher(StampedBool, 'impact_stl/impact_direction', RELIABLE_QOS)
-#         self.vehicle_acceleration = np.array([0.0, 0.0, 0.0])
-#         self.vehicle_past_accelerations = np.zeros((3,))
-#         self.past_accel_x = np.zeros((3,))
-#         self.past_accel_y = np.zeros((3,))
-#         # get the current time
-#         self.t_start = Clock().now().nanoseconds/1000
-#         self.t_wait  = 3
-#         self.get_logger().info('Created an impact detector')
-#     def vehicle_local_position_callback(self, msg):
-#         if (Clock().now().nanoseconds/1000 - self.t_start)/1e6 < self.t_wait:
-#             return
-#         # TODO: handle NED->ENU transformation
-#         self.vehicle_acceleration[0] = msg.ax
-#         self.vehicle_acceleration[1] = -msg.ay
-#         self.vehicle_acceleration[2] = -msg.az
-#         self.vehicle_past_accelerations[:-1] = self.vehicle_past_accelerations[1:]
-#         self.vehicle_past_accelerations[-1] = np.linalg.norm(self.vehicle_acceleration)
-#         self.past_accel_x[:-1] = self.past_accel_x[1:]
-#         self.past_accel_x[-1] = self.vehicle_acceleration[0]
-#         self.past_accel_y[:-1] = self.past_accel_y[1:]
-#         self.past_accel_y[-1] = self.vehicle_acceleration[1]
-#         if np.mean(self.vehicle_past_accelerations) > self.threshold:
-#             self.get_logger().info('--- IMPACT DETECTED ---')
-#             msg = StampedBool()
-#             msg.timestamp = int(Clock().now().nanoseconds / 1000)
-#             msg.data[0] = True
-#             if abs(np.mean(self.past_accel_x)) > abs(np.mean(self.past_accel_y)):
-#                 self.get_logger().info('Impact direction: y')
-#                 msg.data[1] = True
-#             else:
-#                 self.get_logger().info('Impact direction: x')
-#                 msg.data[1] = False
-#             self.publisher_impact.publish(msg)
-#             self.get_logger().info('Impact message published')
-# def main(args=None):
-#     rclpy.init(args=args)
-#     impact_detector = ImpactDetector()
-#     rclpy.spin(impact_detector)
-#     impact_detector.destroy_node()
-#     rclpy.shutdown()
-# if __name__ == '__main__':
-#     main()

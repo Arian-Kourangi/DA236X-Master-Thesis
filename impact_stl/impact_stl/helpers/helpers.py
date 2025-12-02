@@ -61,6 +61,16 @@ def BezierCurve2NumpyArray(bezier_curve):
         return control_points
 
 def BezierPlan2NumpyArray(bezier_plan):
+    """
+    Converts a BezierPlan message to a dictionary of numpy arrays.
+    bezier_plan: BezierPlan message
+
+    returns: dictionary with keys 'rvar', 'drvar', 'hvar', 'dhvar'
+    each value is a list of numpy arrays, one for each bezier curve. Each curve is of shape (d, n) where n is the number of control points
+    d=3 for rvars, d=1 for hvars
+    
+    """
+
     # create a tmp function to get the control points of a bezier, for all bezier segments
     def convert_curves(curves):
         return [BezierCurve2NumpyArray(curve) for curve in curves]
@@ -73,12 +83,41 @@ def BezierPlan2NumpyArray(bezier_plan):
     }
 
 def VerboseBezierPlan2NumpyArray(bezier_plan):
+    """
+    Converts a VerboseBezierPlan message to a dictionary of numpy arrays.
+    Args:
+        bezier_plan: VerboseBezierPlan message
+
+    returns: 
+        dictionary with keys 'rvar', 'drvar', 'hvar', 'dhvar', 'ids', 'other_names'
+        each value is a list of numpy arrays, one for each bezier curve. Each curve is of shape (d, n) where n is the number of control points
+        d=3 for rvars, d=1 for hvars
+    
+    """
     plan = BezierPlan2NumpyArray(bezier_plan)
     plan['ids'] = bezier_plan.ids
     plan['other_names'] = bezier_plan.other_names
     return plan
 
 def interpolate_bezier(plan, t):
+    """
+    Interpolates a bezier plan at time t.
+    Args:
+        plan: dictionary with keys 'rvar', 'drvar', 'hvar', 'dhvar', 'ids', 'other_names'
+            each value is a list of numpy arrays, one for each bezier curve. Each curve is of shape (d, n) where n is the number of control points
+            d=3 for rvars, d=1 for hvars
+        t: time to interpolate at
+    Returns:
+        dictionary with keys 'q', 'dq', 'h', 'dh', 'id', 'other_name'
+        q: position at time t
+        dq: velocity at time t
+        h: time at time t
+        dh: time derivative at time t
+        id: id of the bezier curve at time t
+        other_name: other name of the bezier curve at time t
+    """
+    
+    # idx i segment index, s is the local parameter in [0,1] for the bezier segment (how far along the segment we are)
     idx, s = eval_t(plan['hvar'], t)
     return {
         'q': value_bezier(plan['rvar'][idx], s),

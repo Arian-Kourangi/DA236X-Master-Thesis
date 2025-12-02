@@ -14,6 +14,13 @@ RELIABLE_QOS = QoSProfile(
     depth=10
 )
 
+RELIABLE_QOS_2 = QoSProfile(
+    reliability=QoSReliabilityPolicy.RELIABLE,
+    durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
+    history=QoSHistoryPolicy.KEEP_ALL
+)
+
+
 GZ_BRIDGE_QOS = QoSProfile(
     reliability=QoSReliabilityPolicy.RELIABLE,
     durability=QoSDurabilityPolicy.VOLATILE,

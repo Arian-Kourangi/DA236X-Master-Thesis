@@ -21,6 +21,7 @@ def generate_launch_description():
             DeclareLaunchArgument("name", default_value="snap"),
             DeclareLaunchArgument("delay", default_value="0"),
             DeclareLaunchArgument("headless", default_value="1"),
+            DeclareLaunchArgument("world", default_value="frictionless_kth"),
             ExecuteProcess(
                 cmd=[
                     "xterm",        # or "gnome-terminal", "konsole", "xterm"
@@ -38,7 +39,8 @@ def generate_launch_description():
                     "PX4_INSTANCE": LaunchConfiguration("id"),
                     "PX4_DELAY": LaunchConfiguration("delay"),
                     "PX4_SIM_MODEL": "gz_spacecraft_2d",
-                    "PX4_UXRCE_DDS_NS": LaunchConfiguration("name")},
+                    "PX4_UXRCE_DDS_NS": LaunchConfiguration("name"),
+                    "PX4_GZ_WORLD": LaunchConfiguration("world")},
                     # "HEADLESS": LaunchConfiguration("headless")},
                 output="screen",
             ),

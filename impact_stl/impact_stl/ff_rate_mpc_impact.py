@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-__author__ = "Joris Verhagen"
-__contact__ = "jorisv@kth.se"
+__author__ = "Arian Kourangi"
+__contact__ = "arianke@kth.se"
 
 import rclpy
 import numpy as np
@@ -12,7 +12,7 @@ from impact_stl.helpers.read_write_plan import csv_to_plan
 
 from rclpy.node import Node
 from rclpy.clock import Clock
-from impact_stl.helpers.qos_profiles import NORMAL_QOS, RELIABLE_QOS
+from impact_stl.helpers.qos_profiles import NORMAL_QOS, RELIABLE_QOS, RELIABLE_QOS_2
 
 from nav_msgs.msg import Path
 from geometry_msgs.msg import PoseStamped
@@ -27,18 +27,20 @@ from px4_msgs.msg import VehicleLocalPosition
 from px4_msgs.msg import VehicleRatesSetpoint
 
 from my_msgs.srv import SetPlan, SetVerbosePlan
-from my_msgs.msg import StampedBool, VerboseBezierPlan
+from my_msgs.msg import StampedBool, VerboseBezierPlan, TimeShift, Replan
 
 from ament_index_python.packages import get_package_share_directory
 
 from impact_stl.models.spacecraft_rate_model import SpacecraftRateModel
 from impact_stl.planners.main_planner import plan_to_plan_msg
 # from impact_stl.controller.rate_mpc import SpacecraftRateMPC
-from impact_stl.controllers.rate_mpc import SpacecraftRateMPC
-from impact_stl.controllers.rate_impact_mpc import SpacecraftRateImpactMPC
+from impact_stl.controllers.rate_mpc_acados import SpacecraftRateMPC
+from impact_stl.controllers.rate_inter_mpc_acados import SpacecraftInterMPC
+
 from impact_stl.helpers.helpers import vector2PoseMsg, BezierCurve2NumpyArray, \
                             BezierPlan2NumpyArray, interpolate_bezier, VerboseBezierPlan2NumpyArray,\
                             Quaternion2Euler, Euler2Quaternion
+
 
 class SpacecraftImpactMPC(Node):
 
@@ -47,11 +49,22 @@ class SpacecraftImpactMPC(Node):
         self.get_logger().info('Creating SpacecraftImpactMPC node')
         # the object is an actual robot, so it has a namespace that we need 
         # for properly timing the replanning
+
+
+        self.log_data = {
+            "t": [],
+            "x": [],
+            "xobj": [],
+            "inter": [],
+        }
+
         self.robot_name = self.get_namespace()
         self.object_ns = self.declare_parameter('object_ns', '/crackle').value
         self.scenario_name = self.declare_parameter('scenario_name', 'throw_and_catch').value
-        self.enable_cbf = self.declare_parameter('enable_cbf', False).value
+        self.enable_cbf =self.declare_parameter('enable_cbf', False).value
         self.get_logger().info(f"robot_name: {self.robot_name}, object_ns: {self.object_ns}, enable_cbf: {self.enable_cbf}")
+        self.gz = self.declare_parameter('gz', True).value
+        gz_suffix = '_gz' if self.gz else ''
 
         # get initial state from passed parameters
         self.x0 = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -62,6 +75,7 @@ class SpacecraftImpactMPC(Node):
         self.x0[3] = self.declare_parameter('vx0', 0.0).value
         self.x0[4] = self.declare_parameter('vy0', 0.0).value
         self.x0[5] = self.declare_parameter('vz0', 0.0).value
+
 
         # Subscribers
         self.status_sub = self.create_subscription(
@@ -88,7 +102,7 @@ class SpacecraftImpactMPC(Node):
         # subscriber for the object for the CBF
         self.object_local_position_sub = self.create_subscription(
             VehicleLocalPosition,
-            f'{self.object_ns}/fmu/out/vehicle_local_position_gz',
+            f'{self.object_ns}/fmu/out/vehicle_local_position{gz_suffix}',
             self.object_local_position_callback,
             NORMAL_QOS)
         
@@ -98,15 +112,7 @@ class SpacecraftImpactMPC(Node):
             'impact_stl/execute_plan',
             self.execute_plan_callback,
             RELIABLE_QOS)
-        
-        # Impact detector
-        self.impact_detected_sub = self.create_subscription(
-            StampedBool,
-            'impact_stl/impact_detected',
-            self.impact_detected_callback,
-            RELIABLE_QOS)
-        self.impacted = False
-        self.impact_time = 0
+
 
         # Global reset detector
         self.global_reset_sub = self.create_subscription(
@@ -115,13 +121,12 @@ class SpacecraftImpactMPC(Node):
             self.global_reset_callback,
             RELIABLE_QOS)
 
-        # controller heuristics
-        self.post_impact_backup_duration = 1.5  # how long we turn the contoller off after an impact
-        self.t_object_coming = np.inf           # time when the object is coming to our impact point
-        self.object_coming_wait = 2.0           # how long we wait with replanning after the object is coming
 
-        # for long specs, object_coming_wait: 3, stacksize can be larger: more precise
-        # for short specs, object_coming_wait: 1, stacksize has to be smaller
+        self.global_time_shift_sub = self.create_subscription(
+            TimeShift,
+            '/global/impact_stl/time_shift',
+            self.global_time_shift_callback,
+            RELIABLE_QOS_2)
         
         # get the plan of the object from the csv file
         # this plan also never changes, so we can load it and use it forever :)
@@ -152,22 +157,33 @@ class SpacecraftImpactMPC(Node):
 
         self.publisher_offboard_mode = self.create_publisher(OffboardControlMode, 'fmu/in/offboard_control_mode', NORMAL_QOS)
         self.publisher_rates_setpoint = self.create_publisher(VehicleRatesSetpoint, 'fmu/in/vehicle_rates_setpoint', NORMAL_QOS)
-        self.predicted_path_pub = self.create_publisher(Path, 'impact_stl/predicted_path', 10)
-        self.reference_path_pub = self.create_publisher(Path, "impact_stl/reference_path", 10)
+        
+        #self.predicted_path_pub = self.create_publisher(Path, 'impact_stl/predicted_path', 10)
+        #self.reference_path_pub = self.create_publisher(Path, "impact_stl/reference_path", 10)
+        
         self.entire_path_pub = self.create_publisher(Path, "impact_stl/entire_path", 10)
-        self.publisher_recompute_local_plan = self.create_publisher(StampedBool, 'impact_stl/recompute_local_plan', RELIABLE_QOS)
+        self.replanned_path_pub = self.create_publisher(Path, "impact_stl/replanned_path", 10)
+        
+        self.publisher_recompute_local_plan = self.create_publisher(Replan, 'impact_stl/recompute_local_plan', RELIABLE_QOS)
         self.timer_period = 0.05  # seconds
         self.timer = self.create_timer(self.timer_period, self.cmdloop_callback)
 
         self.timer_period2 = 0.1
         self.offboard_timer = self.create_timer(self.timer_period2, self.offboard_callback)
-
+        
+        self.cooldown_replanner = 0.1  # seconds
+        self.last_replan_time = -np.inf
         self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
 
+        self.save_logs_sub = self.create_subscription(
+            StampedBool,
+            '/impact_stl/save_logs',
+            self.save_logs_callback,
+            RELIABLE_QOS)
         # Create Spacecraft and controller objects
         self.model = SpacecraftRateModel()
-        self.mpc = SpacecraftRateMPC(self.model,Tf=1.0,N=10,add_cbf=self.enable_cbf)
-        self.impact_mpc = SpacecraftRateImpactMPC(self.model,Tf=1.0,N=10)
+        self.mpc = SpacecraftRateMPC(self.model,Tf=1.0,N=10) # N = 10 for rate_mpc, 100 for rate_mpc_acados
+        #self.inter_mpc = SpacecraftInterMPC(self.model,Tf=1.0,N=10,add_cbf=self.enable_cbf)
         self.initial_guess = {'X': None, 'U': None}
 
         self.vehicle_attitude = np.array([1.0, 0.0, 0.0, 0.0])
@@ -179,6 +195,40 @@ class SpacecraftImpactMPC(Node):
 
         self.object_local_position = np.array([0.0, 0.0, 0.0])
         self.object_local_velocity = np.array([0.0, 0.0, 0.0])
+
+    def global_time_shift_callback(self, msg):
+        """Callback for global time shift messages.
+        Args:
+            msg (TimeShift): Message containing the time shift information.
+        Effects:
+            Shifts the timing of the robot's and object's plans if the message is not from this robot.
+            The shift represents much to alter the timing of the plans to stay synchronized with global time changes.
+            Time shifts are caused by the replanner, if we we are replanning our  plans from the replanner already contain the time shift.
+            But if another robot has replanned, we need to shift our plans accordingly.
+            This is done so we delay/avance our plans to stay in sync with the other robots.
+            Its also done so that we know when our next interaction with the object is, to properly replan before that.
+        """
+        if msg.robot_name != self.robot_name:
+            #Propogate time shift for robot plan and object plan
+            #self.get_logger().info(f'Global time shift received: {msg.time_shift} seconds')
+
+            # For all control points in the plan, if the time is after the current time, shift it
+            for idx in range(len(self.plan['hvar'])):
+                for cp in range(self.plan['hvar'][idx].shape[1]):
+                    if self.plan['hvar'][idx][0,cp] > (Clock().now().nanoseconds/ 1e3 - self.start_time)/1e6:
+                        self.plan['hvar'][idx][0,cp] += msg.time_shift
+            
+            # Make sure to recompute the dhvars so it fits the new timing
+            self.plan['dhvar'] = [get_derivative_control_points_gurobi(hvar,1) for hvar in self.plan['hvar']]
+
+            self.plan_object = VerboseBezierPlan2NumpyArray(msg.object_plan)
+
+            ## Also shift the object plan, here we don't care about current time or dhvars, just the timing
+            #for idx in range(len(self.plan_object['hvar'])):
+            #    for cp in range(self.plan_object['hvar'][idx].shape[1]):
+            #        if self.plan_object['hvar'][idx][0,cp] > (Clock().now().nanoseconds/ 1e3 - self.start_time)/1e6:
+            #            self.plan_object['hvar'][idx][0,cp] += msg.time_shift
+
 
     def global_reset_callback(self, msg):
         self.get_logger().info('Global reset received')
@@ -222,10 +272,6 @@ class SpacecraftImpactMPC(Node):
         # print("  - offboard status: ", VehicleStatus.NAVIGATION_STATE_OFFBOARD)
         self.nav_state = msg.nav_state
 
-    def impact_detected_callback(self, msg):
-        self.get_logger().info('Impact received')
-        self.impacted = True
-        self.impact_time = Clock().now().nanoseconds / 1000
 
     def publish_rate_setpoint(self, u_pred):
         thrust_rates = u_pred[:, 0]
@@ -240,33 +286,34 @@ class SpacecraftImpactMPC(Node):
         rates_setpoint_msg.thrust_body[2] = -float(thrust_command[2])
         self.publisher_rates_setpoint.publish(rates_setpoint_msg)
 
-    def get_pre_idx_and_tI(self,t):
-        # if plan0 is pre, and plan1 is post, that means an impact has occurred
-        # in the horizon, and we need to use an impact-mpc
+
+    def get_object_next_inter(self,t):
+        """
+        Get the index of the next interaction bezier segment of the object.
+        Args:
+            t: current time
+        Returns:
+            inter_idx: index of the next interaction bezier segment of the object
+        """
         try:
-            pre_indices = [i for i, x in enumerate(self.plan['ids']) if x == 'pre']
-            pre_tIs = [self.plan['hvar'][i][0,-1] for i in pre_indices]
-            # impacts may only occur in the future, so we find the first for which tI > t
-            pre_idx = next((i for i, tI in enumerate(pre_tIs) if tI > t), len(pre_tIs)-1)
-            tI = pre_tIs[pre_idx]
-            # print(f"pre_indices: {pre_indices}, pre_tIs: {pre_tIs}")
-            # print(f"pre_idx: {pre_idx}, tI: {tI}")
+            # Get all indices where the id is 'inter'
+            #inter_indices = [i for i, x in enumerate(self.plan_object['ids']) if x == 'inter']
+            inter_indices = np.where(np.array(self.plan_object['ids']) == 'inter')[0]
+            # Get the end times of all interaction beziers
+            inter_tEnd = [self.plan_object['hvar'][inter_idx][0,-1] for inter_idx in inter_indices]
+            # The next interaction is either ongoing or in the future, so we find the first for which tStop > t
+            inter_idx = next((inter_indices[i] for i,tend in enumerate(inter_tEnd) if tend > t), -1)
         except:
-            pre_tIs = [0.0]
-            pre_idx = -1
-            tI = np.inf
-        return pre_idx, tI, pre_tIs
+            inter_idx = -1
+        return inter_idx
 
-
-    def get_setpoints(self):
+    def get_setpoints(self,dist):
+        #current time in seconds, compared to start_time
         t = (Clock().now().nanoseconds / 1000 - self.start_time) / 1e6
         setpoints = []
-        times = []
-        impact_idx = None
-        xpre = None
-        xpost = None
-        tI = None
+        selectors = []
         weights = {'Q': None, 'Q_e': None, 'R': None}
+        end_of_int = False
 
         # if we haven't started the simulation, we just keep position at the setpoint
         if not self.started:
@@ -276,71 +323,10 @@ class SpacecraftImpactMPC(Node):
             for i in range(self.mpc.N+1):
                 ti = t+i*self.mpc.dt
                 setpoints.append(setpoint)
-                times.append(ti)
-            
-            return setpoints, times, impact_idx, xpre, xpost, weights, tI
+            return setpoints, None, weights, end_of_int
         # we started the simulation
         else:
-            # self.get_logger().info(f"planner time: {t}")
-            plan0 = interpolate_bezier(self.plan,t)
-            tf = t+self.mpc.Tf
-            planf = interpolate_bezier(self.plan,tf)
-
-            # print(f"id: {plan0['id']}")
-            self.idx, _ = eval_t(self.plan['hvar'], t)
-            self.pre_idx, tI, pre_tIs = self.get_pre_idx_and_tI(t)
-            # self.get_logger().info(f"pre_idx: {self.pre_idx}, tI: {tI}, pre_tIs: {pre_tIs}")
-            t_near_a_tI = any([np.abs(pre_tI - t) < 5e-1 for pre_tI in pre_tIs])
-
-            # 1. find the index of the pre-impact bezier of the object
-            for idx_I in range(len(self.plan_object['ids'])):
-                if tI > self.plan_object['hvar'][idx_I][0,-1]-1e-4 and tI < self.plan_object['hvar'][idx_I][0,-1]+1e-4:
-                    if self.plan_object['ids'][idx_I] == 'pre' and self.plan_object['other_names'][idx_I] in self.robot_name:
-                        # self.get_logger().info(f"pre-impact bezier found for the object at index {idx_I} (robot {self.robot_name})")
-                        break
-            # 2. find the index of the current bezier of the object
-            for idx_Now in range(len(self.plan_object['ids'])):
-                if t > self.plan_object['hvar'][idx_Now][0,0] and t < self.plan_object['hvar'][idx_Now][0,-1]:
-                    # print(f"current bezier for the object at index {idx_Now}")
-                    break
-            # self.get_logger().info(f"plan_object['ids'][idx_Now]: {self.plan_object['ids'][idx_Now]}")
-            # self.get_logger().info(f"plan_object['ids'][idx_I]: {self.plan_object['ids'][idx_I]}")
-            # 2a. check if all 'ids' from idx_Now to idx_I are 'post' or 'none', if that's so, we could replan
-            # self.get_logger().info(f"idx_Now: {idx_Now}, idx_I: {idx_I}, self.idx: {self.idx}")
-            going_straight = True
-            for idx in range(idx_Now,idx_I):
-                # self.get_logger().info(f"plan_object['ids'][{idx}]: {self.plan_object['ids'][idx]}")
-                if self.plan_object['ids'][idx] == 'pre':
-                    going_straight = False
-                    break
-            # self.get_logger().info(f"going_straight: {going_straight}")
-
-            # 3. if the current bezier of the object is the pre-impact bezier, we need to wait a bit before replanning
-            #    to ensure the object is going straight for long enough
-            if going_straight and plan0['id'] == 'pre' \
-                    and self.t_object_coming == np.inf and not self.replanned:
-                self.t_object_coming = t
-                self.get_logger().info(f"that means we can replan, but we need to wait a bit")
-
-            # 4. if the current bezier is a pre-impact bezier, we havent replanned yet, the object's 
-            #    pre-impact bezier is the same as the current one, and the object is coming, we replan
-            #    also do not replan 1 second before or one second after the desired impact time
-            # TODO: this check should also work for short bezier segments of the object
-            # TODO: check if idx_Now does not have any 'pre' segments afterwards until idx_I
-            # self.get_logger().info(f"plan0['id']==pre: {plan0['id']=='pre'}, not replanned: {not self.replanned}, going_straight: {going_straight}, not t_near_a_tI: {not t_near_a_tI}, waited: {t - self.t_object_coming > self.object_coming_wait}")
-            if plan0['id'] == 'pre' and not self.replanned and going_straight and \
-                    t - self.t_object_coming > self.object_coming_wait and not t_near_a_tI:
-                self.get_logger().info('Calling Replanning Service in ff_rate_mpc_impact')
-                msg = StampedBool()
-                msg.timestamp = int(Clock().now().nanoseconds / 1000)
-                msg.t = t
-                msg.data = True
-                self.publisher_recompute_local_plan.publish(msg)
-                self.replanned = True
-                self.t_object_coming = np.inf
-
             # compute the nominal plan via interpolating the bezier curve
-            # then, if an impact will occur, we just add that later at the right position
             for i in range(self.mpc.N+1):
                 ti = t+i*self.mpc.dt
                 plani = interpolate_bezier(self.plan,ti)
@@ -348,55 +334,46 @@ class SpacecraftImpactMPC(Node):
                 setpoints.append(np.array([plani['q'][0], plani['q'][1], 0.0,
                                             plani['dq'][0], plani['dq'][1], 0.0,
                                             1.0, 0.0, 0.0, 0.0]).reshape(10,1))
-                times.append(ti)
+                selectors.append(1 if plani['id']=='inter' else 0)
+            
+            # Check if no interaction on Horizon and next interaction is ours, dist is to not get stuck in replann - CBF loop
+            if all(selectors[i]==0 for i in range(len(selectors))) \
+                and self.plan_object['other_names'][self.get_object_next_inter(t)] in self.robot_name \
+                and dist > 0.6:
+                #self.get_logger().info('Calling Replanning Service in ff_rate_mpc_impact')
+                #Cooldown for the replanner so we don't spam it
+                if Clock().now().nanoseconds/1e9 - self.last_replan_time > self.cooldown_replanner:
+                    self.last_replan_time = Clock().now().nanoseconds/1e9
+                    msg = Replan()
+                    msg.starttime = int(self.start_time)
+                    msg.robot_plan = plan_to_plan_msg(self.plan['rvar'], self.plan['hvar'], self.plan['ids'], self.plan['other_names'])
+                    msg.object_plan = plan_to_plan_msg(self.plan_object['rvar'], self.plan_object['hvar'], self.plan_object['ids'], self.plan_object['other_names'])
+                    #self.get_logger().info(f"next interaction index of the object: {self.get_object_next_inter(t)}")
+                    #self.get_logger().info(f"type of next interaction index of the object: {type(self.get_object_next_inter(t))}")
+                    self.publisher_recompute_local_plan.publish(msg)
 
-            # get the desired state just before and after the impact
-            plan_pre = interpolate_bezier(self.plan,tI-(1e-6))
-            plan_post = interpolate_bezier(self.plan,tI+(1e-6))
-            setpoint_pre = np.array([plan_pre['q'][0], plan_pre['q'][1], 0.0,
-                                     plan_pre['dq'][0], plan_pre['dq'][1], 0.0,
-                                     1.0, 0.0, 0.0, 0.0]).reshape(10,1)
-            setpoint_post = np.array([plan_post['q'][0], plan_post['q'][1], 0.0,
-                                      plan_post['dq'][0], plan_post['dq'][1], 0.0,
-                                      1.0, 0.0, 0.0, 0.0]).reshape(10,1)
-            
-            if t <= tI and tI <= tf-self.mpc.dt:
-                # self.get_logger().info("\nImpact in horizon!")
-                # self.get_logger().info(f"t: {t}, tI: {tI}, tf: {tf}")
-                # now insert setpoint_pre in the first index for which tI < t in times
-                insert_idx = next((i for i, t in enumerate(times) if tI < t), len(times)-1)
-                # print(f"insert_idx: {insert_idx}")
-                # print(f"times before shenanigans: {times}")
-                # remove the index after insert_idx
-                del setpoints[insert_idx+1]
-                del times[insert_idx+1]
-                # and add the setpoint_pre and setpoint_post at insert_idx and insert_idx+1
-                setpoints.insert(insert_idx,setpoint_pre)
-                setpoints.insert(insert_idx+1,setpoint_post)
-                times.insert(insert_idx,tI)
-                times.insert(insert_idx+1,tI)
-                # print(f"times after shenanigans: {times}")
 
-                impact_idx = insert_idx
-                xpre = setpoint_pre
-                xpost = setpoint_post
-                weights = {'Q': None, 'Q_e': None, 'R': None}
-            
-            # if tI has been in the horizon, but impacted=False,
-            # we need to have the MPC focus on maintaining the last setpoint
-            # and increase the weight on the velocity cost
-            if tI <= t-2*self.mpc.dt and t - tI <= self.post_impact_backup_duration \
-                and not self.impacted:
-                # print("Impact not yet occured, post-impact backup plan")
-                # setpoints is plan_pre repeated N+1 times
-                setpoints = [setpoint_pre for _ in range(self.mpc.N+1)]
-                Q = np.diag([0e0, 0e0, 0e0, 8e0, 8e0, 8e0, 8e3])
-                Q_e = np.diag([0e0, 0e0, 0e0, 8e0, 8e0, 8e0, 8e3])
-                R = 2*np.diag([1e-3, 1e-3, 1e-3, 2e0, 2e0, 2e0])
-                weights = {'Q': Q, 'Q_e': Q_e, 'R': R}
-                # weights = {'Q': None, 'Q_e': None, 'R': None}
-            
-            return setpoints, times, impact_idx, xpre, xpost, weights, tI
+            #Checking if we are on an interaction and the end of the interaction is on the horizon
+            # NOTE: WE might need to put some sort of delay after the interaction is done,
+                # since the replanner won't change the pos directly after the interaction
+                # so the MPC might slam into the newly released object.
+
+            if any(selectors[i] ==1 for i in range(len(selectors)-1)) and selectors[-1]==0:
+
+                # Make all the setpoints after the interaction equal a linear propgation of the last interaction point
+                # We do this so the MPC focuses on the interaction and not on going to some random place afterwards
+                end_idx = next(i for i in range(len(selectors)) if selectors[i]==0)
+                for point in range(end_idx, len(setpoints)):
+                    # artificially extend the interaction to make the MPC focus on the interaction
+                    # Propogate position linearly
+                    setpoints[point][0:3] = setpoints[point-1][0:3] + self.mpc.dt*setpoints[end_idx-1][3:6]  # keep position from last interaction point
+                    # Constant velocity
+                    setpoints[point][3:6] = setpoints[end_idx-1][3:6]  # keep velocity from last interaction point
+                    # Mark as interaction to allow MPC to use interaction controller
+                    selectors[point] = 1  # keep using interaction controller
+                end_of_int = True
+
+            return setpoints, selectors, weights, end_of_int
 
 
     def offboard_callback(self):
@@ -421,73 +398,85 @@ class SpacecraftImpactMPC(Node):
                          self.object_local_velocity[0], self.object_local_velocity[1], self.object_local_velocity[2],
                          1,0,0,0]).reshape(10, 1)
         # print(f"x0: {x0}")
-
+        #Don't want to replan if we are too close to the object already
+        dist = np.linalg.norm(self.vehicle_local_position[0:3] - self.object_local_position[0:3])
         # get the reference states and corresponding times in the horizon
-        setpoints, times, impact_idx, xpre, xpost, weights, tI = self.get_setpoints()
+        setpoints, selectors, weights, end_of_int = self.get_setpoints(dist)
         # self.get_logger().info(f"setpoints: {setpoints[0][0:2].T}, pos: {self.vehicle_local_position[0:2].T}")
-
+        #self.get_logger().info(f"selectors: {selectors}")
         # solve the mpc
-        if impact_idx is None:
-            # now the initial guess has to be x_pred again, but check the size!
-            if self.initial_guess['X'] is not None:
-                self.initial_guess['X'] = self.initial_guess['X'][:,1::] if self.initial_guess['X'].shape[1] > self.mpc.N+1 else self.initial_guess['X']    
-                self.initial_guess['U'] = self.initial_guess['U'][:,1::] if self.initial_guess['U'].shape[1] > self.mpc.N else self.initial_guess['U']
-            
-
-            t = 0 if times is None or not self.started else times[0]
-            if self.plan is None:
-                id = 'none'
+        # now the initial guess has to be x_pred again, but check the size!
+        if self.initial_guess['X'] is not None:
+            self.initial_guess['X'] = self.initial_guess['X'][:,1::] if self.initial_guess['X'].shape[1] > self.mpc.N+1 else self.initial_guess['X']    
+            self.initial_guess['U'] = self.initial_guess['U'][:,1::] if self.initial_guess['U'].shape[1] > self.mpc.N else self.initial_guess['U']
+        
+        #Collision avoidance flag
+        col_avoid = False
+        approach = False
+        if self.started:
+            # Get the desired end velocity
+            _,inter_idx = self.get_pre_inter_idx((Clock().now().nanoseconds / 1000 - self.start_time) / 1e6)
+            if self.plan['dhvar'][inter_idx][0,-1] == 0:
+                v_des = np.array([0.0,0.0,0.0])
             else:
-                plan0 = interpolate_bezier(self.plan,t)
-                id = plan0['id']
-            # self.get_logger().info(f"t: {t}")
-            self.get_logger().info(f"id: {id}") if self.enable_cbf else None
-            if self.started:
-                if (id == 'pre' and tI - t <= 5) or not self.enable_cbf:
-                    enable_cbf = False
-                    xobj = None
-            else:
-                enable_cbf = True
-                xobj = xobj
-            self.get_logger().info(f"enable_cbf: {enable_cbf}") if self.enable_cbf else None
-            x_pred, u_pred = self.mpc.solve(x0,setpoints,
-                                            weights=weights,
-                                            initial_guess=self.initial_guess,
-                                            xobj=xobj,enable_cbf=enable_cbf,
-                                            logger=self.get_logger(),
-                                            verbose=False)#self.robot_name=="/pop")
+                v_des = self.plan['drvar'][inter_idx][:, -1]/self.plan['dhvar'][inter_idx][0, -1]
+                #self.get_logger().info(f"v_des: {v_des.T}") 
+            # Check if we are far from the interaction point in time and space to enable collision avoidance
+            if np.linalg.norm(self.plan['rvar'][inter_idx][0:2,0] - x0[0:2]) > 5.0 and \
+                self.plan['hvar'][inter_idx][0,0] - (Clock().now().nanoseconds / 1000 - self.start_time) / 1e6 > 10.0:
+                col_avoid = True
+            if self.plan['hvar'][inter_idx][0,0] - (Clock().now().nanoseconds / 1000 - self.start_time) / 1e6 > 2:
+                approach = True
+            if inter_idx == len(self.plan['ids']) -1:
+                # Last interaction, no need for collision avoidance
+                col_avoid = True
         else:
-            assert(xpre is not None)
-            assert(xpost is not None)
-            # now the initial guess can be the setpoints
-            self.initial_guess['X'] = np.array([setpoints]).reshape(10, self.impact_mpc.N+1)
-            # for the control input, if the previous mpc was a normal mpc, we need to add zeros 
-            # where the impact will occur
-            if self.initial_guess['U'].shape[1] < self.impact_mpc.N:
-                self.initial_guess['U'] = np.insert(self.initial_guess['U'],impact_idx,np.zeros((6,)), axis=1)
-            # print(f"setpoints:")
-            # for i in range(len(setpoints)):
-            #     print(f"[{i}]: {setpoints[i].T}")
-
-            x_pred, u_pred = self.impact_mpc.solve(x0,xpre,xpost,
-                                                   impact_idx,setpoints,times,
-                                                   weights=weights,
-                                                   initial_guess=self.initial_guess,
-                                                   verbose=False)
+            v_des = np.array([0.0,0.0,0.0])
+        
+        if selectors is not None and selectors[0] == 0:
+            # During the time before the interaction we want to set the delta_V and decide if its
+            # Straight line pushing or not
+            # We don't have an else statement here, we keep the previous values if we are on an interaction
+            v = xobj[3:6,0]
+            self.delta_V = v_des - v
             
-        # if we just impacted the object, turn off the controller to prevent further pushing
-        dt_post_impact = (Clock().now().nanoseconds / 1000 - self.impact_time)/1e6
-        if self.impacted and dt_post_impact < self.post_impact_backup_duration:
-            # self.get_logger().info('Impact detected, stopping controller')
-            # self.replanned = False
-            u_pred = np.zeros_like(u_pred)
-        if self.impacted and dt_post_impact >= self.post_impact_backup_duration:
-            # self.get_logger().info('Impact passed, starting controller again!')
-            self.impact_time = 0
-            self.impacted = False
-            self.replanned = False
+            v_norm = np.linalg.norm(v)
+            dv_norm = np.linalg.norm(self.delta_V)
+            # If the object is almost still, we consider it a straight push
+            if v_norm < 0.05:
+                self.straight = True
+            else:
+                # Project delta_V onto v to get the parallel component
+                p = v * np.dot(self.delta_V ,v )/(v_norm**2 + 1e-15)
+                # Get the tangential component
+                t = self.delta_V - p
+                ratio = np.linalg.norm(t)/(dv_norm + 1e-15)
+                # If the tangential component is more than 10% of the total, we consider it not straight
+                if ratio > 0.1:
+                    self.straight = False
+                else:
+                    self.straight = True
 
+        elif selectors is None:
+            # We have not started yet
+            self.delta_V = np.array([0.0,0.0,0.0])
+            self.straight = True
+        #print(f"v_des: {v_des.T}")
+        x_pred, u_pred = self.mpc.solve(x0,setpoints,
+                                        weights=weights,
+                                        initial_guess=self.initial_guess,
+                                        xobj=xobj,
+                                        logger=self.get_logger(),
+                                        verbose=False,selectors=selectors,delta_V=self.delta_V, v_des=v_des, straight = self.straight, col_avoid=col_avoid, approach=approach, end_of_int=end_of_int)
+        
         self.initial_guess = {'X': x_pred, 'U': u_pred}
+
+        # log data
+        if self.started:
+            self.log_data['t'].append((Clock().now().nanoseconds / 1000 - self.start_time) / 1e6)
+            self.log_data['x'].append(x0.flatten())
+            self.log_data['xobj'].append(xobj.flatten())
+            self.log_data['inter'].append(selectors[0] if selectors is not None else -1)
 
         # predicted_path_msg = Path()
         # for idx in range(x_pred.shape[1]):
@@ -512,34 +501,47 @@ class SpacecraftImpactMPC(Node):
         if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             self.publish_rate_setpoint(u_pred)
         
-        # print(f"Time elapsed: {time.time() - t0}")
-        # if time.time() - t0 > self.timer_period:
-        #     self.get_logger().info(f"LOOP TOOK TOO LONG: {time.time() - t0} (timer_period: {self.timer_period})")
+        #print(f"Time elapsed: {time.time() - t0}")
+        if time.time() - t0 > self.timer_period:
+            self.get_logger().info(f"LOOP TOOK TOO LONG: {time.time() - t0} (timer_period: {self.timer_period})")
             
     def add_set_plan_callback(self, request, response):
-        self.get_logger().info('Received request')
-        # self.plan = BezierPlan2NumpyArray(request.plan)
+        #Save the robot plan
         self.plan = VerboseBezierPlan2NumpyArray(request.plan)
-        # print some info
-        # self.get_logger().info(f"Number of bezier segments: {len(self.plan['rvar'])}")
-        # self.get_logger().info(f"Number of control points: {self.plan['rvar'][0].shape[1]}")
-        # self.get_logger().info(f"Segment ids: {self.plan['ids']}")
-        # create the entire path and publish it to rviz
+        
+        if request.replanned:
+            #Save the object plan with new times
+            self.plan_object = VerboseBezierPlan2NumpyArray(request.object_plan)
+        self.publish_plan(request.replanned)
+        return response
+    
+    def publish_plan(self,replanned):
+        if not replanned:
+            start = 0
+            stop = -1
+            pub = self.entire_path_pub
+            path_id = 'entire'
+        else:
+            t = (Clock().now().nanoseconds / 1000 - self.start_time) / 1e6
+            start,_ = self.get_pre_inter_idx(t)
+            stop = start +1
+            pub = self.replanned_path_pub
+            path_id = 'replanned'
+
         try:
             N = 100
-            ts = np.linspace(self.plan['hvar'][0][0,0],self.plan['hvar'][-1][0,-1],N)
-            entire_path_msg = Path()
+            ts = np.linspace(self.plan['hvar'][start][0,0],self.plan['hvar'][stop][0,-1],N)
+            path_msg = Path()
             for t in ts:
                 plani = interpolate_bezier(self.plan,t)
                 posei = vector2PoseMsg('world', np.array([plani['q'][0], plani['q'][1], -0.01]), np.array([1.0, 0.0, 0.0, 0.0]))
-                entire_path_msg.header = posei.header
-                entire_path_msg.poses.append(posei)
-            self.get_logger().info('Publishing the entire path')
-            self.entire_path_pub.publish(entire_path_msg)
+                path_msg.header = posei.header
+                path_msg.poses.append(posei)
+            #self.get_logger().info(f'Publishing the {path_id} path')
+            pub.publish(path_msg)
         except Exception as e:
-            self.get_logger().info(f"Could not publish the entire path: {e}")
-
-        return response
+            self.get_logger().info(f"Could not publish the {path_id} path: {e}")
+        
 
     def execute_plan_callback(self, msg):
         self.get_logger().info('Starting executing the plan')
@@ -552,8 +554,58 @@ class SpacecraftImpactMPC(Node):
                 self.started = True
                 self.start_time = Clock().now().nanoseconds / 1000
         
+    def get_pre_inter_idx(self,t):
+        """
+        Get the index of the next pre-impact bezier segment and the impact time tI.
+        Args:
+            t: current time
+        Returns:
+            pre_idx: index of the next pre-impact bezier segment
+        """
+        try:
+            # Get all indices where the id is 'pre'
+            pre_indices = [i for i, x in enumerate(self.plan['ids']) if x == 'pre']
+            # Get the end times of all pre-impact beziers
+            pre_tIs = [self.plan['hvar'][i][0,-1] for i in pre_indices]
+            # impacts may only occur in the future, so we find the first for which tI > t
+            pre_idx = next((pre_indices[i] for i, tI in enumerate(pre_tIs) if tI > t), -1)
+        except:
+            pre_idx = -1
+        try:
+            # Get all indices where the id is 'inter'
+            inter_indices = [i for i, x in enumerate(self.plan['ids']) if x == 'inter']
+            # Get the end times of all pre-impact beziers
+            inter_tIs = [self.plan['hvar'][i][0,-1] for i in inter_indices]
+            # impacts may only occur in the future, so we find the first for which tI > t
+            inter_idx = next((inter_indices[i] for i, tI in enumerate(inter_tIs) if tI > t), -1)
+        except:
+            inter_idx = -1
+        return pre_idx, inter_idx
 
+    def save_logs_callback(self, msg):
+        run_nr = int(msg.timestamp)
+        self.get_logger().info("Saving log data")
+        # base directory for this scenario
+        base_dir = os.path.expanduser(
+            f"~/space_ws/src/impact_stl/impact_stl/saved_logs/{self.scenario_name}"
+        )
+        os.makedirs(base_dir, exist_ok=True)
 
+        # robot name without the leading slash
+        robot = self.robot_name[1:]
+
+        # final path
+        path = os.path.join(base_dir, f"{robot}_{run_nr}.npz")
+
+        try:
+            np.savez(path, **self.log_data)
+            self.get_logger().info(f"Saved log to {path}")
+            # saving the plan as well
+            plan_path = os.path.join(base_dir, f"{robot}_replan_{run_nr}.npz")
+            np.savez(plan_path, rvars=self.plan['rvar'], hvars=self.plan['hvar'],drvars = self.plan['drvar'], dhvars=self.plan['dhvar'], ids=self.plan['ids'], other_names=self.plan['other_names'])
+            self.get_logger().info(f"Saved plan to {plan_path}")
+        except Exception as e:
+            self.get_logger().error(f"Failed to save log, {e}")
 def main(args=None):
     rclpy.init(args=args)
     spacecraft_mpc = SpacecraftImpactMPC()
