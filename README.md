@@ -17,18 +17,50 @@ The only proprietary dependency is `gurobi` which is only required for `impact_s
 ## Just the planner
 If you have a `gurobi` license and you are interested in only generating the motion plans, you can build a virtual environment using the `environment.yml` file in `impact_stl/planner`
 
-```conda env create -f environment.yml```
+```
+conda env create -f environment.yml
+```
 
 
 ## The whole deal
 To run the SITL or hardware simulations, I have provided a DockerFile in `DockerFiles`. This image requires approximately 15Gb of storage as it installs, among others, `ros2`, `gazebo`, and `px4-space-systems`.
 
-```docker build -t impact_stl:latest -f DockerFiles/Dockerfile .```
+```
+docker build -t impact_stl:latest -f DockerFiles/Dockerfile . 
+```
 
-```docker run -it --gpus all --network=host --ipc=host -e DISPLAY=$DISPLAY -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=all -e QT_X11_NO_MITSHM=1 -v /tmp/.X11-unix:/tmp/.X11-unix:rw -v /dev/dri:/dev/dri -e XDG_RUNTIME_DIR=/tmp/runtime-root --runtime=nvidia -v /home/none/gits/PROJECTS/impact_stl:/home/px4space/space_ws/src/impact_stl --name impact_stl_cont impact_stl```
+``` 
+  docker run -it \
+  --network=host \
+  --ipc=host \
+  -e DISPLAY=$DISPLAY \
+  -e QT_X11_NO_MITSHM=1 \
+  -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+  -v /dev/dri:/dev/dri \
+  -e XDG_RUNTIME_DIR=/tmp/runtime-root \
+  -v /home/DA236X_Master_Thesis/impact_stl:/home/px4space/space_ws/src/impact_stl \
+  --name impact_stl_cont \
+  impact_stl:latest 
+  ```
 
-The last argument links your local clone of the `impact_stl` repository to the Docker container. You can change the path to your local clone of the repository.
+The last argument links your local clone of the `impact_stl` package (not the repository) to the Docker container. You can change the path to your local clone of the package.
 
+After creating the container you can run it with 
+```
+docker start -ai impact_stl_cont
+```
+And attach more shells using 
+
+```
+docker exec -it impact_stl_cont /bin/bash 
+```
+
+Finally, to ensure we get the correct ros packages and gazebo worlds 
+```
+cp -f -r ~/space_ws/src/impact_stl/resource/my_msgs/ ~/space_ws/src/ 
+cp -f -r ~/space_ws/src/impact_stl/resource/px4-offboard/ ~/space_ws/src/ 
+cp -f -r ~/space_ws/src/impact_stl/resource/worlds/frictionless_kth* /home/px4space/PX4/PX4-Space-Systems/Tools/simulation/gz/worlds 
+```
 # Running the code
 ## Planner
 To run the planner, you need to activate the conda environment and run the `main.py` script. 
@@ -58,27 +90,30 @@ In any directory, run the following command to start the micro-ROS agent:
 
 ### SITL launch file
 Go to the `space_ws` directory, and build the workspace:
-```colcon build```
+```colcon build --symlink-install```
 
 Source the workspace:
 ```source install/setup.bash```
 
 Then, run the following command to start the PX4 autopilot in SITL mode:
-```ros2 launch impact_stl sitl_obstacle_avoidance.launch.py```
+```ros2 launch impact_stl sitl_test1.launch.py```
 
 ### Scenario launch file
 In the `impact_stl` directory, run the following command to start the scenario:
-```ros2 launch impact_stl obstacle_avoidance.launch.py```
+```ros2 launch impact_stl test1.launch.py```
 
 ### Start launch file
 In the `impact_stl` directory, run the following command to start the simulation:
 ```ros2 launch impact_stl start_scenario.launch.py```
 
+### Additional Scenarios
+There are 5 total scenarios, out which 1-4 are currently working well. The final scenario called final_test highlight some of flaws that are still present in the stack.
+
 # Hardware
 If you have access to the ATMOS platform, you can also run the code on the platforms. The only difference is that you need to launch the `hw_obstacle_avoidance.launch.py` file instead of the `sitl_obstacle_avoidance.launch.py` file (and you can skip micro-ros as this is run on the robots).
 
 Some things to note:
-- You might need to change the restitution coefficient in the planner and replaner to match the hardware. We recently changed the robot's bumpers, so I will update these values soon.
+- You might need to change the restitution coefficient in the planner and replanner to match the hardware. We recently changed the robot's bumpers, so I will update these values soon.
 
 ![hippo](media/pong_4.gif)
 
