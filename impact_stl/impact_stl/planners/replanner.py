@@ -10,7 +10,6 @@ from rclpy.node import Node
 from rclpy.clock import Clock
 from impact_stl.helpers.qos_profiles import NORMAL_QOS, RELIABLE_QOS, RELIABLE_QOS_2
 import os
-import cvxpy as cp
 import copy
 
 from px4_msgs.msg import VehicleAngularVelocity
@@ -23,7 +22,7 @@ from my_msgs.msg import StampedBool, Replan, TimeShift
 from ament_index_python.packages import get_package_share_directory
 
 from impact_stl.planners.main_planner import MinimalClientAsync, plan_to_plan_msg
-from impact_stl.helpers.beziers import get_derivative_control_points_gurobi, get_derivative_control_points_cvxpy
+from impact_stl.helpers.beziers import get_derivative_control_points_gurobi
 from impact_stl.helpers.read_write_plan import csv_to_plan, plan_to_csv
 #from impact_stl.helpers.solve_two_body_impact import solve_two_body_impact
 from impact_stl.helpers.plot_rvars_hvars import plot_rvars_hvars
