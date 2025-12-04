@@ -63,8 +63,8 @@ class SpacecraftImpactMPC(Node):
         self.scenario_name = self.declare_parameter('scenario_name', 'throw_and_catch').value
         self.enable_cbf =self.declare_parameter('enable_cbf', False).value
         self.get_logger().info(f"robot_name: {self.robot_name}, object_ns: {self.object_ns}, enable_cbf: {self.enable_cbf}")
-        self.gz = self.declare_parameter('gz', True).value
-        gz_suffix = '_gz' if self.gz else ''
+        self.hw = self.declare_parameter('hw', False).value
+        gz_suffix = '_gz' if not self.hw else ''
 
         # get initial state from passed parameters
         self.x0 = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -105,6 +105,7 @@ class SpacecraftImpactMPC(Node):
             f'{self.object_ns}/fmu/out/vehicle_local_position{gz_suffix}',
             self.object_local_position_callback,
             NORMAL_QOS)
+        # Object is always from gz, both SITL and HW we take form the gz bridge
         
         # Bezier planner stuff
         self.execute_plan_sub = self.create_subscription(
@@ -337,20 +338,23 @@ class SpacecraftImpactMPC(Node):
                 selectors.append(1 if plani['id']=='inter' else 0)
             
             # Check if no interaction on Horizon and next interaction is ours, dist is to not get stuck in replann - CBF loop
-            if all(selectors[i]==0 for i in range(len(selectors))) \
-                and self.plan_object['other_names'][self.get_object_next_inter(t)] in self.robot_name \
-                and dist > 0.6:
-                #self.get_logger().info('Calling Replanning Service in ff_rate_mpc_impact')
-                #Cooldown for the replanner so we don't spam it
-                if Clock().now().nanoseconds/1e9 - self.last_replan_time > self.cooldown_replanner:
-                    self.last_replan_time = Clock().now().nanoseconds/1e9
-                    msg = Replan()
-                    msg.starttime = int(self.start_time)
-                    msg.robot_plan = plan_to_plan_msg(self.plan['rvar'], self.plan['hvar'], self.plan['ids'], self.plan['other_names'])
-                    msg.object_plan = plan_to_plan_msg(self.plan_object['rvar'], self.plan_object['hvar'], self.plan_object['ids'], self.plan_object['other_names'])
-                    #self.get_logger().info(f"next interaction index of the object: {self.get_object_next_inter(t)}")
-                    #self.get_logger().info(f"type of next interaction index of the object: {type(self.get_object_next_inter(t))}")
-                    self.publisher_recompute_local_plan.publish(msg)
+            ## NOTE: Disabling this for hw testing since we are not using interactions 
+            if self.scenario_name != 'hw_test': # Turnning this of for now since we are hw_testing without interactions
+
+                if all(selectors[i]==0 for i in range(len(selectors))) \
+                    and self.plan_object['other_names'][self.get_object_next_inter(t)] in self.robot_name \
+                    and dist > 0.6:
+                    #self.get_logger().info('Calling Replanning Service in ff_rate_mpc_impact')
+                    #Cooldown for the replanner so we don't spam it
+                    if Clock().now().nanoseconds/1e9 - self.last_replan_time > self.cooldown_replanner:
+                        self.last_replan_time = Clock().now().nanoseconds/1e9
+                        msg = Replan()
+                        msg.starttime = int(self.start_time)
+                        msg.robot_plan = plan_to_plan_msg(self.plan['rvar'], self.plan['hvar'], self.plan['ids'], self.plan['other_names'])
+                        msg.object_plan = plan_to_plan_msg(self.plan_object['rvar'], self.plan_object['hvar'], self.plan_object['ids'], self.plan_object['other_names'])
+                        #self.get_logger().info(f"next interaction index of the object: {self.get_object_next_inter(t)}")
+                        #self.get_logger().info(f"type of next interaction index of the object: {type(self.get_object_next_inter(t))}")
+                        self.publisher_recompute_local_plan.publish(msg)
 
 
             #Checking if we are on an interaction and the end of the interaction is on the horizon
