@@ -555,7 +555,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         world.spec = Spec(t0=0,tf=tf)
         bz = 2
         
-        robot1 = Robot(name="snap",
+        robot1 = Robot(name="pop",
                        x0=np.array([1,0]),
                        dx0=np.array([0,0]),
                        xf=np.array([2.5,0]),

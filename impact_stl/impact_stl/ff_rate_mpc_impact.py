@@ -9,7 +9,7 @@ import os
 
 from planner.utilities.beziers import value_bezier, eval_t, get_derivative_control_points_gurobi
 from impact_stl.helpers.read_write_plan import csv_to_plan
-
+from scipy.spatial.transform import Rotation as R
 from rclpy.node import Node
 from rclpy.clock import Clock
 from impact_stl.helpers.qos_profiles import NORMAL_QOS, RELIABLE_QOS, RELIABLE_QOS_2
@@ -81,6 +81,11 @@ class SpacecraftImpactMPC(Node):
         self.status_sub = self.create_subscription(
             VehicleStatus,
             'fmu/out/vehicle_status',
+            self.vehicle_status_callback,
+            NORMAL_QOS)
+        self.status_sub = self.create_subscription(
+            VehicleStatus,
+            'fmu/out/vehicle_status_v1',
             self.vehicle_status_callback,
             NORMAL_QOS)
         self.attitude_sub = self.create_subscription(
@@ -159,8 +164,8 @@ class SpacecraftImpactMPC(Node):
         self.publisher_offboard_mode = self.create_publisher(OffboardControlMode, 'fmu/in/offboard_control_mode', NORMAL_QOS)
         self.publisher_rates_setpoint = self.create_publisher(VehicleRatesSetpoint, 'fmu/in/vehicle_rates_setpoint', NORMAL_QOS)
         
-        #self.predicted_path_pub = self.create_publisher(Path, 'impact_stl/predicted_path', 10)
-        #self.reference_path_pub = self.create_publisher(Path, "impact_stl/reference_path", 10)
+        self.predicted_path_pub = self.create_publisher(Path, 'impact_stl/predicted_path', 10)
+        self.reference_path_pub = self.create_publisher(Path, "impact_stl/reference_path", 10)
         
         self.entire_path_pub = self.create_publisher(Path, "impact_stl/entire_path", 10)
         self.replanned_path_pub = self.create_publisher(Path, "impact_stl/replanned_path", 10)
@@ -239,31 +244,45 @@ class SpacecraftImpactMPC(Node):
 
     def vehicle_attitude_callback(self, msg):
         # TODO: handle NED->ENU transformation
-        self.vehicle_attitude[0] = msg.q[0]
-        self.vehicle_attitude[1] = msg.q[1]
-        self.vehicle_attitude[2] = -msg.q[2]
-        self.vehicle_attitude[3] = -msg.q[3]
+        # q = R.from_euler('z', -np.pi/2)
+        # q_msg = R.from_quat([msg.q[0], msg.q[1], msg.q[2], msg.q[3]], scalar_first=True)  # wxyz
+        # q_total = q * q_msg
+        # self.vehicle_attitude = q_total.as_quat(scalar_first=True)
+        # self.vehicle_attitude[0] = q[0]
+        # self.vehicle_attitude[1] = q[1]
+        # self.vehicle_attitude[2] = q[2]
+        # self.vehicle_attitude[3] = q[3]
+        self.vehicle_attitude = self.q_ned_to_q_enu(np.array([msg.q[0], msg.q[1], msg.q[2], msg.q[3]]))
 
     def vehicle_local_position_callback(self, msg):
         # TODO: handle NED->ENU transformation
-        self.vehicle_local_position[0] = msg.x
-        self.vehicle_local_position[1] = -msg.y
+        self.vehicle_local_position[0] = msg.y
+        self.vehicle_local_position[1] = msg.x
         self.vehicle_local_position[2] = -msg.z
-        self.vehicle_local_velocity[0] = msg.vx
-        self.vehicle_local_velocity[1] = -msg.vy
+        self.vehicle_local_velocity[0] = msg.vy
+        self.vehicle_local_velocity[1] = msg.vx
         self.vehicle_local_velocity[2] = -msg.vz
 
     def object_local_position_callback(self, msg):
         # TODO: handle NED->ENU transformation
-        self.object_local_position[0] = msg.x
-        self.object_local_position[1] = -msg.y
+        self.object_local_position[0] = msg.y
+        self.object_local_position[1] = msg.x
         self.object_local_position[2] = -msg.z
-        self.object_local_velocity[0] = msg.vx
-        self.object_local_velocity[1] = -msg.vy
+        self.object_local_velocity[0] = msg.vy
+        self.object_local_velocity[1] = msg.vx
         self.object_local_velocity[2] = -msg.vz
+
+    def q_ned_to_q_enu(self, q_ned):
+        # Convert NED quaternion to ENU quaternion
+        # q is in the form (qw, qx, qy, qz) and describes the rotation from body frame to global frame
+        # Yes, NED <-> ENU  is symmetric
+        q_enu = 1/np.sqrt(2) * np.array([q_ned[0] + q_ned[3], q_ned[1] + q_ned[2], q_ned[1] - q_ned[2], q_ned[0] - q_ned[3]])
+        q_enu /= np.linalg.norm(q_enu)
+        return q_enu.astype(float)
 
     def vehicle_angular_velocity_callback(self, msg):
         # TODO: handle NED->ENU transformation
+        # NOTE: Not correct format
         self.vehicle_angular_velocity[0] = msg.xyz[0]
         self.vehicle_angular_velocity[1] = -msg.xyz[1]
         self.vehicle_angular_velocity[2] = -msg.xyz[2]
@@ -282,9 +301,10 @@ class SpacecraftImpactMPC(Node):
         rates_setpoint_msg.roll  = float(thrust_rates[3])
         rates_setpoint_msg.pitch = -float(thrust_rates[4])
         rates_setpoint_msg.yaw   = -float(thrust_rates[5])
-        rates_setpoint_msg.thrust_body[0] = float(thrust_command[0])
-        rates_setpoint_msg.thrust_body[1] = -float(thrust_command[1])
-        rates_setpoint_msg.thrust_body[2] = -float(thrust_command[2])
+        # Might ened to switch these for right frame conversion
+        rates_setpoint_msg.thrust_body[0] = float(thrust_command[0])/2.8
+        rates_setpoint_msg.thrust_body[1] = -float(thrust_command[1])/2.8
+        rates_setpoint_msg.thrust_body[2] = -float(thrust_command[2])/2.8
         self.publisher_rates_setpoint.publish(rates_setpoint_msg)
 
 
@@ -474,7 +494,12 @@ class SpacecraftImpactMPC(Node):
                                         verbose=False,selectors=selectors,delta_V=self.delta_V, v_des=v_des, straight = self.straight, col_avoid=col_avoid, approach=approach, end_of_int=end_of_int)
         
         self.initial_guess = {'X': x_pred, 'U': u_pred}
-
+        # print('x0',x0[0:3].flatten())
+        # print('setpoints',setpoints[0][0:3].flatten())
+        # print(Quaternion2Euler(x0[6:10,0]))
+        # print('quat', x0[6:10,0])
+        
+        print('u_pred[:,0]:', u_pred[:,0])
         # log data
         if self.started:
             self.log_data['t'].append((Clock().now().nanoseconds / 1000 - self.start_time) / 1e6)
@@ -482,25 +507,29 @@ class SpacecraftImpactMPC(Node):
             self.log_data['xobj'].append(xobj.flatten())
             self.log_data['inter'].append(selectors[0] if selectors is not None else -1)
 
-        # predicted_path_msg = Path()
-        # for idx in range(x_pred.shape[1]):
-        #     # print(f"idx: {idx}, x_pred: {x_pred[:,idx]}")
-        #     predicted_state = x_pred[:,idx]
-        #     # Publish time history of the vehicle path
-        #     predicted_pose_msg = vector2PoseMsg('map', predicted_state[0:3], np.array([1.0, 0.0, 0.0, 0.0]))
-        #     predicted_path_msg.header = predicted_pose_msg.header
-        #     predicted_path_msg.poses.append(predicted_pose_msg)
-        # self.predicted_path_pub.publish(predicted_path_msg)
+        predicted_path_msg = Path()
+        # print('x_pred[0]:', x_pred[0:3,0])    
+        # print('x_pred[1]:', x_pred[0:3,0:10])
 
-        # setpoint_path_msg = Path()
-        # for idx in range(len(setpoints)):
-        #     setpoint = setpoints[idx]
-        #     # print(f"setpoint[{idx}]: {setpoint[0:3]}")
-        #     # Publish time history of the vehicle path
-        #     setpoint_pose_msg = vector2PoseMsg('map', setpoint[0:3], np.array([1.0, 0.0, 0.0, 0.0]))
-        #     setpoint_path_msg.header = setpoint_pose_msg.header
-        #     setpoint_path_msg.poses.append(setpoint_pose_msg)
-        # self.reference_path_pub.publish(setpoint_path_msg)
+    
+        for idx in range(x_pred.shape[1]):
+            # print(f"idx: {idx}, x_pred: {x_pred[:,idx]}")
+            predicted_state = x_pred[:, idx]
+            # Publish time history of the vehicle path
+            predicted_pose_msg = vector2PoseMsg('world', predicted_state[0:3], np.array([1.0, 0.0, 0.0, 0.0]))
+            predicted_path_msg.header = predicted_pose_msg.header
+            predicted_path_msg.poses.append(predicted_pose_msg)
+        self.predicted_path_pub.publish(predicted_path_msg)
+#       
+        setpoint_path_msg = Path()
+        for idx in range(len(setpoints)):
+            setpoint = setpoints[idx]
+            # print(f"setpoint[{idx}]: {setpoint[0:3]}")
+            # Publish time history of the vehicle path
+            setpoint_pose_msg = vector2PoseMsg('world', setpoint[0:3], np.array([1.0, 0.0, 0.0, 0.0]))
+            setpoint_path_msg.header = setpoint_pose_msg.header
+            setpoint_path_msg.poses.append(setpoint_pose_msg)
+        self.reference_path_pub.publish(setpoint_path_msg)
 
         if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             self.publish_rate_setpoint(u_pred)

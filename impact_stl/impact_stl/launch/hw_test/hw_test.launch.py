@@ -14,14 +14,14 @@ def generate_launch_description():
         # MPC controller
         Node(
             package='impact_stl',
-            namespace='snap',
+            namespace='pop',
             executable='ff_rate_mpc_impact', # spacecraft_mpc, spacecraft_impact_mpc
             name='snap_mpc',
             output='screen',
             emulate_tty=True,
             parameters=[{'x0':1.0, 'y0':0.0, 'z0':0.0, 'vx0':0.0, 'vy0':0.0, 'vz0':0.0},
                         {'scenario_name':'hw_test'},
-                        {'object_ns':'/pop'},
+                        {'object_ns':'/snap'},
                         {'enable_cbf':True},
                         {'hw':False}] # NOTE: This must be True to use mocap/PX4 data for object
         ),
@@ -42,7 +42,7 @@ def generate_launch_description():
         # Bezier planner
         Node(
             package='impact_stl',
-            namespace='snap',
+            namespace='pop',
             executable='main_planner',
             name='snap_planner',
             output='screen',

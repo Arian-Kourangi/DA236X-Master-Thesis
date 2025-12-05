@@ -35,20 +35,20 @@ def generate_launch_description():
             name='visualizer_1',
     )),
 
-    # camera 
-    ld.add_action(Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='static_tf_world_to_inertial',
-            arguments=['0', '0', '0', '0', '0', '0', 'world', 'inertial']
-        )),
-    ld.add_action(Node(
-                package='tf2_ros',
-                executable='static_transform_publisher',
-                name='static_tf_world_to_camera',
-                # arguments=['0', '0', '2.5', '0', '0.4349655', '0', '0.9', 'world', 'camera_link'] # camera 1
-                arguments=['2', '1.9', '2.3', '0.3010647', '0.3013046', '-0.6395013', '0.6400107', 'world', 'camera_link'] # camera 2
-        )),
+#    # camera 
+#    ld.add_action(Node(
+#            package='tf2_ros',
+#            executable='static_transform_publisher',
+#            name='static_tf_world_to_inertial',
+#            arguments=['0', '0', '0', '0', '0', '0', 'world', 'inertial']
+#        )),
+#    ld.add_action(Node(
+#                package='tf2_ros',
+#                executable='static_transform_publisher',
+#                name='static_tf_world_to_camera',
+#                # arguments=['0', '0', '2.5', '0', '0.4349655', '0', '0.9', 'world', 'camera_link'] # camera 1
+#                arguments=['2', '1.9', '2.3', '0.3010647', '0.3013046', '-0.6395013', '0.6400107', 'world', 'camera_link'] # camera 2
+#        )),
 
 
     # Rviz while loading a config file (valid for all three spacecrafts)
@@ -72,29 +72,30 @@ def generate_launch_description():
     # .../fmu/out/vehicle_local_position to .../fmu/out/vehicle_local_position_gz
     # or vice-versa. Keep care of the namespace and robot_prefix parameters!!!
     # snap
-    ld.add_action(Node(
-            package='impact_stl',
-            executable='odom_to_vehicle_local_position',
-            namespace='snap',
-            output='screen',
-            parameters=[{'topic_name': '/snap/odom'}]
-    ))
-    # crackle
-    ld.add_action(Node(
-            package='impact_stl',
-            executable='odom_to_vehicle_local_position',
-            namespace='crackle',
-            output='screen',
-            parameters=[{'topic_name': '/crackle/odom'}]
-    ))
-    # pop
-    ld.add_action(Node(
-            package='impact_stl',
-            executable='odom_to_vehicle_local_position',
-            namespace='pop',
-            output='screen',
-            parameters=[{'topic_name': '/pop/odom'}]
-    ))
+    
+#     ld.add_action(Node(
+#             package='impact_stl',
+#             executable='odom_to_vehicle_local_position',
+#             namespace='snap',
+#             output='screen',
+#             parameters=[{'topic_name': '/snap/odom'}]
+#     ))
+#     # crackle
+#     ld.add_action(Node(
+#             package='impact_stl',
+#             executable='odom_to_vehicle_local_position',
+#             namespace='crackle',
+#             output='screen',
+#             parameters=[{'topic_name': '/crackle/odom'}]
+#     ))
+#     # pop
+#     ld.add_action(Node(
+#             package='impact_stl',
+#             executable='odom_to_vehicle_local_position',
+#             namespace='pop',
+#             output='screen',
+#             parameters=[{'topic_name': '/pop/odom'}]
+#     ))
 
     return ld
 
