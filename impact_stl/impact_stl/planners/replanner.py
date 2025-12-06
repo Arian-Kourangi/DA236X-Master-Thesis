@@ -166,24 +166,24 @@ class RePlanner(Node):
             self.object_local_position_time_stack[:,-1] = msg.timestamp
         else:
             self.object_local_position_time_stack[:,-1] = msg.timestamp_sample
-        self.object_local_position[0] = msg.x
-        self.object_local_position[1] = -msg.y
+        self.object_local_position[0] = msg.y
+        self.object_local_position[1] = msg.x
         self.object_local_position[2] = -msg.z
         self.object_local_position_stack[:,0:-1] = self.object_local_position_stack[:,1:]
         self.object_local_position_stack[:,-1] = self.object_local_position
-        self.object_local_velocity[0] = msg.vx
-        self.object_local_velocity[1] = -msg.vy
+        self.object_local_velocity[0] = msg.vy
+        self.object_local_velocity[1] = msg.vx
         self.object_local_velocity[2] = -msg.vz
         self.object_local_velocity_stack[:,0:-1] = self.object_local_velocity_stack[:,1:]
         self.object_local_velocity_stack[:,-1] = self.object_local_velocity
 
     def robot_local_position_callback(self, msg):
         self.robot_local_time = msg.timestamp_sample
-        self.robot_local_position[0] = msg.x
-        self.robot_local_position[1] = -msg.y
+        self.robot_local_position[0] = msg.y
+        self.robot_local_position[1] = msg.x
         self.robot_local_position[2] = -msg.z
-        self.robot_local_velocity[0] = msg.vx
-        self.robot_local_velocity[1] = -msg.vy
+        self.robot_local_velocity[0] = msg.vy
+        self.robot_local_velocity[1] = msg.vx
         self.robot_local_velocity[2] = -msg.vz
         
     def time_shift_callback(self, msg):
@@ -602,9 +602,9 @@ class RePlanner(Node):
         J += (1-s)*1e5 * eps**2  # Penalty for non-parallelism of ending position vector
         ## For pre curve we can have smaller weights
         for i in range(ddrvars[0].shape[1]):
-            J += 1*cs.sumsqr(ddrvars[0][:,i])
+            J += 20*cs.sumsqr(ddrvars[0][:,i])
         for i in range(ddhvars[0].shape[1]):
-            J += 1*cs.sumsqr(ddhvars[0][0,i])
+            J += 20*cs.sumsqr(ddhvars[0][0,i])
     
         # For interaction curve we want to minimize acceleration more
         w_acc = 2*1e2

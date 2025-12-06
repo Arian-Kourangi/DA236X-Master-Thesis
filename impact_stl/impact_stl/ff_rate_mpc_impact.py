@@ -238,27 +238,49 @@ class SpacecraftImpactMPC(Node):
 
     def vehicle_attitude_callback(self, msg):
         # TODO: handle NED->ENU transformation
-        self.vehicle_attitude[0] = msg.q[0]
-        self.vehicle_attitude[1] = msg.q[1]
-        self.vehicle_attitude[2] = -msg.q[2]
-        self.vehicle_attitude[3] = -msg.q[3]
+        #self.vehicle_attitude[0] = msg.q[0]
+        #self.vehicle_attitude[1] = msg.q[1]
+        #self.vehicle_attitude[2] = -msg.q[2]
+        #self.vehicle_attitude[3] = -msg.q[3]
+        self.vehicle_attitude = self.q_ned_to_q_enu(np.array([msg.q[0], msg.q[1], msg.q[2], msg.q[3]]))
+        
+        #T = np.array([
+        #    [0, 1, 0],
+        #    [1, 0, 0],
+        #    [0, 0,-1],
+        #])
+        #
+        #r_ned = R.from_quat([msg.q[1], msg.q[2], msg.q[3], msg.q[0]])  # scipy uses (x,y,z,w)
+        #R_ned_b = r_ned.as_matrix()
+        #R_enu_b = T @ R_ned_b
+        #r_enu = R.from_matrix(R_enu_b)
+        #x_e, y_e, z_e, w_e = r_enu.as_quat()  # scipy uses (x,y,z,w)
+        #self.vehicle_attitude = np.array([w_e, x_e, y_e, z_e])
+    
+    def q_ned_to_q_enu(self, q_ned):
+        # Convert NED quaternion to ENU quaternion
+        # q is in the form (qw, qx, qy, qz) and describes the rotation from body frame to global frame
+        # Yes, NED <-> ENU  is symmetric
+        q_enu = 1/np.sqrt(2) * np.array([q_ned[0] + q_ned[3], q_ned[1] + q_ned[2], q_ned[1] - q_ned[2], q_ned[0] - q_ned[3]])
+        q_enu /= np.linalg.norm(q_enu)
+        return q_enu.astype(float)
 
     def vehicle_local_position_callback(self, msg):
         # TODO: handle NED->ENU transformation
-        self.vehicle_local_position[0] = msg.x
-        self.vehicle_local_position[1] = -msg.y
+        self.vehicle_local_position[0] = msg.y
+        self.vehicle_local_position[1] = msg.x
         self.vehicle_local_position[2] = -msg.z
-        self.vehicle_local_velocity[0] = msg.vx
-        self.vehicle_local_velocity[1] = -msg.vy
+        self.vehicle_local_velocity[0] = msg.vy
+        self.vehicle_local_velocity[1] = msg.vx
         self.vehicle_local_velocity[2] = -msg.vz
 
     def object_local_position_callback(self, msg):
         # TODO: handle NED->ENU transformation
-        self.object_local_position[0] = msg.x
-        self.object_local_position[1] = -msg.y
+        self.object_local_position[0] = msg.y
+        self.object_local_position[1] = msg.x
         self.object_local_position[2] = -msg.z
-        self.object_local_velocity[0] = msg.vx
-        self.object_local_velocity[1] = -msg.vy
+        self.object_local_velocity[0] = msg.vy
+        self.object_local_velocity[1] = msg.vx
         self.object_local_velocity[2] = -msg.vz
 
     def vehicle_angular_velocity_callback(self, msg):

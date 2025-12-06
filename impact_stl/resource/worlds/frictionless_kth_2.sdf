@@ -283,7 +283,7 @@
           <material>
             <diffuse>0 1 0 1</diffuse>
           </material>
-          <pose>0 2 0.005 0 0 0</pose>
+          <pose>2 0 0.005 0 0 0</pose>
         </visual>
       </link>
     </model>
@@ -300,7 +300,7 @@
           <material>
             <diffuse>0 0 1 1</diffuse>
           </material>
-          <pose> -2 0 0.005 0 0 0</pose>
+          <pose> 0 2 0.005 0 0 0</pose>
         </visual>
       </link>
     </model>
@@ -317,7 +317,7 @@
           <material>
             <diffuse>0 0 1 1</diffuse>
           </material>
-          <pose> -25 25 0.005 0 0 0</pose>
+          <pose> 25 25 0.005 0 0 0</pose>
         </visual>
       </link>
     </model>
