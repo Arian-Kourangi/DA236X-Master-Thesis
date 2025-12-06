@@ -9,7 +9,6 @@ import os
 
 from planner.utilities.beziers import value_bezier, eval_t, get_derivative_control_points_gurobi
 from impact_stl.helpers.read_write_plan import csv_to_plan
-from scipy.spatial.transform import Rotation as R
 from rclpy.node import Node
 from rclpy.clock import Clock
 from impact_stl.helpers.qos_profiles import NORMAL_QOS, RELIABLE_QOS, RELIABLE_QOS_2
@@ -93,11 +92,6 @@ class SpacecraftImpactMPC(Node):
             'fmu/out/vehicle_attitude',
             self.vehicle_attitude_callback,
             NORMAL_QOS)
-        self.angular_vel_sub = self.create_subscription(
-            VehicleAngularVelocity,
-            'fmu/out/vehicle_angular_velocity',
-            self.vehicle_angular_velocity_callback,
-            NORMAL_QOS)
         self.local_position_sub = self.create_subscription(
             VehicleLocalPosition,
             'fmu/out/vehicle_local_position',
@@ -118,15 +112,6 @@ class SpacecraftImpactMPC(Node):
             'impact_stl/execute_plan',
             self.execute_plan_callback,
             RELIABLE_QOS)
-
-
-        # Global reset detector
-        self.global_reset_sub = self.create_subscription(
-            StampedBool,
-            '/global_reset',
-            self.global_reset_callback,
-            RELIABLE_QOS)
-
 
         self.global_time_shift_sub = self.create_subscription(
             TimeShift,
@@ -194,8 +179,6 @@ class SpacecraftImpactMPC(Node):
 
         self.vehicle_attitude = np.array([1.0, 0.0, 0.0, 0.0])
         self.vehicle_local_position = np.array([0.0, 0.0, 0.0])
-        self.vehicle_angular_velocity = np.array([0.0, 0.0, 0.0])
-        self.vehicle_angular_velocity = np.array([0.0, 0.0, 0.0])
         self.vehicle_local_velocity = np.array([0.0, 0.0, 0.0])
         self.setpoint_position = np.array([0.0, 0.0, 0.0])
 
@@ -236,23 +219,18 @@ class SpacecraftImpactMPC(Node):
             #            self.plan_object['hvar'][idx][0,cp] += msg.time_shift
 
 
-    def global_reset_callback(self, msg):
-        self.get_logger().info('Global reset received')
-        self.started = False
-        self.replanned = False
-        self.t_object_coming = np.inf
-
     def vehicle_attitude_callback(self, msg):
         # TODO: handle NED->ENU transformation
-        # q = R.from_euler('z', -np.pi/2)
-        # q_msg = R.from_quat([msg.q[0], msg.q[1], msg.q[2], msg.q[3]], scalar_first=True)  # wxyz
-        # q_total = q * q_msg
-        # self.vehicle_attitude = q_total.as_quat(scalar_first=True)
-        # self.vehicle_attitude[0] = q[0]
-        # self.vehicle_attitude[1] = q[1]
-        # self.vehicle_attitude[2] = q[2]
-        # self.vehicle_attitude[3] = q[3]
         self.vehicle_attitude = self.q_ned_to_q_enu(np.array([msg.q[0], msg.q[1], msg.q[2], msg.q[3]]))
+
+    def q_ned_to_q_enu(self, q_ned):
+        # Convert NED quaternion to ENU quaternion
+        # q is in the form (qw, qx, qy, qz) and describes the rotation from body frame to global frame
+        # Yes, NED <-> ENU  is symmetric
+        q_enu = 1/np.sqrt(2) * np.array([q_ned[0] + q_ned[3], q_ned[1] + q_ned[2], q_ned[1] - q_ned[2], q_ned[0] - q_ned[3]])
+        q_enu /= np.linalg.norm(q_enu)
+        return q_enu.astype(float)
+
 
     def vehicle_local_position_callback(self, msg):
         # TODO: handle NED->ENU transformation
@@ -263,6 +241,7 @@ class SpacecraftImpactMPC(Node):
         self.vehicle_local_velocity[1] = msg.vx
         self.vehicle_local_velocity[2] = -msg.vz
 
+
     def object_local_position_callback(self, msg):
         # TODO: handle NED->ENU transformation
         self.object_local_position[0] = msg.y
@@ -272,20 +251,6 @@ class SpacecraftImpactMPC(Node):
         self.object_local_velocity[1] = msg.vx
         self.object_local_velocity[2] = -msg.vz
 
-    def q_ned_to_q_enu(self, q_ned):
-        # Convert NED quaternion to ENU quaternion
-        # q is in the form (qw, qx, qy, qz) and describes the rotation from body frame to global frame
-        # Yes, NED <-> ENU  is symmetric
-        q_enu = 1/np.sqrt(2) * np.array([q_ned[0] + q_ned[3], q_ned[1] + q_ned[2], q_ned[1] - q_ned[2], q_ned[0] - q_ned[3]])
-        q_enu /= np.linalg.norm(q_enu)
-        return q_enu.astype(float)
-
-    def vehicle_angular_velocity_callback(self, msg):
-        # TODO: handle NED->ENU transformation
-        # NOTE: Not correct format
-        self.vehicle_angular_velocity[0] = msg.xyz[0]
-        self.vehicle_angular_velocity[1] = -msg.xyz[1]
-        self.vehicle_angular_velocity[2] = -msg.xyz[2]
 
     def vehicle_status_callback(self, msg):
         # print("NAV_STATUS: ", msg.nav_state)
@@ -302,9 +267,10 @@ class SpacecraftImpactMPC(Node):
         rates_setpoint_msg.pitch = -float(thrust_rates[4])
         rates_setpoint_msg.yaw   = -float(thrust_rates[5])
         # Might ened to switch these for right frame conversion
-        rates_setpoint_msg.thrust_body[0] = float(thrust_command[0])/2.8
-        rates_setpoint_msg.thrust_body[1] = -float(thrust_command[1])/2.8
-        rates_setpoint_msg.thrust_body[2] = -float(thrust_command[2])/2.8
+        k = 2.8 if self.hw else 1.0
+        rates_setpoint_msg.thrust_body[0] = float(thrust_command[0])/k
+        rates_setpoint_msg.thrust_body[1] = -float(thrust_command[1])/k
+        rates_setpoint_msg.thrust_body[2] = -float(thrust_command[2])/k
         self.publisher_rates_setpoint.publish(rates_setpoint_msg)
 
 
@@ -499,7 +465,7 @@ class SpacecraftImpactMPC(Node):
         # print(Quaternion2Euler(x0[6:10,0]))
         # print('quat', x0[6:10,0])
         
-        print('u_pred[:,0]:', u_pred[:,0])
+        #print('u_pred[:,0]:', u_pred[:,0])
         # log data
         if self.started:
             self.log_data['t'].append((Clock().now().nanoseconds / 1000 - self.start_time) / 1e6)

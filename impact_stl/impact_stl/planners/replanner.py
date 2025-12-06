@@ -54,16 +54,6 @@ class RePlanner(Node):
             NORMAL_QOS)
         
         # robot subscribers
-        self.robot_attitude_sub = self.create_subscription(
-            VehicleAttitude,
-            'fmu/out/vehicle_attitude',
-            self.robot_attitude_callback,
-            NORMAL_QOS)
-        self.robot_angular_vel_sub = self.create_subscription(
-            VehicleAngularVelocity,
-            'fmu/out/vehicle_angular_velocity',
-            self.robot_angular_velocity_callback,
-            NORMAL_QOS)
         self.robot_local_position_sub = self.create_subscription(
             VehicleLocalPosition,
             'fmu/out/vehicle_local_position',
@@ -118,8 +108,6 @@ class RePlanner(Node):
         self.object_local_position_stack = np.zeros((3,stack_size))
         self.object_local_position_time_stack = np.zeros((1,stack_size))
 
-        self.robot_attitude = np.array([1.0, 0.0, 0.0, 0.0])
-        self.robot_angular_velocity = np.array([0.0, 0.0, 0.0])
         self.robot_local_position = np.array([0.0, 0.0, 0.0])
         self.robot_local_velocity = np.array([0.0, 0.0, 0.0])
         self.robot_local_time = 0
@@ -133,38 +121,30 @@ class RePlanner(Node):
         self.opti = self.setup()
         self.get_logger().info('Finished Replanner Node')
 
-    def robot_attitude_callback(self, msg):
-        self.robot_attitude[0] = msg.q[0]
-        self.robot_attitude[1] = msg.q[1]
-        self.robot_attitude[2] = -msg.q[2]
-        self.robot_attitude[3] = -msg.q[3]
-
-    def robot_angular_velocity_callback(self, msg):
-        self.robot_angular_velocity[0] = msg.xyz[0]
-        self.robot_angular_velocity[1] = -msg.xyz[1]
-        self.robot_angular_velocity[2] = -msg.xyz[2]
-
     def object_local_position_callback(self, msg):
         self.object_local_position_time_stack[:,0:-1] = self.object_local_position_time_stack[:,1:]
-        self.object_local_position_time_stack[:,-1] = msg.timestamp
-        self.object_local_position[0] = msg.x
-        self.object_local_position[1] = -msg.y
+        if not self.hw:
+            self.object_local_position_time_stack[:,-1] = msg.timestamp
+        else:
+            self.object_local_position_time_stack[:,-1] = msg.timestamp_sample
+        self.object_local_position[0] = msg.y
+        self.object_local_position[1] = msg.x
         self.object_local_position[2] = -msg.z
         self.object_local_position_stack[:,0:-1] = self.object_local_position_stack[:,1:]
         self.object_local_position_stack[:,-1] = self.object_local_position
-        self.object_local_velocity[0] = msg.vx
-        self.object_local_velocity[1] = -msg.vy
+        self.object_local_velocity[0] = msg.vy
+        self.object_local_velocity[1] = msg.vx
         self.object_local_velocity[2] = -msg.vz
         self.object_local_velocity_stack[:,0:-1] = self.object_local_velocity_stack[:,1:]
         self.object_local_velocity_stack[:,-1] = self.object_local_velocity
 
     def robot_local_position_callback(self, msg):
         self.robot_local_time = msg.timestamp_sample
-        self.robot_local_position[0] = msg.x
-        self.robot_local_position[1] = -msg.y
+        self.robot_local_position[0] = msg.y
+        self.robot_local_position[1] = msg.x
         self.robot_local_position[2] = -msg.z
-        self.robot_local_velocity[0] = msg.vx
-        self.robot_local_velocity[1] = -msg.vy
+        self.robot_local_velocity[0] = msg.vy
+        self.robot_local_velocity[1] = msg.vx
         self.robot_local_velocity[2] = -msg.vz
         
     def time_shift_callback(self, msg):
@@ -583,9 +563,9 @@ class RePlanner(Node):
         J += (1-s)*1e5 * eps**2  # Penalty for non-parallelism of ending position vector
         ## For pre curve we can have smaller weights
         for i in range(ddrvars[0].shape[1]):
-            J += 1*cs.sumsqr(ddrvars[0][:,i])
+            J += 20*cs.sumsqr(ddrvars[0][:,i])
         for i in range(ddhvars[0].shape[1]):
-            J += 1*cs.sumsqr(ddhvars[0][0,i])
+            J += 20*cs.sumsqr(ddhvars[0][0,i])
     
         # For interaction curve we want to minimize acceleration more
         w_acc = 2*1e2

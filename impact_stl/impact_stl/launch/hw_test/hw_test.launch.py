@@ -16,7 +16,7 @@ def generate_launch_description():
             package='impact_stl',
             namespace='pop',
             executable='ff_rate_mpc_impact', # spacecraft_mpc, spacecraft_impact_mpc
-            name='snap_mpc',
+            name='pop_mpc',
             output='screen',
             emulate_tty=True,
             parameters=[{'x0':1.0, 'y0':0.0, 'z0':0.0, 'vx0':0.0, 'vy0':0.0, 'vz0':0.0},

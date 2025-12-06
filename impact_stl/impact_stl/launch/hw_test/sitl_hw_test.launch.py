@@ -21,21 +21,21 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(
             [get_package_share_directory('impact_stl'), '/px4.launch.py']),
 
-        launch_arguments={'id':'0', 'pose':'0,1,0', 'name':'snap', 'delay':'0', 'headless':'0', 'world': 'frictionless_kth'}.items()
+        launch_arguments={'id':'0', 'pose':'1,0,0', 'name':'pop', 'delay':'0', 'headless':'0', 'world': 'frictionless_kth'}.items()
     )
 
     #lf_2 = IncludeLaunchDescription(
     #    PythonLaunchDescriptionSource(
     #        [get_package_share_directory('impact_stl'), '/px4.launch.py']),
 #
-    #    launch_arguments={'id':'1', 'pose':'-20,5,0', 'name':'crackle', 'delay':'5', 'headless':'0', 'world' : 'frictionless_kth'}.items()
+    #    launch_arguments={'id':'1', 'pose':'5,20,0', 'name':'crackle', 'delay':'5', 'headless':'0', 'world' : 'frictionless_kth'}.items()
     #)
 #
     #lf_3 = IncludeLaunchDescription(
     #    PythonLaunchDescriptionSource(
     #        [get_package_share_directory('impact_stl'), '/px4.launch.py']),
 #
-    #    launch_arguments={'id':'2', 'pose':'-2,5,0', 'name':'pop', 'delay':'10', 'headless':'0', 'world': 'frictionless_kth'}.items()
+    #    launch_arguments={'id':'2', 'pose':'5,2,0', 'name':'pop', 'delay':'10', 'headless':'0', 'world': 'frictionless_kth'}.items()
     #)
 
     ld.add_action(lf_1)
@@ -46,7 +46,7 @@ def generate_launch_description():
     # topics for rviz
     ld.add_action(Node(
             package='px4_offboard',
-            namespace='snap',
+            namespace='pop',
             executable='visualizer',
             name='visualizer_0'
     )),
@@ -102,7 +102,7 @@ def generate_launch_description():
     ld.add_action(Node(
             package='impact_stl',
             executable='odom_to_vehicle_local_position',
-            namespace='snap',
+            namespace='pop',
             output='screen',
             parameters=[{'topic_name': '/model/spacecraft_2d_0/odometry'}]
     ))
