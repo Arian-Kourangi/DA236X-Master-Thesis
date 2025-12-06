@@ -47,16 +47,6 @@ class RePlanner(Node):
 
         gz_suffix = '_gz' if self.gz else ''
         # object subscribers
-        self.object_attitude_sub = self.create_subscription(
-            VehicleAttitude,
-            f'{self.object_ns}/fmu/out/vehicle_attitude{gz_suffix}',
-            self.object_attitude_callback,
-            NORMAL_QOS)
-        self.object_angular_vel_sub = self.create_subscription(
-            VehicleAngularVelocity,
-            f'{self.object_ns}/fmu/out/vehicle_angular_velocity{gz_suffix}',
-            self.object_angular_velocity_callback,
-            NORMAL_QOS)
         self.object_local_position_sub = self.create_subscription(
             VehicleLocalPosition,
             f'{self.object_ns}/fmu/out/vehicle_local_position{gz_suffix}',
@@ -64,16 +54,6 @@ class RePlanner(Node):
             NORMAL_QOS)
         
         # robot subscribers
-        self.robot_attitude_sub = self.create_subscription(
-            VehicleAttitude,
-            'fmu/out/vehicle_attitude',
-            self.robot_attitude_callback,
-            NORMAL_QOS)
-        self.robot_angular_vel_sub = self.create_subscription(
-            VehicleAngularVelocity,
-            'fmu/out/vehicle_angular_velocity',
-            self.robot_angular_velocity_callback,
-            NORMAL_QOS)
         self.robot_local_position_sub = self.create_subscription(
             VehicleLocalPosition,
             'fmu/out/vehicle_local_position',
@@ -112,8 +92,6 @@ class RePlanner(Node):
         self.dq_ub = np.array([2,2])  
 
         # position and velocity variables that are updated with the subscriber calls
-        self.object_attitude = np.array([1.0, 0.0, 0.0, 0.0])
-        self.object_angular_velocity = np.array([0.0, 0.0, 0.0])
         self.object_local_position = np.array([0.0, 0.0, 0.0])
         self.object_local_velocity = np.array([0.0, 0.0, 0.0])
         # keep track of a stack of velocities to interpolate
@@ -124,8 +102,6 @@ class RePlanner(Node):
         self.object_local_position_stack = np.zeros((3,stack_size))
         self.object_local_position_time_stack = np.zeros((1,stack_size))
 
-        self.robot_attitude = np.array([1.0, 0.0, 0.0, 0.0])
-        self.robot_angular_velocity = np.array([0.0, 0.0, 0.0])
         self.robot_local_position = np.array([0.0, 0.0, 0.0])
         self.robot_local_velocity = np.array([0.0, 0.0, 0.0])
         self.robot_local_time = 0
@@ -138,27 +114,6 @@ class RePlanner(Node):
         self.n_cp = 6 # number of control points per curve
         self.opti = self.setup()
         self.get_logger().info('Finished Replanner Node')
-
-        
-    def object_attitude_callback(self, msg):
-        self.object_attitude[0] = msg.q[0]
-        self.object_attitude[1] = msg.q[1]
-        self.object_attitude[2] = -msg.q[2]
-        self.object_attitude[3] = -msg.q[3]
-    def robot_attitude_callback(self, msg):
-        self.robot_attitude[0] = msg.q[0]
-        self.robot_attitude[1] = msg.q[1]
-        self.robot_attitude[2] = -msg.q[2]
-        self.robot_attitude[3] = -msg.q[3]
-
-    def object_angular_velocity_callback(self, msg):
-        self.object_angular_velocity[0] = msg.xyz[0]
-        self.object_angular_velocity[1] = -msg.xyz[1]
-        self.object_angular_velocity[2] = -msg.xyz[2]
-    def robot_angular_velocity_callback(self, msg):
-        self.robot_angular_velocity[0] = msg.xyz[0]
-        self.robot_angular_velocity[1] = -msg.xyz[1]
-        self.robot_angular_velocity[2] = -msg.xyz[2]
 
     def object_local_position_callback(self, msg):
         self.object_local_position_time_stack[:,0:-1] = self.object_local_position_time_stack[:,1:]
