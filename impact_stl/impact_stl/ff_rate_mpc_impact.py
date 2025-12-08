@@ -402,6 +402,8 @@ class SpacecraftImpactMPC(Node):
                 v_des = self.plan['drvar'][inter_idx][:, -1]/self.plan['dhvar'][inter_idx][0, -1]
                 #self.get_logger().info(f"v_des: {v_des.T}") 
             # Check if we are far from the interaction point in time and space to enable collision avoidance
+            if inter_idx == -1:
+                col_avoid = True
             if np.linalg.norm(self.plan['rvar'][inter_idx][0:2,0] - x0[0:2]) > 5.0 and \
                 self.plan['hvar'][inter_idx][0,0] - (Clock().now().nanoseconds / 1000 - self.start_time) / 1e6 > 10.0:
                 col_avoid = True
