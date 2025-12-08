@@ -92,10 +92,10 @@ class RePlanner(Node):
             self.dq_lb = np.array([-0.2,-0.2])
             self.dq_ub = np.array([0.2,0.2]) 
         else:   
-            self.world_lb = np.array([0,0])
-            self.world_ub = np.array([100,100])
-            self.dq_lb = np.array([-2,-2])
-            self.dq_ub = np.array([2,2])  
+            self.world_lb = np.array([0,-1.75])
+            self.world_ub = np.array([3.5,1.75])
+            self.dq_lb = np.array([-0.2,-0.2])
+            self.dq_ub = np.array([0.2,0.2]) 
 
         # position and velocity variables that are updated with the subscriber calls
         self.object_local_position = np.array([0.0, 0.0, 0.0])
@@ -239,20 +239,25 @@ class RePlanner(Node):
             obj_next_pre_idx (int): index of the next pre curve for the object after obj_pre_idx
         """
         #Initial conditions on robot (i don't have updated robot state, lets just assume it follows the preplanned one)
-        
-        #Get all pre idx
-        rob_pre_idxs = np.where(np.array(self.robot_idvars) == 'pre')[0]
-        # Get the time of impact for all pre idxs, the impact time is the final time of the curve
-        rob_pre_tIs = [self.robot_hvars[pre_idx][0,-1] for pre_idx in rob_pre_idxs]
-        #Get the last pre idx before t_meas (or when the all is made whatever)
-        rob_pre_idx = next((rob_pre_idxs[i] for i, tI in enumerate(rob_pre_tIs) if tI > t_meas), len(rob_pre_tIs)-1)
+        try:
+            #Get all pre idx
+            rob_pre_idxs = np.where(np.array(self.robot_idvars) == 'pre')[0]
+            # Get the time of impact for all pre idxs, the impact time is the final time of the curve
+            rob_pre_tIs = [self.robot_hvars[pre_idx][0,-1] for pre_idx in rob_pre_idxs]
+            #Get the last pre idx before t_meas (or when the all is made whatever)
+            rob_pre_idx = next((rob_pre_idxs[i] for i, tI in enumerate(rob_pre_tIs) if tI > t_meas), len(rob_pre_tIs)-1)
 
-        # Get obj pre index
-        obj_pre_idxs = np.where(np.array(self.obj_idvars) == 'pre')[0]
-        obj_pre_TIs = [self.obj_hvars[pre_idx][0,-1] for pre_idx in obj_pre_idxs]
-        obj_pre_future_idx = [obj_pre_idxs[i] for i, tI in enumerate(obj_pre_TIs) if tI > t_meas]
-        obj_pre_idx = obj_pre_future_idx[0] # if there are multiple future pre curves take the first one
-        obj_next_pre_idx = obj_pre_future_idx[1] if len(obj_pre_future_idx) > 1 else obj_pre_future_idx[0]
+            # Get obj pre index
+            obj_pre_idxs = np.where(np.array(self.obj_idvars) == 'pre')[0]
+            obj_pre_TIs = [self.obj_hvars[pre_idx][0,-1] for pre_idx in obj_pre_idxs]
+            obj_pre_future_idx = [obj_pre_idxs[i] for i, tI in enumerate(obj_pre_TIs) if tI > t_meas]
+            obj_pre_idx = obj_pre_future_idx[0] # if there are multiple future pre curves take the first one
+            obj_next_pre_idx = obj_pre_future_idx[1] if len(obj_pre_future_idx) > 1 else obj_pre_future_idx[0]
+        except Exception as e:
+            self.get_logger().error(f"Error in get_pre_Idxs: {e}")
+            rob_pre_idx = -1
+            obj_pre_idx = -1
+            obj_next_pre_idx = -1
         return rob_pre_idx, obj_pre_idx, obj_next_pre_idx
 
 
@@ -278,6 +283,9 @@ class RePlanner(Node):
         vel_meas = np.mean(dxs_from_pos,axis=1)[0:2]
         # Get the idx of the robots next pre curve after t_meas, and the two next pre curves of the object
         pre_idx, obj_pre_idx, obj_next_pre = self.get_pre_Idxs(t_meas)
+        if pre_idx == -1 or obj_pre_idx == -1:
+            self.get_logger().error("Could not find valid pre indices for replanning, aborting replanning")
+            return False
         
         ##### PARAMS BASED ON UPDATED STATE ####
         ### OBJECT STATE ###
@@ -311,12 +319,12 @@ class RePlanner(Node):
         self.opti.set_value(self.params['next_obj_int_pos'], self.obj_rvars[obj_next_pre][0:2,-1])
         
         # Set weights, if end vel is 0 then vel weight should be higher
-        if np.linalg.norm(self.original_rob_plan['drvar'][pre_idx+1][0:2,-1]) < 1e-2:
+        if np.linalg.norm(self.original_rob_plan['drvar'][pre_idx+1][0:2,-1]) < 1e-3:
             w_s_val = np.array([1e4, 0, 0, 0])
             self.opti.set_value(self.params['s'], 1.0)
             #self.get_logger().info("Using higher end velocity weight since desired end velocity is 0")
         else:
-            w_s_val = np.array([1e3, 1e4, 1e0, 1e4])
+            w_s_val = np.array([1e0, 1e4, 1e0, 1e4])
             if reset:
                 w_s_val = np.array([1e1, 1e1, 1e0, 1e1])
             self.opti.set_value(self.params['s'], 0.0)
@@ -388,7 +396,7 @@ class RePlanner(Node):
             opti.subject_to(dhvars[0][0,i] >= 1*1e-1)
         ## Tigher constraing for interaction curve to minimize acceleration
         for i in range(dhvars[1].shape[1]):
-            opti.subject_to(dhvars[1][0,i] >= 80*1e-1)
+            opti.subject_to(dhvars[1][0,i] >= 1*1e-1)
 
         #Contuinuity constraints between pre and interaction curve
         opti.subject_to(rvars[0][:,-1] == rvars[-1][:,0])
