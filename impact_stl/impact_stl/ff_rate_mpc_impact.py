@@ -329,7 +329,7 @@ class SpacecraftImpactMPC(Node):
 
                 if all(selectors[i]==0 for i in range(len(selectors))) \
                     and self.plan_object['other_names'][self.get_object_next_inter(t)] in self.robot_name \
-                    and dist > 0.6:
+                    and dist > 0.5:
                     #self.get_logger().info('Calling Replanning Service in ff_rate_mpc_impact')
                     #Cooldown for the replanner so we don't spam it
                     if Clock().now().nanoseconds/1e9 - self.last_replan_time > self.cooldown_replanner:

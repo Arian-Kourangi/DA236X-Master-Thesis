@@ -231,7 +231,7 @@ Visualization Manager:
       Enabled: true
       Name: Crackle
       Namespaces:
-        {}
+        robot_radius: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -270,7 +270,7 @@ Visualization Manager:
       Enabled: true
       Name: Crackle_vel
       Namespaces:
-        {}
+        arrow: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -394,25 +394,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 4.096970081329346
+      Distance: 7.220261573791504
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 2.1436614990234375
-        Y: 0.0710955485701561
-        Z: 8.151823997497559
+        X: 2.4911720752716064
+        Y: 0.09405826777219772
+        Z: 8.176904678344727
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.2247966527938843
+      Pitch: 1.1997966766357422
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.577298641204834
+      Yaw: 4.692301273345947
     Saved: ~
 Window Geometry:
   Displays:

@@ -49,7 +49,7 @@ class SpacecraftRateModel():
         # constants
         self.mass = 16.8
         self.object_mass = 16.8
-        self.max_thrust = 1.86
+        self.max_thrust = 1.
         self.max_rate = 0.5
 
         self.u_ub = np.array([self.max_thrust,self.max_thrust,self.max_thrust,

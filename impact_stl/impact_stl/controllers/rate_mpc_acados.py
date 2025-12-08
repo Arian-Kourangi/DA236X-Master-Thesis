@@ -148,7 +148,7 @@ class SpacecraftRateMPC():
                     + self.alpha * self.dh(x_robot, x_object,0.03)[0] \
                     + self.beta * self.h(x_robot, x_object,0.03)[0] \
                     + u_delta  # δ enters additively
-        # For test1 set the distance to 1 m instead of 2
+        # For test1 set the distance to 1 m instead of 2 # 0.1 for hwtest3
         cbf_stage_aggresive = self.ddh(x_robot,x_object, f_robot, f_object,1)[0] \
                     + self.alpha * self.dh(x_robot, x_object,1)[0] \
                     + self.beta * self.h(x_robot, x_object,1)[0] \
@@ -199,8 +199,8 @@ class SpacecraftRateMPC():
         # Control error
         cost_u = cs.mtimes([u_phys.T, self.R, u_phys])
         # Slack error only when s = 0
-        cost_delta = 1e6 * u_delta  # penalize slack
-        cost_delta += 1e5 * u_delta2  # penalize slack
+        cost_delta = 1e4 * u_delta  # penalize slack
+        cost_delta += 1e4 * u_delta2  # penalize slack
 
         # Tangent acceleration cost, only active when s = 1
         tangent = cs.SX.eye(3) - cs.mtimes(contact_norm, contact_norm.T)
@@ -251,6 +251,46 @@ class SpacecraftRateMPC():
         
         ocp.constraints.lbu = lbu
         ocp.constraints.ubu = ubu
+
+        idxbx = np.arange(self.nx*2)
+        ocp.constraints.idxbx = idxbx
+        lbx = np.zeros((self.nx*2,))
+        ubx = np.zeros((self.nx*2,))
+        lbx[0] = 0.0
+        ubx[0] = 3.5
+        lbx[1] = -1.75
+        ubx[1] = 1.75
+        lbx[2] = -1e1
+        ubx[2] = 1e1
+        lbx[3] = -0.3
+        ubx[3] = 0.3
+        lbx[4] = -0.3
+        ubx[4] = 0.3
+        lbx[5] = -0.3
+        ubx[5] = 0.3
+        lbx[6:10] = -1e1
+        ubx[6:10] = 1e1
+        lbx[self.nx] = 0
+        ubx[self.nx] = 3.0
+        lbx[self.nx+1] = -1.75
+        ubx[self.nx+1] = 1.75
+        lbx[self.nx+2] = -1e1
+        ubx[self.nx+2] = 1e1
+        lbx[self.nx+3] = -0.3
+        ubx[self.nx+3] = 0.3
+        lbx[self.nx+4] = -0.3
+        ubx[self.nx+4] = 0.3
+        lbx[self.nx+5] = -0.3
+        ubx[self.nx+5] = 0.3
+        lbx[self.nx+6:self.nx+10] = -1e1
+        ubx[self.nx+6:self.nx+10] = 1e1
+        
+        ocp.constraints.lbx = lbx
+        ocp.constraints.ubx = ubx
+
+
+
+       
         # Setting the CBF / interaction constraint bounds
 
         ocp.constraints.lh_0 = np.array([-1e6,-1e6])
