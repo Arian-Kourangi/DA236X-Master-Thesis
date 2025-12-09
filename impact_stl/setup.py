@@ -54,6 +54,7 @@ setup(
 
                 # controllers
                 'ff_rate_mpc_impact = impact_stl.ff_rate_mpc_impact:main',
+                'ff_rate_mpc_velocity_keeping = impact_stl.ff_rate_mpc_velocity_keeping:main',
                 # helpers
                 'odom_to_vehicle_local_position = impact_stl.helpers.odom_to_vehicle_local_position:main',
                 'odom_to_vehicle_angular_velocity = impact_stl.helpers.odom_to_vehicle_angular_velocity:main',

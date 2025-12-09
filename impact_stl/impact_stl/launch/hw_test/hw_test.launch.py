@@ -7,7 +7,7 @@ from launch_ros.actions import Node, PushRosNamespace
 from ament_index_python.packages import get_package_share_directory
 import os
 
-
+HW = False
 def generate_launch_description():
     
     return LaunchDescription([
@@ -23,7 +23,7 @@ def generate_launch_description():
                         {'scenario_name':'hw_test'},
                         {'object_ns':'/snap'},
                         {'enable_cbf':True},
-                        {'hw':False}] # NOTE: This must be True to use mocap/PX4 data for object
+                        {'hw':HW}] # NOTE: This must be True to use mocap/PX4 data for object
         ),
         #Node(
         #    package='impact_stl',

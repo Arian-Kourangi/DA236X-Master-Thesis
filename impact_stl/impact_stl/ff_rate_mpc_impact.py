@@ -185,6 +185,9 @@ class SpacecraftImpactMPC(Node):
         self.object_local_position = np.array([0.0, 0.0, 0.0])
         self.object_local_velocity = np.array([0.0, 0.0, 0.0])
 
+        self.interaction_pub = self.create_publisher(StampedBool, '/global/interaction', RELIABLE_QOS_2)
+        
+
     def global_time_shift_callback(self, msg):
         """Callback for global time shift messages.
         Args:
@@ -454,14 +457,17 @@ class SpacecraftImpactMPC(Node):
             self.delta_V = np.array([0.0,0.0,0.0])
             self.straight = True
         #print(f"v_des: {v_des.T}")
-        x_pred, u_pred = self.mpc.solve(x0,setpoints,
+        if selectors is not None and selectors[0] == 1:
+            # On interaction, publish interaction flag
+            self.interaction_pub.publish(StampedBool())
+        x_pred, u_pred, status = self.mpc.solve(x0,setpoints,
                                         weights=weights,
                                         initial_guess=self.initial_guess,
                                         xobj=xobj,
                                         logger=self.get_logger(),
                                         verbose=False,selectors=selectors,delta_V=self.delta_V, v_des=v_des, straight = self.straight, col_avoid=col_avoid, approach=approach, end_of_int=end_of_int)
-        
-        self.initial_guess = {'X': x_pred, 'U': u_pred}
+        if status ==0:
+            self.initial_guess = {'X': x_pred, 'U': u_pred}
         # print('x0',x0[0:3].flatten())
         # print('setpoints',setpoints[0][0:3].flatten())
         # print(Quaternion2Euler(x0[6:10,0]))
@@ -479,15 +485,15 @@ class SpacecraftImpactMPC(Node):
         # print('x_pred[0]:', x_pred[0:3,0])    
         # print('x_pred[1]:', x_pred[0:3,0:10])
 
-    
-        for idx in range(x_pred.shape[1]):
-            # print(f"idx: {idx}, x_pred: {x_pred[:,idx]}")
-            predicted_state = x_pred[:, idx]
-            # Publish time history of the vehicle path
-            predicted_pose_msg = vector2PoseMsg('world', predicted_state[0:3], np.array([1.0, 0.0, 0.0, 0.0]))
-            predicted_path_msg.header = predicted_pose_msg.header
-            predicted_path_msg.poses.append(predicted_pose_msg)
-        self.predicted_path_pub.publish(predicted_path_msg)
+        if status == 0:
+            for idx in range(x_pred.shape[1]):
+                # print(f"idx: {idx}, x_pred: {x_pred[:,idx]}")
+                predicted_state = x_pred[:, idx]
+                # Publish time history of the vehicle path
+                predicted_pose_msg = vector2PoseMsg('world', predicted_state[0:3], np.array([1.0, 0.0, 0.0, 0.0]))
+                predicted_path_msg.header = predicted_pose_msg.header
+                predicted_path_msg.poses.append(predicted_pose_msg)
+            self.predicted_path_pub.publish(predicted_path_msg)
 #       
         setpoint_path_msg = Path()
         for idx in range(len(setpoints)):
@@ -499,8 +505,10 @@ class SpacecraftImpactMPC(Node):
             setpoint_path_msg.poses.append(setpoint_pose_msg)
         self.reference_path_pub.publish(setpoint_path_msg)
 
-        if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+        if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD and status == 0:
             self.publish_rate_setpoint(u_pred)
+        else:
+            self.publish_rate_setpoint(np.zeros((6,1)))
         
         #print(f"Time elapsed: {time.time() - t0}")
         if time.time() - t0 > self.timer_period:

@@ -313,7 +313,13 @@ class SpacecraftRateMPC():
 
         # regularization helps numeric stability
         ocp.solver_options.levenberg_marquardt = 1e-4
-        solver = AcadosOcpSolver(ocp, json_file='simple_rate_mpc.json')
+        import os
+        base_dir = os.getcwd()
+        # MPC A folder
+        dir = os.path.join(base_dir, "MPC_A")
+        os.makedirs(dir, exist_ok=True)
+        ocp.code_export_directory = dir
+        solver = AcadosOcpSolver(ocp, json_file='simple_rate_mpc.json', build =True)
         return solver
     
     def solve(self, x0, setpoints=None,
@@ -389,18 +395,20 @@ class SpacecraftRateMPC():
             X_pred = np.zeros((self.nx*2, self.N+1))
             U_pred = np.zeros((self.nu, self.N))
             sol = self.solver.solve()
-            #self.solver.get_status()
-            for k in range(self.N+1):
-                X_pred[:, k] = self.solver.get(k, "x")
-            for k in range(self.N):
-                U_pred[:, k] = self.solver.get(k, "u") # including slack if any
-
+            if self.solver.get_status() == 0:
+                for k in range(self.N+1):
+                    X_pred[:, k] = self.solver.get(k, "x")
+                for k in range(self.N):
+                    U_pred[:, k] = self.solver.get(k, "u") # including slack if any
+            else:
+                U_pred = None
+                X_pred = None
         except Exception as e:
             print(f"Optimization failed: {e}")
             X_pred = np.zeros((self.nx*2, self.N+1))
             U_pred = np.zeros((self.nu, self.N))
 
-        return X_pred, U_pred
+        return X_pred, U_pred, self.solver.get_status()
 
     def safe_sigmoid(self,x):
         return 0.5 * (1 - cs.tanh(0.5 * x))

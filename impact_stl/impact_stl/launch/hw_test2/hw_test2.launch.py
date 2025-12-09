@@ -7,7 +7,7 @@ from launch_ros.actions import Node, PushRosNamespace
 from ament_index_python.packages import get_package_share_directory
 import os
 
-
+HW = False
 def generate_launch_description():
     
     return LaunchDescription([
@@ -23,7 +23,7 @@ def generate_launch_description():
                         {'scenario_name':'hw_test2'},
                         {'object_ns':'/snap'},
                         {'enable_cbf':True},
-                        {'hw':False}] # NOTE: This must be True to use mocap/PX4 data for object
+                        {'hw':HW}] # NOTE: This must be True to use mocap/PX4 data for object
         ),
         #Node(
         #    package='impact_stl',
@@ -70,8 +70,8 @@ def generate_launch_description():
             output='screen',
             parameters=[{'object_ns':'/snap'},
                         {'scenario_name':'hw_test2'},
-                        {'hw':False}]
-        )
+                        {'hw':HW}]
+        ),
         # Replanner
         #Node(
         #    package='impact_stl',
@@ -83,5 +83,15 @@ def generate_launch_description():
         #                {'scenario_name':'hw_test'},
         #                {'hw':True}]
         #),
-
+        # Velocity keeping MPC controller for object
+        Node(
+            package='impact_stl',
+            namespace='snap',
+            executable='ff_rate_mpc_velocity_keeping', 
+            name='snap_velocity_keeping_mpc',
+            output='screen',
+            emulate_tty=True,
+            parameters=[{'x0':1.5, 'y0':0.0, 'z0':0.0, 'vx0':0.0, 'vy0':0.0, 'vz0':0.0},
+                        {'hw':HW}]
+        ),
     ])
