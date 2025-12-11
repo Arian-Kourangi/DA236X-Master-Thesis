@@ -45,7 +45,7 @@ class SpacecraftRateMPC():
         # px4-mpc
         # To test the normal MPC without the reactive part, double the weights 
         #self.Q = 10*np.diag([5e1, 5e1, 5e1, 5e1, 5e1, 5e1, 8e2, 8e2, 8e2, 8e2])
-        self.Q = np.diag([5e1, 5e1, 5e1, 5e1, 5e1, 5e1, 8e2, 8e2, 8e2, 8e2])
+        self.Q = np.diag([5e1, 5e1, 5e1, 5e1, 5e1, 5e1, 8e4, 8e3, 8e3, 8e3])
         self.Q_e = 10 * self.Q
         self.R = 2*np.diag([1e-2, 1e-2, 1e-2, 2e0, 2e0, 2e0])
         
