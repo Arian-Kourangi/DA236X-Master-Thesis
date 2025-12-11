@@ -1,6 +1,7 @@
 import numpy as np
 from helpers.beziers import get_derivative_control_points_gurobi
 from helpers.read_write_plan import csv_to_plan
+from robustness_calc import signed_distance_point_to_polygon
 
 
 class Robot:
@@ -38,19 +39,27 @@ class Robot:
         self.T_final_plan = self.original_plan['hvars'][self.inter_idxs[-1]][0, -1]
         print(f"Final time for {name}: {self.T_final_plan}") if verbose else None
 
-
 SCENARIO = 'test1'
 MPC = 'R'  # 'R' for reactive MPC, models the interaction and reacts to state of the object
             # N for nominal MPC, ignores the interaction altogether and just follows the plan
-metrics = {'delta_V_pre':[], 'delta_V_post':[], 'delta_V_final':[], 'delta_pos_final':[], 'delta_T':[]}
+if SCENARIO not in ['test1','test2']: #These test do not have obstacles
+    metrics = {'delta_V_pre':[], 'delta_V_post':[], 'delta_V_final':[], 'delta_pos_final':[], 'delta_T':[],'robustness':[]}
+else: 
+    metrics = {'delta_V_pre':[], 'delta_V_post':[], 'delta_V_final':[], 'delta_pos_final':[], 'delta_T':[]}
+
+obstacles = {'test3': [np.array([0,10]), np.array([18,16])],
+             'test4': [np.array([12,12]), np.array([18,18])]}
+
 Verbose = False
-for run_id in range(1,11):
+for run_id in range(1,2):
     print(f"Analyzing run ID: {run_id}") if Verbose else None
     robots = {'snap':None, 'crackle':None}
+    rhos = []
     for name in robots.keys():
         robot = Robot(name, SCENARIO,MPC, verbose=Verbose, run_id=run_id)
         robots[name] = robot
 
+        ## Calculating metrics for each interaction
         for i in range(len(robot.inter_sets)):
             start_idx, end_idx = robot.inter_sets[i]
 
@@ -69,7 +78,25 @@ for run_id in range(1,11):
             delta_V_post = np.linalg.norm(object_vel_post - desired_vel_post)
             metrics['delta_V_post'].append(delta_V_post)
             print(f"Robot {robot.name} interaction {i} delta_V_post: {delta_V_post}") if Verbose else None
+        
+    # Robustness metrics
+    if SCENARIO not in ['test1','test2']: #These test do not have obstacles
+        for name, robot in robots.items():
+            lb = obstacles[SCENARIO][0]
+            ub = obstacles[SCENARIO][1]
+            for log_idx in range(len(robot.log['t'])):
+                pos = robot.log['x'][log_idx, 0:2]
+                sd = signed_distance_point_to_polygon(pos, lb, ub)
+                rhos.append(sd)
+                obj_pos = robot.log['xobj'][log_idx, 0:2]
+                sd_obj = signed_distance_point_to_polygon(obj_pos, lb, ub)
+                rhos.append(sd_obj)
+        
+        robustness = np.min(rhos)
+        metrics['robustness'].append(robustness)
+        print(f"Robustness for run ID {run_id}: {robustness}") if Verbose else None
 
+        
 
     # Find the robot with the largest final time, compare the planned vel, pos and time
     max_T_final = -np.inf
