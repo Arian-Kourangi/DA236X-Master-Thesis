@@ -177,8 +177,14 @@ class SpacecraftRateMPC():
         e_robot = x_robot - xref_r
         cost_p_r =  cs.mtimes([e_robot[0:6].T, self.Q[0:6,0:6], e_robot[0:6]])
         
-        q_r = x_robot[6:10]
-        qref_r = xref_r[6:10]
+        q_r = x_robot[6:10] #/ cs.norm_2(x_robot[6:10])
+        qref_r = xref_r[6:10]# / cs.norm_2(xref_r[6:10])
+
+        #q_error = self.quat_mult(qref_r, cs.vertcat(q_r[0], -q_r[1], -q_r[2], -q_r[3]))
+        #q_error = q_error * cs.sign(q_error[0])  # shortest rotation
+        #cost_eq_r = cs.mtimes([q_error.T, self.Q[6:10,6:10], q_error])
+
+
         eq_r = 1 - (q_r.T @ qref_r)**2 
         cost_eq_r = eq_r.T @ self.Q[6,6].reshape((1, 1)) @ eq_r
 
@@ -192,6 +198,7 @@ class SpacecraftRateMPC():
 
 
         cost_p_r_e = cs.mtimes([e_robot[0:6].T, self.Q_e[0:6,0:6], e_robot[0:6]])
+        #cost_eq_r_e = cs.mtimes([q_error.T, self.Q_e[6:10,6:10], q_error])
         cost_eq_r_e = eq_r.T @ self.Q_e[6,6].reshape((1, 1)) @ eq_r
         cost_p_o_e = cs.mtimes([e_object[0:6].T,self.Q_e[0:6,0:6], e_object[0:6]])
         cost_eq_o_e = eq_o.T @ self.Q_e[6,6].reshape((1, 1)) @ eq_o
@@ -252,41 +259,41 @@ class SpacecraftRateMPC():
         ocp.constraints.lbu = lbu
         ocp.constraints.ubu = ubu
 
-        idxbx = np.arange(self.nx*2)
-        ocp.constraints.idxbx = idxbx
-        lbx = np.zeros((self.nx*2,))
-        ubx = np.zeros((self.nx*2,))
-        lbx[0] = 0.0
-        ubx[0] = 3.5
-        lbx[1] = -1.75
-        ubx[1] = 1.75
-        lbx[2] = -1e1
-        ubx[2] = 1e1
-        lbx[3] = -0.3
-        ubx[3] = 0.3
-        lbx[4] = -0.3
-        ubx[4] = 0.3
-        lbx[5] = -0.3
-        ubx[5] = 0.3
-        lbx[6:10] = -1e1
-        ubx[6:10] = 1e1
-        lbx[self.nx] = 0
-        ubx[self.nx] = 3.0
-        lbx[self.nx+1] = -1.75
-        ubx[self.nx+1] = 1.75
-        lbx[self.nx+2] = -1e1
-        ubx[self.nx+2] = 1e1
-        lbx[self.nx+3] = -0.3
-        ubx[self.nx+3] = 0.3
-        lbx[self.nx+4] = -0.3
-        ubx[self.nx+4] = 0.3
-        lbx[self.nx+5] = -0.3
-        ubx[self.nx+5] = 0.3
-        lbx[self.nx+6:self.nx+10] = -1e1
-        ubx[self.nx+6:self.nx+10] = 1e1
+        # idxbx = np.arange(self.nx*2)
+        # ocp.constraints.idxbx = idxbx
+        # lbx = np.zeros((self.nx*2,))
+        # ubx = np.zeros((self.nx*2,))
+        # lbx[0] = 0.0
+        # ubx[0] = 3.5
+        # lbx[1] = -1.75
+        # ubx[1] = 1.75
+        # lbx[2] = -1e1
+        # ubx[2] = 1e1
+        # lbx[3] = -0.3
+        # ubx[3] = 0.3
+        # lbx[4] = -0.3
+        # ubx[4] = 0.3
+        # lbx[5] = -0.3
+        # ubx[5] = 0.3
+        # lbx[6:10] = -1e1
+        # ubx[6:10] = 1e1
+        # lbx[self.nx] = 0
+        # ubx[self.nx] = 3.0
+        # lbx[self.nx+1] = -1.75
+        # ubx[self.nx+1] = 1.75
+        # lbx[self.nx+2] = -1e1
+        # ubx[self.nx+2] = 1e1
+        # lbx[self.nx+3] = -0.3
+        # ubx[self.nx+3] = 0.3
+        # lbx[self.nx+4] = -0.3
+        # ubx[self.nx+4] = 0.3
+        # lbx[self.nx+5] = -0.3
+        # ubx[self.nx+5] = 0.3
+        # lbx[self.nx+6:self.nx+10] = -1e1
+        # ubx[self.nx+6:self.nx+10] = 1e1
         
-        ocp.constraints.lbx = lbx
-        ocp.constraints.ubx = ubx
+        # ocp.constraints.lbx = lbx
+        # ocp.constraints.ubx = ubx
 
 
 
@@ -412,3 +419,10 @@ class SpacecraftRateMPC():
 
     def safe_sigmoid(self,x):
         return 0.5 * (1 - cs.tanh(0.5 * x))
+    def quat_mult(self, q1, q2):
+        return cs.vertcat(
+                q1[0]*q2[0] - q1[1]*q2[1] - q1[2]*q2[2] - q1[3]*q2[3],
+                q1[0]*q2[1] + q1[1]*q2[0] + q1[2]*q2[3] - q1[3]*q2[2],
+                q1[0]*q2[2] - q1[1]*q2[3] + q1[2]*q2[0] + q1[3]*q2[1],
+                q1[0]*q2[3] + q1[1]*q2[2] - q1[2]*q2[1] + q1[3]*q2[0]
+            )

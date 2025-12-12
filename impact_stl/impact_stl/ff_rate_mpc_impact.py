@@ -161,7 +161,7 @@ class SpacecraftImpactMPC(Node):
 
         self.timer_period2 = 0.1
         self.offboard_timer = self.create_timer(self.timer_period2, self.offboard_callback)
-        
+
         self.cooldown_replanner = 0.1  # seconds
         self.last_replan_time = -np.inf
         self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
@@ -469,7 +469,8 @@ class SpacecraftImpactMPC(Node):
         if status ==0:
             self.initial_guess = {'X': x_pred, 'U': u_pred}
         # print('x0',x0[0:3].flatten())
-        # print('setpoints',setpoints[0][0:3].flatten())
+        # print('vel',x0[3:6].flatten())
+        # print('setpoints',setpoints[0][6:10].flatten())
         # print(Quaternion2Euler(x0[6:10,0]))
         # print('quat', x0[6:10,0])
         
