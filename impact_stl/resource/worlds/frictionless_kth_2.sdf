@@ -50,7 +50,7 @@
         <scene>scene</scene>
         <ambient_light>0.4 0.4 0.4</ambient_light>
         <background_color>0.8 0.8 0.8</background_color>
-        <camera_pose>15 15 10 0 1.57 3.14159</camera_pose>
+        <camera_pose>15 15 25 0 1.57 3.14159</camera_pose>
         <camera_clip>
           <near>0.25</near>
           <far>25000</far>
@@ -74,6 +74,16 @@
           <property key="showTitleBar" type="bool">false</property>
         </gz-gui>
       </plugin>
+
+      <plugin filename="ImageDisplay" name="Static Camera View">
+        <gz-gui>
+          <property key="state" type="string">floating</property>
+          <property key="width" type="double">640</property>
+          <property key="height" type="double">360</property>
+        </gz-gui>
+        <topic>/world/frictionless_kth_2/model/static_camera_1/link/link/sensor/camera/image</topic>
+      </plugin>
+
       <plugin filename="InteractiveViewControl" name="Interactive view control">
         <gz-gui>
           <property key="resizable" type="bool">false</property>
@@ -252,6 +262,35 @@
         <falloff>0</falloff>
       </spot>
     </light>
+
+    <model name="static_camera_1">
+      <static>true</static>
+      <link name="link">
+        <pose>0 0 0 0 0 0</pose>
+
+        <sensor name="camera" type="camera">
+          <pose>15 15 50 0 1.57 3.14159</pose>
+
+          <camera>
+            <horizontal_fov>1.047</horizontal_fov>
+            <image>
+              <width>1280</width>
+              <height>720</height>
+              <format>R8G8B8</format>
+            </image>
+            <clip>
+              <near>0.1</near>
+              <far>1000</far>
+            </clip>
+          </camera>
+
+          <always_on>true</always_on>
+          <update_rate>30</update_rate>
+          <visualize>true</visualize>
+        </sensor>
+      </link>
+    </model>
+
 
     <!-- Add coordinate markers -->
     <model name="origin_marker">
