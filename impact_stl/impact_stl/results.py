@@ -2,8 +2,8 @@ import numpy as np
 from helpers.beziers import get_derivative_control_points_gurobi
 from helpers.read_write_plan import csv_to_plan
 from robustness_calc import signed_distance_point_to_polygon
-
-
+from helpers.beziers import eval_bezier
+import matplotlib.pyplot as plt
 class Robot:
     def __init__(self, name, scenario, mpc= 'R', run_id = 1, verbose=False):
         self.name = name
@@ -11,6 +11,13 @@ class Robot:
         drvars = [get_derivative_control_points_gurobi(rvar) for rvar in rvars]
         dhvars = [get_derivative_control_points_gurobi(hvar) for hvar in hvars]
         self.original_plan ={'rvars': rvars, 'hvars': hvars, 'drvars': drvars, 'dhvars': dhvars, 'ids': ids, 'other_names': other_names}
+        
+        self.robot_start_pos = rvars[0][:2,0]
+        rvars1,_,ids1,_ = csv_to_plan(robot_name='pop',scenario_name=scenario,path=f'/home/arian/repos/thesis/impact_stl/impact_stl/planners/plans/{SCENARIO}')
+        self.original_plan_obj ={'rvars': rvars1, 'ids': ids1}
+        
+        self.object_start_pos = rvars1[0][:2,0]
+        self.goal_pos = rvars1[-1][:2,-1]
         print(f"Loaded plan for {name}:") if verbose else None
         self.replan = np.load(f'/home/arian/repos/thesis/impact_stl/impact_stl/saved_logs/{scenario}/{mpc}/{name}_replan_{run_id}.npz', allow_pickle=True)
         print(f"Loaded replan for {name}:") if verbose else None
@@ -51,7 +58,7 @@ obstacles = {'test3': [np.array([0,10]), np.array([18,16])],
              'test4': [np.array([12,12]), np.array([18,18])]}
 
 Verbose = False
-for run_id in range(1,2):
+for run_id in range(1,11):
     print(f"Analyzing run ID: {run_id}") if Verbose else None
     robots = {'snap':None, 'crackle':None}
     rhos = []
@@ -81,9 +88,9 @@ for run_id in range(1,2):
         
     # Robustness metrics
     if SCENARIO not in ['test1','test2']: #These test do not have obstacles
+        lb = obstacles[SCENARIO][0]
+        ub = obstacles[SCENARIO][1]
         for name, robot in robots.items():
-            lb = obstacles[SCENARIO][0]
-            ub = obstacles[SCENARIO][1]
             for log_idx in range(len(robot.log['t'])):
                 pos = robot.log['x'][log_idx, 0:2]
                 sd = signed_distance_point_to_polygon(pos, lb, ub)
@@ -142,13 +149,135 @@ for key, values in metrics.items():
     #print(f"Values for metric {key}: {values}") if Verbose else None
     print(f"Metric {key}:  mean = {mean_val}, median = {median_val}")
 
+# Original robustness of the plan
+rhos_plan = []
+
+if SCENARIO not in ['test1','test2']: #These test do not have obstacles
+    lb = obstacles[SCENARIO][0]
+    ub = obstacles[SCENARIO][1]
+    for name in robots.keys():
+        robot = robots[name]
+        for i in range(len(robot.original_plan['rvars'])):
+            rvar = robot.original_plan['rvars'][i]
+            evals = eval_bezier(rvar, N=100)
+            for pos in evals.T:
+                sd = signed_distance_point_to_polygon(pos[0:2], lb, ub)
+                rhos_plan.append(sd)
+        for i in range(len(robot.original_plan_obj['rvars'])):
+            rvar = robot.original_plan_obj['rvars'][i]
+            evals = eval_bezier(rvar, N=100)
+            for pos in evals.T:
+                sd = signed_distance_point_to_polygon(pos[0:2], lb, ub)
+                rhos_plan.append(sd)
+        
+    robustness_plan = np.min(rhos_plan)
+    print(f"Original plan robustness for scenario {SCENARIO}: {robustness_plan}")
 
 
-#print(data.files)
-#t = data['t']
-#x = data['x']
-#xobj = data['xobj']
-#inter = data['inter']
-#print(t)
-#print(inter)
-#print(x.shape)
+#### Plotting #####
+# Plot the setup first, including start pose of all robots and object, goal pose, and obstacles if ann
+# make sure they are labeled in the plot, or include a legend
+
+# Then plot the original planned trajectories of the the robots and objects
+# Then the replanned curves
+# Then the realised trajectories from the logs
+# Enough to do it for one run_id per scenario
+# Make seperate plots for Original, replanned, and realised trajectories
+
+if MPC == 'R':
+    if SCENARIO == 'test1':
+        offset = 5
+        xlim = (-5,25)
+        ylim = (-5,25)
+    else:
+        offset = 0.0
+        xlim = (0,30)
+        ylim = (0,30)
+    fig, (ax1,ax2, ax3) = plt.subplots(1, 3,  figsize=(14, 6))
+    colors = {'snap':'black', 'crackle':'y', 'object':'red'}
+    ls = {'snap':'k-', 'crackle':'y-', 'object':'r-'}
+    inter_ls = {'snap':'b_', 'crackle':'b_'}
+    lw = 2
+    ms = 15
+    
+    # Subplot 1: Original Plan
+    # Plot obstacles
+    if SCENARIO not in ['test1','test2']:
+        lb = obstacles[SCENARIO][0]
+        ub = obstacles[SCENARIO][1]
+        rect = plt.Rectangle((lb[0], lb[1]), ub[0]-lb[0], ub[1]-lb[1], color='gray', alpha=0.5, label='Obstacle')
+        ax1.add_patch(rect)
+    # Plot original planned trajectories
+    for name, robot in robots.items():
+        evals = None
+        for i,rvar in enumerate(robot.original_plan['rvars']):
+            if robot.original_plan['ids'][i] != 'inter':
+                evals = eval_bezier(rvar[0:2,:], N=100).T if evals is None else np.vstack((evals, eval_bezier(rvar[0:2], N=100).T))
+        ax1.plot(evals[:,0] + offset, evals[:,1],ls[name], label=f'{name[0].capitalize() + name[1:]} plan', linewidth=lw, zorder=1)
+        evals = None
+        for i,rvar in enumerate(robot.original_plan['rvars']):
+            if robot.original_plan['ids'][i] == 'inter':
+                evals = eval_bezier(rvar[0:2,:], N=100).T if evals is None else np.vstack((evals, eval_bezier(rvar[0:2], N=100).T))
+        ax1.plot(evals[:,0] + offset, evals[:,1],inter_ls[name], label=f'{name[0].capitalize() + name[1:]} interaction', linewidth=lw, zorder = 3)
+        if name == ref_rob.name:
+            evals = None
+            for i,rvar in enumerate(robot.original_plan_obj['rvars']):
+                if robot.original_plan_obj['ids'][i] != 'inter':
+                    evals = eval_bezier(rvar, N=100).T if evals is None else np.vstack((evals, eval_bezier(rvar, N=100).T))
+            ax1.plot(evals[:,0] + offset, evals[:,1], ls['object'], label='Object plan', linewidth=lw, zorder=2)
+    # Plot start positions
+    for name, robot in robots.items():
+        ax1.plot(robot.robot_start_pos[0] + offset, robot.robot_start_pos[1], marker='o', color=colors[name], label=f'{name[0].capitalize() + name[1:]} start', markersize=ms, zorder=4)
+        if name == ref_rob.name:
+            ax1.plot(robot.object_start_pos[0]+offset, robot.object_start_pos[1], marker='o', color=colors['object'], label='Object start', markersize=ms, zorder=4)
+            ax1.plot(robot.goal_pos[0] + offset, robot.goal_pos[1], marker='*', color='green', label='Goal', markersize=ms, zorder=4)
+    ax1.set_title(f'Original Plan - Scenario {SCENARIO[-1]}')
+    ax1.set_xlabel('X position [m]')
+    ax1.set_ylabel('Y position [m]')
+    ax1.set_xlim(xlim[0],xlim[1])
+    ax1.set_ylim(ylim[0],ylim[1])
+    ax1.set_xticks(np.arange(xlim[0],xlim[1]+1,5))
+    ax1.set_yticks(np.arange(ylim[0],ylim[1]+1,5))
+    ax1.set_xticklabels(np.arange(xlim[0],xlim[1]+1,5))
+    ax1.set_yticklabels(np.arange(ylim[0],ylim[1]+1,5))
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+
+
+
+
+
+
+
+    # Subplot 3: Realized Trajectories
+    # Plot obstacles
+    if SCENARIO not in ['test1','test2']:
+        lb = obstacles[SCENARIO][0]
+        ub = obstacles[SCENARIO][1]
+        rect = plt.Rectangle((lb[0], lb[1]), ub[0]-lb[0], ub[1]-lb[1], color='gray', alpha=0.5, label='obstacle')
+        ax3.add_patch(rect)
+    # Plot realised trajectories from logs
+    for name, robot in robots.items():
+        ax3.plot(robot.log['x'][:,0] + offset, robot.log['x'][:,1],ls[name] , label=f'{name[0].capitalize() + name[1:]} realized', linewidth=lw)
+        if name == ref_rob.name:
+            ax3.plot(robot.log['xobj'][:ref_rob.inter_sets[-1][-1],0] + offset, robot.log['xobj'][:ref_rob.inter_sets[-1][-1],1], ls['object'], label='Object realized', linewidth=lw, zorder=3)
+    # Plot start positions
+    for name, robot in robots.items():
+        ax3.plot(robot.robot_start_pos[0] + offset, robot.robot_start_pos[1], marker='o', color=colors[name], label=f'{name[0].capitalize() + name[1:]} start', markersize=ms, zorder =4)
+        if name == ref_rob.name:
+            ax3.plot(robot.object_start_pos[0]+offset, robot.object_start_pos[1], marker='o', color=colors['object'], label='Object start', markersize=ms, zorder=4)
+            ax3.plot(robot.goal_pos[0] + offset, robot.goal_pos[1], marker='*', color='red', label='Goal', markersize=ms, zorder =4)
+    ax3.set_title(f'Realized Trajectories - Scenario {SCENARIO[-1]}')
+    ax3.set_xlabel('X position [m]')
+    ax3.set_ylabel('Y position [m]')
+    ax3.set_xlim(xlim[0],xlim[1])
+    ax3.set_ylim(ylim[0],ylim[1])
+    ax3.set_xticks(np.arange(xlim[0],xlim[1]+1,5))
+    ax3.set_yticks(np.arange(ylim[0],ylim[1]+1,5))
+    ax3.set_xticklabels(np.arange(xlim[0],xlim[1]+1,5))
+    ax3.set_yticklabels(np.arange(ylim[0],ylim[1]+1,5))
+    ax3.legend()
+    ax3.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.show()
