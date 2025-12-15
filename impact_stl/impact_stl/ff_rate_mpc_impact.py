@@ -184,6 +184,9 @@ class SpacecraftImpactMPC(Node):
 
         self.object_local_position = np.array([0.0, 0.0, 0.0])
         self.object_local_velocity = np.array([0.0, 0.0, 0.0])
+        if self.scenario_name == 'hw_test':
+            # Just put the object in the corner away form the robot so the MPC doesnt freak out
+            self.object_local_position = np.array([3.0, 1.5, 0.0])  
 
         self.interaction_pub = self.create_publisher(StampedBool, '/global/interaction', RELIABLE_QOS_2)
         

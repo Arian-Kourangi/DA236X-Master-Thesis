@@ -110,28 +110,28 @@ class SpacecraftRateMPC():
         ocp.constraints.lbu = lbu
         ocp.constraints.ubu = ubu
 
-        idxbx = np.arange(self.nx)
+        # Turn of from here if funky
+        idxbx = np.array([0,1,2,3,4,5])
         ocp.constraints.idxbx = idxbx
-        lbx = np.zeros((self.nx,))
-        ubx = np.zeros((self.nx,))
+        lbx = np.zeros((6,))
+        ubx = np.zeros((6,))
         lbx[0] = 0.0
         ubx[0] = 3.5
         lbx[1] = -1.75
         ubx[1] = 1.75
-        lbx[2] = -1e1
-        ubx[2] = 1e1
+        lbx[2] = -1e2
+        ubx[2] = 1e2
         lbx[3] = -0.3
         ubx[3] = 0.3
         lbx[4] = -0.3
         ubx[4] = 0.3
         lbx[5] = -0.3
         ubx[5] = 0.3
-        lbx[6:10] = -1e1
-        ubx[6:10] = 1e1
+  
 
         ocp.constraints.lbx = lbx
         ocp.constraints.ubx = ubx
-
+        ####
 
         
         # set solver options
