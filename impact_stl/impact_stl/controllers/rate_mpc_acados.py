@@ -45,7 +45,7 @@ class SpacecraftRateMPC():
         # px4-mpc
         # To test the normal MPC without the reactive part, double the weights 
         #self.Q = 10*np.diag([5e1, 5e1, 5e1, 5e1, 5e1, 5e1, 8e2, 8e2, 8e2, 8e2])
-        self.Q = np.diag([5e1, 5e1, 5e1, 5e1, 5e1, 5e1, 8e2, 8e3, 8e3, 8e3])
+        self.Q = np.diag([5e1, 5e1, 5e1, 5e1, 5e1, 5e1, 8e3, 8e3, 8e3, 8e3])
         self.Q_e = 10 * self.Q
         self.R = 2*np.diag([1e-2, 1e-2, 1e-2, 2e0, 2e0, 2e0])
         
@@ -149,9 +149,9 @@ class SpacecraftRateMPC():
                     + self.beta * self.h(x_robot, x_object,0.03)[0] \
                     + u_delta  # δ enters additively
         # For test1 set the distance to 1 m instead of 2
-        cbf_stage_aggresive = self.ddh(x_robot,x_object, f_robot, f_object,1)[0] \
-                    + self.alpha * self.dh(x_robot, x_object,1)[0] \
-                    + self.beta * self.h(x_robot, x_object,1)[0] \
+        cbf_stage_aggresive = self.ddh(x_robot,x_object, f_robot, f_object,2)[0] \
+                    + self.alpha * self.dh(x_robot, x_object,2)[0] \
+                    + self.beta * self.h(x_robot, x_object,2)[0] \
                     + u_delta2
 
         model_ac.con_h_expr_0 = cs.vertcat(cbf_stage, cbf_stage_aggresive)

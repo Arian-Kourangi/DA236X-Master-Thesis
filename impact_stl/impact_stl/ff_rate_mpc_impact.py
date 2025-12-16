@@ -56,9 +56,9 @@ class SpacecraftImpactMPC(Node):
             "x": [],
             "xobj": [],
             "inter": [],
-            "replans": []
+            "replans": [],
+            'replan_ids': []
         }
-        self.replan_saved = False
         self.robot_name = self.get_namespace()
         self.object_ns = self.declare_parameter('object_ns', '/crackle').value
         self.scenario_name = self.declare_parameter('scenario_name', 'throw_and_catch').value
@@ -495,14 +495,16 @@ class SpacecraftImpactMPC(Node):
         if request.replanned:
             #Save the object plan with new times
             self.plan_object = VerboseBezierPlan2NumpyArray(request.object_plan)
-            if not self.replan_saved:
-                self.replan_saved = True
-                #self.get_logger().info("First replan received, saving previous plan replans as well")
-                 # save all replans before this one as well
-                pre_ids = [i for i, x in enumerate(self.plan['ids']) if x == 'pre']
-                for pre_idx in pre_ids:
-                    self.log_data['replans'].append(self.plan['rvar'][pre_idx])
-                    self.log_data['replans'].append(self.plan['rvar'][pre_idx+1])
+
+            pre_indices = [i for i, x in enumerate(self.plan['ids']) if x == 'pre']
+            pre_tIs = [self.plan['hvar'][i][0,-1] for i in pre_indices]
+            t = (Clock().now().nanoseconds / 1000 - self.start_time) / 1e6
+            # impacts may only occur in the future, so we find the first for which tI > t
+            pre_ids = next((pre_indices[i] for i, tI in enumerate(pre_tIs) if tI > t), -1)
+            
+            self.log_data['replans'].append(np.hstack((self.plan['rvar'][pre_ids], self.plan['rvar'][pre_ids+1])))
+            #self.log_data['replans'].append(self.plan['rvar'][pre_ids+1])
+            self.log_data['replan_ids'].append(pre_ids)
         
         self.publish_plan(request.replanned)
         return response

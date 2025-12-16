@@ -46,7 +46,7 @@ class Robot:
         self.T_final_plan = self.original_plan['hvars'][self.inter_idxs[-1]][0, -1]
         print(f"Final time for {name}: {self.T_final_plan}") if verbose else None
 
-SCENARIO = 'test1'
+SCENARIO = 'test4'
 MPC = 'R'  # 'R' for reactive MPC, models the interaction and reacts to state of the object
             # N for nominal MPC, ignores the interaction altogether and just follows the plan
 if SCENARIO not in ['test1','test2']: #These test do not have obstacles
@@ -196,7 +196,7 @@ if MPC == 'R':
     fig, (ax1,ax2, ax3) = plt.subplots(1, 3,  figsize=(14, 6))
     colors = {'snap':'black', 'crackle':'y', 'object':'red'}
     ls = {'snap':'k-', 'crackle':'y-', 'object':'r-'}
-    inter_ls = {'snap':'b_', 'crackle':'b_'}
+    inter_ls = {'snap':'x', 'crackle':'x'}
     lw = 2
     ms = 15
     
@@ -205,7 +205,7 @@ if MPC == 'R':
     if SCENARIO not in ['test1','test2']:
         lb = obstacles[SCENARIO][0]
         ub = obstacles[SCENARIO][1]
-        rect = plt.Rectangle((lb[0], lb[1]), ub[0]-lb[0], ub[1]-lb[1], color='gray', alpha=0.5, label='Obstacle')
+        rect = plt.Rectangle((lb[0], lb[1]), ub[0]-lb[0], ub[1]-lb[1], color='gray', alpha=0.8, label='Obstacle')
         ax1.add_patch(rect)
     # Plot original planned trajectories
     for name, robot in robots.items():
@@ -246,14 +246,24 @@ if MPC == 'R':
     if SCENARIO not in ['test1','test2']:
         lb = obstacles[SCENARIO][0]
         ub = obstacles[SCENARIO][1]
-        rect = plt.Rectangle((lb[0], lb[1]), ub[0]-lb[0], ub[1]-lb[1], color='gray', alpha=0.5, label='Obstacle')
+        rect = plt.Rectangle((lb[0], lb[1]), ub[0]-lb[0], ub[1]-lb[1], color='gray', alpha=0.8, label='Obstacle')
         ax2.add_patch(rect)
     # Plot original planned trajectories
     for name, robot in robots.items():
-        evals = None
-        for rvar in robot.log['replans']:
-            evals = eval_bezier(rvar[0:2,:], N=100).T if evals is None else np.vstack((evals, eval_bezier(rvar[0:2], N=100).T))
-        ax2.plot(evals[:,0] + offset, evals[:,1],'b-', label=f'{name[0].capitalize() + name[1:]} replans', linewidth=1, zorder = 3)
+        if SCENARIO not in ['test1','test2']:
+            ids_printed = []
+            evals = None
+            for i in range(len(robot.log['replans'])):
+                if robot.log['replan_ids'][i] not in ids_printed:
+                    pre = robot.log['replans'][i]
+                    ids_printed.append(robot.log['replan_ids'][i])
+                    evals = eval_bezier(pre[0:2], N=100).T if evals is None else np.vstack((evals, eval_bezier(pre[0:2], N=100).T))
+            ax2.plot(evals[:,0] + offset, evals[:,1],'x', label=f'{name[0].capitalize() + name[1:]} replans', linewidth=1, zorder = 3)
+        else:
+            evals = None
+            for rvar in robot.log['replans']:
+                evals = eval_bezier(rvar[0:2,:], N=100).T if evals is None else np.vstack((evals, eval_bezier(rvar[0:2], N=100).T))
+            ax2.plot(evals[:,0] + offset, evals[:,1],'b-', label=f'{name[0].capitalize() + name[1:]} replans', linewidth=1, zorder = 3)
     # Plot start positions
     for name, robot in robots.items():
         ax2.plot(robot.robot_start_pos[0] + offset, robot.robot_start_pos[1], marker='o', color=colors[name], label=f'{name[0].capitalize() + name[1:]} start', markersize=ms, zorder=4)
@@ -282,7 +292,7 @@ if MPC == 'R':
     if SCENARIO not in ['test1','test2']:
         lb = obstacles[SCENARIO][0]
         ub = obstacles[SCENARIO][1]
-        rect = plt.Rectangle((lb[0], lb[1]), ub[0]-lb[0], ub[1]-lb[1], color='gray', alpha=0.5, label='obstacle')
+        rect = plt.Rectangle((lb[0], lb[1]), ub[0]-lb[0], ub[1]-lb[1], color='gray', alpha=0.8, label='Obstacle')
         ax3.add_patch(rect)
     # Plot realised trajectories from logs
     for name, robot in robots.items():
