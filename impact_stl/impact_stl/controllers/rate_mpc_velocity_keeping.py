@@ -61,16 +61,21 @@ class SpacecraftRateMPC():
         # Just velocity cost
         cost_p_r =  cs.mtimes([e_robot[3:6].T, self.Q[3:6,3:6], e_robot[3:6]])
         
-        q_r = x[6:10]
-        qref_r = xref_r[6:10]
-        eq_r = 1 - (q_r.T @ qref_r)**2 
-        cost_eq_r = eq_r.T @ self.Q[6,6].reshape((1, 1)) @ eq_r
+        # q_r = x[6:10]
+        # qref_r = xref_r[6:10]
+        # eq_r = 1 - (q_r.T @ qref_r)**2 
+        # cost_eq_r = eq_r.T @ self.Q[6,6].reshape((1, 1)) @ eq_r
     
+        q_r = x[6:10] / cs.sqrt(cs.sumsqr(x[6:10]) + 1e-15)
+        qref_r = xref_r[6:10] / cs.sqrt(cs.sumsqr(xref_r[6:10]) + 1e-15)
 
+        q_error = self.quat_mult(qref_r, cs.vertcat(q_r[0], -q_r[1], -q_r[2], -q_r[3]))
+        q_error = q_error * cs.sign(q_error[0])  # shortest rotation
+        q_error = q_error[1:4]  # vector part
+        cost_eq_r = cs.mtimes([q_error.T, self.Q[6:9,6:9], q_error])
 
         cost_p_r_e = cs.mtimes([e_robot[3:6].T, self.Q_e[3:6,3:6], e_robot[3:6]])
-        cost_eq_r_e = eq_r.T @ self.Q_e[6,6].reshape((1, 1)) @ eq_r
-
+        cost_eq_r_e = cs.mtimes([q_error.T, self.Q_e[6:9,6:9], q_error])
         # Control error
         cost_u = cs.mtimes([u.T, self.R, u])
 
@@ -78,8 +83,8 @@ class SpacecraftRateMPC():
 
 
         model_ac.cost_expr_ext_cost = cost_p_r + \
-            + cost_u
-        model_ac.cost_expr_ext_cost_e = cost_p_r_e
+            + cost_u #+ cost_eq_r
+        model_ac.cost_expr_ext_cost_e = cost_p_r_e #+ cost_eq_r_e
 
         ocp = AcadosOcp()
         ocp.model = model_ac
@@ -204,3 +209,10 @@ class SpacecraftRateMPC():
             U_pred = np.zeros((self.nu, self.N))
 
         return X_pred, U_pred, self.solver.get_status()
+    def quat_mult(self, q1, q2):
+        return cs.vertcat(
+                q1[0]*q2[0] - q1[1]*q2[1] - q1[2]*q2[2] - q1[3]*q2[3],
+                q1[0]*q2[1] + q1[1]*q2[0] + q1[2]*q2[3] - q1[3]*q2[2],
+                q1[0]*q2[2] - q1[1]*q2[3] + q1[2]*q2[0] + q1[3]*q2[1],
+                q1[0]*q2[3] + q1[1]*q2[2] - q1[2]*q2[1] + q1[3]*q2[0]
+            )
