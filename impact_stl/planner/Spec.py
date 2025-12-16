@@ -413,7 +413,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         # Area's of interest
         world.areas = [area1]
     elif specification == "test2":
-        tf = 50
+        tf = 65
         world.spec = Spec(t0=0,tf=tf)
 
         bz = 6

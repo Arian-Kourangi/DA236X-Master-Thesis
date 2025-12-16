@@ -211,7 +211,7 @@ class SpacecraftRateMPC():
 
         # non-colinear terminal velocity cost, only used for straight pushes
         tmp = cs.cross(x_object[3:6], v_des)
-        v_cost_e = s_z*1e5*cs.dot(tmp, tmp)
+        v_cost_e = s_z*2*1e5*cs.dot(tmp, tmp)
 
         model_ac.cost_expr_ext_cost = cost_p_r + cost_eq_r \
             + cost_u + s*cost_p_o + s*cost_eq_o + s*tangent_cost + (1-s)*cost_delta
