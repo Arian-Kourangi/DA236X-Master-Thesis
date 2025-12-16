@@ -231,7 +231,7 @@ if MPC == 'R':
         if name == ref_rob.name:
             ax1.plot(robot.object_start_pos[0]+offset, robot.object_start_pos[1], marker='o', color=colors['object'], label='Object start', markersize=ms, zorder=4)
             ax1.plot(robot.goal_pos[0] + offset, robot.goal_pos[1], marker='*', color='green', label='Goal', markersize=ms, zorder=4)
-    ax1.set_title(f'Original Plan - Scenario {SCENARIO[-1]}')
+    ax1.set_title(f'Original Plans - Scenario {SCENARIO[-1]}')
     ax1.set_xlabel('X position [m]')
     ax1.set_ylabel('Y position [m]')
     ax1.set_xlim(xlim[0],xlim[1])
@@ -243,6 +243,34 @@ if MPC == 'R':
     ax1.legend()
     ax1.grid(True, alpha=0.3)
 
+    if SCENARIO not in ['test1','test2']:
+        lb = obstacles[SCENARIO][0]
+        ub = obstacles[SCENARIO][1]
+        rect = plt.Rectangle((lb[0], lb[1]), ub[0]-lb[0], ub[1]-lb[1], color='gray', alpha=0.5, label='Obstacle')
+        ax2.add_patch(rect)
+    # Plot original planned trajectories
+    for name, robot in robots.items():
+        evals = None
+        for rvar in robot.log['replans']:
+            evals = eval_bezier(rvar[0:2,:], N=100).T if evals is None else np.vstack((evals, eval_bezier(rvar[0:2], N=100).T))
+        ax2.plot(evals[:,0] + offset, evals[:,1],'b-', label=f'{name[0].capitalize() + name[1:]} replans', linewidth=1, zorder = 3)
+    # Plot start positions
+    for name, robot in robots.items():
+        ax2.plot(robot.robot_start_pos[0] + offset, robot.robot_start_pos[1], marker='o', color=colors[name], label=f'{name[0].capitalize() + name[1:]} start', markersize=ms, zorder=4)
+        if name == ref_rob.name:
+            ax2.plot(robot.object_start_pos[0]+offset, robot.object_start_pos[1], marker='o', color=colors['object'], label='Object start', markersize=ms, zorder=4)
+            ax2.plot(robot.goal_pos[0] + offset, robot.goal_pos[1], marker='*', color='green', label='Goal', markersize=ms, zorder=4)
+    ax2.set_title(f'Re-Plans - Scenario {SCENARIO[-1]}')
+    ax2.set_xlabel('X position [m]')
+    ax2.set_ylabel('Y position [m]')
+    ax2.set_xlim(xlim[0],xlim[1])
+    ax2.set_ylim(ylim[0],ylim[1])
+    ax2.set_xticks(np.arange(xlim[0],xlim[1]+1,5))
+    ax2.set_yticks(np.arange(ylim[0],ylim[1]+1,5))
+    ax2.set_xticklabels(np.arange(xlim[0],xlim[1]+1,5))
+    ax2.set_yticklabels(np.arange(ylim[0],ylim[1]+1,5))
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
 
 
 
