@@ -28,7 +28,7 @@ def generate_launch_description():
        PythonLaunchDescriptionSource(
            [get_package_share_directory('impact_stl'), '/px4.launch.py']),
 
-       launch_arguments={'id':'1', 'pose':'1.5,0,0', 'name':'snap', 'delay':'5', 'headless':'0', 'world' : 'frictionless_kth'}.items()
+       launch_arguments={'id':'1', 'pose':'1.5,0,0', 'name':'crackle', 'delay':'5', 'headless':'0', 'world' : 'frictionless_kth'}.items()
     )
 #
     #lf_3 = IncludeLaunchDescription(
@@ -52,7 +52,7 @@ def generate_launch_description():
     )),
     ld.add_action(Node(
             package='px4_offboard',
-            namespace='snap',
+            namespace='crackle',
             executable='visualizer',
             name='visualizer_1',
     )),
@@ -110,7 +110,7 @@ def generate_launch_description():
     ld.add_action(Node(
             package='impact_stl',
             executable='odom_to_vehicle_local_position',
-            namespace='snap',
+            namespace='crackle',
             output='screen',
             parameters=[{'topic_name': '/model/spacecraft_2d_1/odometry'}]
     ))

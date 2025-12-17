@@ -590,7 +590,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         world.areas = [area1]
 
     elif specification == "hw_test2":
-        tf = 18
+        tf = 22
 
         world.spec = Spec(t0=0,tf=tf)
         bz = 4
@@ -607,7 +607,7 @@ def spatial_specifications(world: Object ,specification: str) -> None:
         #               xf=np.array([5,20]),
         #               dxf=np.array([0,0]),nbz=bz, dq_lb=np.array([-2,-2]),dq_ub=np.array([2,2]))
         #
-        object1 = Object(name="snap",
+        object1 = Object(name="crackle",
                          x0=np.array([1.5,0]),
                          dx0=np.array([0,0]),
                          xf=np.array([2.5,0]),

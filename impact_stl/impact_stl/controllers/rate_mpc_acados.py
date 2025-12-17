@@ -260,37 +260,37 @@ class SpacecraftRateMPC():
         ocp.constraints.ubu = ubu
 
         ### Turn off from here if funky
-        idxbx = np.array([0, 1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15])
-        ocp.constraints.idxbx = idxbx
-        lbx = np.zeros((12,))
-        ubx = np.zeros((12,))
-        lbx[0] = 0.0
-        ubx[0] = 3.5
-        lbx[1] = -1.75
-        ubx[1] = 1.75
-        lbx[2] = -1e2
-        ubx[2] = 1e2
-        lbx[3] = -0.3
-        ubx[3] = 0.3
-        lbx[4] = -0.3
-        ubx[4] = 0.3
-        lbx[5] = -0.3
-        ubx[5] = 0.3
+        # idxbx = np.array([0, 1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15])
+        # ocp.constraints.idxbx = idxbx
+        # lbx = np.zeros((12,))
+        # ubx = np.zeros((12,))
+        # lbx[0] = 0.0
+        # ubx[0] = 3.5
+        # lbx[1] = -1.75
+        # ubx[1] = 1.75
+        # lbx[2] = -1e2
+        # ubx[2] = 1e2
+        # lbx[3] = -0.3
+        # ubx[3] = 0.3
+        # lbx[4] = -0.3
+        # ubx[4] = 0.3
+        # lbx[5] = -0.3
+        # ubx[5] = 0.3
         
-        lbx[6] = 0.0
-        ubx[6] = 3.5
-        lbx[6+1] = -1.75
-        ubx[6+1] = 1.75
-        lbx[6+2] = -1e2
-        ubx[6+2] = 1e2
-        lbx[6+3] = -0.3
-        ubx[6+3] = 0.3
-        lbx[6+4] = -0.3
-        ubx[6+4] = 0.3
-        lbx[6+5] = -0.3
-        ubx[6+5] = 0.3
-        ocp.constraints.lbx = lbx
-        ocp.constraints.ubx = ubx
+        # lbx[6] = 0.0
+        # ubx[6] = 3.5
+        # lbx[6+1] = -1.75
+        # ubx[6+1] = 1.75
+        # lbx[6+2] = -1e2
+        # ubx[6+2] = 1e2
+        # lbx[6+3] = -0.3
+        # ubx[6+3] = 0.3
+        # lbx[6+4] = -0.3
+        # ubx[6+4] = 0.3
+        # lbx[6+5] = -0.3
+        # ubx[6+5] = 0.3
+        # ocp.constraints.lbx = lbx
+        # ocp.constraints.ubx = ubx
 
         #### 
 

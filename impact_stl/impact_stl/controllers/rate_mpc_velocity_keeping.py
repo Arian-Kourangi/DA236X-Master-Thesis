@@ -52,14 +52,16 @@ class SpacecraftRateMPC():
         model_ac.u = u
         model_ac.xdot = xdot
         model_ac.name = 'spacecraft_model'
-
+        s = cs.SX.sym('s')  # interaction flag parameter
         xref_r = cs.SX.sym('yref', self.nx)
-        model_ac.p = cs.vertcat(xref_r)
+        p = cs.vertcat(xref_r, s)
+        model_ac.p = cs.vertcat(p)
 
         # Robot error
         e_robot = x - xref_r
         # Just velocity cost
-        cost_p_r =  cs.mtimes([e_robot[3:6].T, self.Q[3:6,3:6], e_robot[3:6]])
+        cost_p_r_init =  cs.mtimes([e_robot[0:6].T, self.Q[0:6,0:6], e_robot[0:6]])
+        cost_p_r =cs.mtimes([e_robot[3:6].T, self.Q[3:6,3:6], e_robot[3:6]])
         
         # q_r = x[6:10]
         # qref_r = xref_r[6:10]
@@ -74,17 +76,20 @@ class SpacecraftRateMPC():
         q_error = q_error[1:4]  # vector part
         cost_eq_r = cs.mtimes([q_error.T, self.Q[6:9,6:9], q_error])
 
+        cost_p_r_e_init = cs.mtimes([e_robot[0:6].T, self.Q_e[0:6,0:6], e_robot[0:6]])
         cost_p_r_e = cs.mtimes([e_robot[3:6].T, self.Q_e[3:6,3:6], e_robot[3:6]])
         cost_eq_r_e = cs.mtimes([q_error.T, self.Q_e[6:9,6:9], q_error])
+        #cost_eq_r_e = eq_r.T @ self.Q_e[6,6].reshape((1, 1)) @ eq_r
         # Control error
         cost_u = cs.mtimes([u.T, self.R, u])
 
         # non-colinear terminal velocity cost, only used for straight pushes
 
 
-        model_ac.cost_expr_ext_cost = cost_p_r + \
-            + cost_u #+ cost_eq_r
-        model_ac.cost_expr_ext_cost_e = cost_p_r_e #+ cost_eq_r_e
+        model_ac.cost_expr_ext_cost = s*cost_p_r + (1-s)*cost_p_r_init \
+            + cost_u + (1-s)*cost_eq_r
+        
+        model_ac.cost_expr_ext_cost_e = s*cost_p_r_e + (1-s)*cost_p_r_e_init + (1-s)*cost_eq_r_e
 
         ocp = AcadosOcp()
         ocp.model = model_ac
@@ -116,26 +121,26 @@ class SpacecraftRateMPC():
         ocp.constraints.ubu = ubu
 
         # Turn of from here if funky
-        idxbx = np.array([0,1,2,3,4,5])
-        ocp.constraints.idxbx = idxbx
-        lbx = np.zeros((6,))
-        ubx = np.zeros((6,))
-        lbx[0] = 0.0
-        ubx[0] = 3.5
-        lbx[1] = -1.75
-        ubx[1] = 1.75
-        lbx[2] = -1e2
-        ubx[2] = 1e2
-        lbx[3] = -0.3
-        ubx[3] = 0.3
-        lbx[4] = -0.3
-        ubx[4] = 0.3
-        lbx[5] = -0.3
-        ubx[5] = 0.3
+        # idxbx = np.array([0,1,2,3,4,5])
+        # ocp.constraints.idxbx = idxbx
+        # lbx = np.zeros((6,))
+        # ubx = np.zeros((6,))
+        # lbx[0] = 0.0
+        # ubx[0] = 3.5
+        # lbx[1] = -1.75
+        # ubx[1] = 1.75
+        # lbx[2] = -1e2
+        # ubx[2] = 1e2
+        # lbx[3] = -0.3
+        # ubx[3] = 0.3
+        # lbx[4] = -0.3
+        # ubx[4] = 0.3
+        # lbx[5] = -0.3
+        # ubx[5] = 0.3
   
 
-        ocp.constraints.lbx = lbx
-        ocp.constraints.ubx = ubx
+        # ocp.constraints.lbx = lbx
+        # ocp.constraints.ubx = ubx
         ####
 
         
@@ -165,7 +170,7 @@ class SpacecraftRateMPC():
         ocp.code_export_directory = dir
         solver = AcadosOcpSolver(ocp, json_file='vel_keeping_mpc.json', build =True)
         return solver
-    def solve(self, x0, setpoints=None,initial_guess={'X': None, 'U': None}):
+    def solve(self, x0, setpoints=None,initial_guess={'X': None, 'U': None},started=False):
         
         x_0 = x0.ravel()
         assert x_0.size == self.nx
@@ -182,10 +187,15 @@ class SpacecraftRateMPC():
                 self.solver.set(k, "u", initial_guess['U'][:, k])    # guessed controls
 
 
-        xref = np.hstack(setpoints)     
+        xref = np.hstack(setpoints)
+        if started:
+            s = np.array([1])
+        else:
+            s = np.array([0])
+        s = s.ravel()     
         for k in range(self.N+1):
             yref = xref[:, k].ravel()
-            p_stacked = yref
+            p_stacked = np.concatenate((yref, s))
             self.solver.set(k, "p", p_stacked)
 
                

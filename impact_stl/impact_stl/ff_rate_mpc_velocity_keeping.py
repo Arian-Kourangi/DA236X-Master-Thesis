@@ -24,6 +24,8 @@ from px4_msgs.msg import VehicleAngularVelocity
 from px4_msgs.msg import VehicleAngularVelocity
 from px4_msgs.msg import VehicleLocalPosition
 from px4_msgs.msg import VehicleRatesSetpoint
+from px4_msgs.msg import VehicleTorqueSetpoint
+from px4_msgs.msg import VehicleThrustSetpoint
 
 from my_msgs.srv import SetPlan, SetVerbosePlan
 from my_msgs.msg import StampedBool, VerboseBezierPlan, TimeShift, Replan
@@ -112,8 +114,17 @@ class SpacecraftImpactMPC(Node):
         
         self.publisher_rates_setpoint = self.create_publisher(VehicleRatesSetpoint, 'fmu/in/vehicle_rates_setpoint', NORMAL_QOS)
         self.publisher_offboard_mode = self.create_publisher(OffboardControlMode, 'fmu/in/offboard_control_mode', NORMAL_QOS)
+        self.publisher_torque_setpoint = self.create_publisher(
+            VehicleTorqueSetpoint,
+            'fmu/in/vehicle_torque_setpoint',
+            NORMAL_QOS)
+        self.publisher_thrust_setpoint = self.create_publisher(
+            VehicleThrustSetpoint,
+            'fmu/in/vehicle_thrust_setpoint',
+            NORMAL_QOS)
+        
         self.timer_period2 = 0.1
-        self.offboard_timer = self.create_timer(self.timer_period2, self.offboard_callback)
+        #self.offboard_timer = self.create_timer(self.timer_period2, self.offboard_callback)
         self.timer_period = 0.1  # seconds
         self.timer = self.create_timer(self.timer_period, self.cmdloop_callback)
         self.release_time = np.array([0.0])
@@ -155,7 +166,7 @@ class SpacecraftImpactMPC(Node):
         self.nav_state = msg.nav_state
 
 
-    def publish_rate_setpoint(self, u_pred):
+    def publish_rate_setpoint(self, u_pred, reset_integral = False):
         thrust_rates = u_pred[:, 0]
         thrust_command = thrust_rates[0:3]
         rates_setpoint_msg = VehicleRatesSetpoint()
@@ -168,10 +179,21 @@ class SpacecraftImpactMPC(Node):
         rates_setpoint_msg.thrust_body[0] = float(thrust_command[0])/k
         rates_setpoint_msg.thrust_body[1] = -float(thrust_command[1])/k
         rates_setpoint_msg.thrust_body[2] = -float(thrust_command[2])/k
+        rates_setpoint_msg.reset_integral = reset_integral
         self.publisher_rates_setpoint.publish(rates_setpoint_msg)
 
+    def publish_wrench_setpoint(self, u):
+        force_output_msg = VehicleThrustSetpoint()
+        force_output_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+        torque_output_msg = VehicleTorqueSetpoint()
+        torque_output_msg.timestamp = int(Clock().now().nanoseconds / 1000)
 
-    def offboard_callback(self):
+        force_output_msg.xyz = [u[0], u[1], u[2]]
+        torque_output_msg.xyz = [u[3], u[4], u[5]]
+        self.publisher_thrust_setpoint.publish(force_output_msg)
+        self.publisher_torque_setpoint.publish(torque_output_msg)
+
+    def offboard_callback(self, mode=None):
         # Publish offboard control modes
         offboard_msg = OffboardControlMode()
         offboard_msg.timestamp = int(Clock().now().nanoseconds / 1000)
@@ -181,7 +203,8 @@ class SpacecraftImpactMPC(Node):
         offboard_msg.attitude = False
         offboard_msg.body_rate = False
         offboard_msg.direct_actuator = False
-        offboard_msg.body_rate = True   # rate control
+        offboard_msg.body_rate = True if mode == "Rates" else False   # rate control
+        offboard_msg.thrust_and_torque = True if mode == "Wrench" else False  # wrench control
         self.publisher_offboard_mode.publish(offboard_msg)
 
     def cmdloop_callback(self):
@@ -198,12 +221,14 @@ class SpacecraftImpactMPC(Node):
         t = Clock().now().nanoseconds  / 1e9
 
         if not self.started:
+            self.offboard_callback(mode="Rates")
             setpoint = self.x0
             for i in range(self.mpc.N+1):
                 ti = t+i*self.mpc.dt
                 setpoints.append(setpoint)
             self.v_des = np.array([0.0, 0.0, 0.0])
         elif t - self.last_inter_time[0] > INTER_HOLD_TIME:
+            self.offboard_callback(mode="Rates")
             if not self.saved:  
                 self.v_des = self.vehicle_local_velocity.copy()
                 self.release_position = self.vehicle_local_position.copy()
@@ -233,7 +258,7 @@ class SpacecraftImpactMPC(Node):
         #if not self.started:
             # We just interacted, need to keep the velocity we had after the interaction to combat friciton of the floor
             x_pred, u_pred ,status= self.mpc.solve(x0,setpoints,
-                                            initial_guess=self.initial_guess)
+                                            initial_guess=self.initial_guess, started=self.started)
             if status == 0:
                 self.initial_guess = {'X': x_pred, 'U': u_pred}
         
@@ -245,8 +270,13 @@ class SpacecraftImpactMPC(Node):
             if time.time() - t0 > self.timer_period:
                 self.get_logger().info(f"LOOP TOOK TOO LONG: {time.time() - t0} (timer_period: {self.timer_period})")
         else:
+            self.offboard_callback(mode="Wrench")
             self.initial_guess = {'X': None, 'U': None}
-            self.publish_rate_setpoint(np.zeros((6,1)))
+            control = np.zeros((6,),dtype=float)
+            #control[0] = 1.0  # small constant thrust
+            #self.publish_rate_setpoint(control,reset_integral = False)
+            self.publish_wrench_setpoint(control)
+
         #print('v_des',self.v_des)
 def main(args=None):
     rclpy.init(args=args)

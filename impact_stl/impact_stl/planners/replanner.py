@@ -126,7 +126,7 @@ class RePlanner(Node):
         if not self.hw:
             self.object_local_position_time_stack[:,-1] = msg.timestamp
         else:
-            self.object_local_position_time_stack[:,-1] = msg.timestamp_sample
+            self.object_local_position_time_stack[:,-1] = msg.timestamp
         self.object_local_position[0] = msg.y
         self.object_local_position[1] = msg.x
         self.object_local_position[2] = -msg.z
@@ -571,12 +571,12 @@ class RePlanner(Node):
         J += (1-s)*1e5 * eps**2  # Penalty for non-parallelism of ending position vector
         ## For pre curve we can have smaller weights
         for i in range(ddrvars[0].shape[1]):
-            J += 20*cs.sumsqr(ddrvars[0][:,i])
+            J += 10*cs.sumsqr(ddrvars[0][:,i])
         for i in range(ddhvars[0].shape[1]):
-            J += 20*cs.sumsqr(ddhvars[0][0,i])
+            J += 10*cs.sumsqr(ddhvars[0][0,i])
     
         # For interaction curve we want to minimize acceleration more
-        w_acc = 2*1e2
+        w_acc = 2*1e1
         for i in range(ddrvars[1].shape[1]):
             J += w_acc*cs.sumsqr(ddrvars[1][:,i])
         for i in range(ddhvars[1].shape[1]):
@@ -623,8 +623,24 @@ class RePlanner(Node):
             'print_iteration': False,
             'qpsol_options': qp_opts
         }
-        opti.solver('sqpmethod', sqp_opts)
 
+        ipopt_opts = {
+            'ipopt': {
+                'max_iter': 1000,
+                'tol': 1e-6,
+                'acceptable_tol': 1e-4,
+                'acceptable_iter': 5,
+                'print_level': 0,
+                'sb': 'yes',
+                'linear_solver': 'mumps',
+                'mu_strategy': 'adaptive',
+                'hessian_approximation': 'limited-memory'
+            },
+            'print_time': False,
+            'error_on_fail': False
+}
+        opti.solver('sqpmethod', sqp_opts)
+        #opti.solver('ipopt', ipopt_opts)
 
         return opti
     

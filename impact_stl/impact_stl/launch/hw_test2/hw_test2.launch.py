@@ -7,7 +7,7 @@ from launch_ros.actions import Node, PushRosNamespace
 from ament_index_python.packages import get_package_share_directory
 import os
 
-HW = False
+HW = True
 def generate_launch_description():
     
     return LaunchDescription([
@@ -21,7 +21,7 @@ def generate_launch_description():
             emulate_tty=True,
             parameters=[{'x0':0.5, 'y0':0.0, 'z0':0.0, 'vx0':0.0, 'vy0':0.0, 'vz0':0.0},
                         {'scenario_name':'hw_test2'},
-                        {'object_ns':'/snap'},
+                        {'object_ns':'/crackle'},
                         {'enable_cbf':True},
                         {'hw':HW}] # NOTE: This must be True to use mocap/PX4 data for object
         ),
@@ -68,7 +68,7 @@ def generate_launch_description():
             executable='replanner',
             name='pop_replanner',
             output='screen',
-            parameters=[{'object_ns':'/snap'},
+            parameters=[{'object_ns':'/crackle'},
                         {'scenario_name':'hw_test2'},
                         {'hw':HW}]
         ),
@@ -86,7 +86,7 @@ def generate_launch_description():
         # Velocity keeping MPC controller for object
         Node(
             package='impact_stl',
-            namespace='snap',
+            namespace='crackle',
             executable='ff_rate_mpc_velocity_keeping', 
             name='snap_velocity_keeping_mpc',
             output='screen',
