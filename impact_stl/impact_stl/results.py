@@ -46,7 +46,7 @@ class Robot:
         self.T_final_plan = self.original_plan['hvars'][self.inter_idxs[-1]][0, -1]
         print(f"Final time for {name}: {self.T_final_plan}") if verbose else None
 
-SCENARIO = 'test2'
+SCENARIO = 'test3'
 MPC = 'R'  # 'R' for reactive MPC, models the interaction and reacts to state of the object
             # N for nominal MPC, ignores the interaction altogether and just follows the plan
 if SCENARIO not in ['test1','test2']: #These test do not have obstacles

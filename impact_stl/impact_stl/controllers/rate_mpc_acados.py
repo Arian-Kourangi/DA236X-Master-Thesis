@@ -149,9 +149,9 @@ class SpacecraftRateMPC():
                     + self.beta * self.h(x_robot, x_object,0.03)[0] \
                     + u_delta  # δ enters additively
         # For test1 set the distance to 1 m instead of 2
-        cbf_stage_aggresive = self.ddh(x_robot,x_object, f_robot, f_object,2)[0] \
-                    + self.alpha * self.dh(x_robot, x_object,2)[0] \
-                    + self.beta * self.h(x_robot, x_object,2)[0] \
+        cbf_stage_aggresive = self.ddh(x_robot,x_object, f_robot, f_object,1)[0] \
+                    + self.alpha * self.dh(x_robot, x_object,1)[0] \
+                    + self.beta * self.h(x_robot, x_object,1)[0] \
                     + u_delta2
 
         model_ac.con_h_expr_0 = cs.vertcat(cbf_stage, cbf_stage_aggresive)
