@@ -4,7 +4,7 @@ from World import World
 from utilities.beziers import eval_bezier
 
 robustness_type = "spatial" # "spatial" or "impact"
-specification   = "hw_test2" # see respective specifications for the options
+specification   = "hw_test3" # see respective specifications for the options
 
 if __name__ == "__main__":
 

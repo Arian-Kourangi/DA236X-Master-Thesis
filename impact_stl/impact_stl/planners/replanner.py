@@ -89,13 +89,13 @@ class RePlanner(Node):
         if self.hw:
             self.world_lb = np.array([0,-1.75])
             self.world_ub = np.array([3.5,1.75])
-            self.dq_lb = np.array([-0.2,-0.2])
-            self.dq_ub = np.array([0.2,0.2]) 
+            self.dq_lb = np.array([-0.3,-0.3])
+            self.dq_ub = np.array([0.3,0.3]) 
         else:   
             self.world_lb = np.array([0,-1.75])
             self.world_ub = np.array([3.5,1.75])
-            self.dq_lb = np.array([-0.2,-0.2])
-            self.dq_ub = np.array([0.2,0.2]) 
+            self.dq_lb = np.array([-0.3,-0.3])
+            self.dq_ub = np.array([0.3,0.3]) 
 
         # position and velocity variables that are updated with the subscriber calls
         self.object_local_position = np.array([0.0, 0.0, 0.0])
@@ -126,7 +126,7 @@ class RePlanner(Node):
         if not self.hw:
             self.object_local_position_time_stack[:,-1] = msg.timestamp
         else:
-            self.object_local_position_time_stack[:,-1] = msg.timestamp
+            self.object_local_position_time_stack[:,-1] = msg.timestamp_sample
         self.object_local_position[0] = msg.y
         self.object_local_position[1] = msg.x
         self.object_local_position[2] = -msg.z
@@ -324,9 +324,9 @@ class RePlanner(Node):
             self.opti.set_value(self.params['s'], 1.0)
             #self.get_logger().info("Using higher end velocity weight since desired end velocity is 0")
         else:
-            w_s_val = np.array([1e0, 1e4, 1e0, 1e4])
+            w_s_val = np.array([1e0, 1e3, 1e0, 1e3])
             if reset:
-                w_s_val = np.array([1e1, 1e1, 1e0, 1e1])
+                w_s_val = np.array([1e0, 1e4, 1e0, 1e4])
             self.opti.set_value(self.params['s'], 0.0)
         self.opti.set_value(self.params['w_s'], w_s_val)
 
@@ -571,12 +571,12 @@ class RePlanner(Node):
         J += (1-s)*1e5 * eps**2  # Penalty for non-parallelism of ending position vector
         ## For pre curve we can have smaller weights
         for i in range(ddrvars[0].shape[1]):
-            J += 10*cs.sumsqr(ddrvars[0][:,i])
+            J += 20*cs.sumsqr(ddrvars[0][:,i])
         for i in range(ddhvars[0].shape[1]):
-            J += 10*cs.sumsqr(ddhvars[0][0,i])
+            J += 20*cs.sumsqr(ddhvars[0][0,i])
     
         # For interaction curve we want to minimize acceleration more
-        w_acc = 2*1e1
+        w_acc = 2*1e2
         for i in range(ddrvars[1].shape[1]):
             J += w_acc*cs.sumsqr(ddrvars[1][:,i])
         for i in range(ddhvars[1].shape[1]):
@@ -608,8 +608,8 @@ class RePlanner(Node):
         qp_opts = {'osqp': {
             'max_iter': 1000,
             'verbose': False,
-            'eps_abs': 1e-3,
-            'eps_rel': 1e-3,
+            'eps_abs': 1e-4,
+            'eps_rel': 1e-4,
             'adaptive_rho': True,
             'polish':True}, 'warm_start_primal': True, 'warm_start_dual': True, 'error_on_fail': False
         }

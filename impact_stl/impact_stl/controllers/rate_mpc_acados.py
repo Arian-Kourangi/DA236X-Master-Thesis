@@ -30,8 +30,8 @@ class SpacecraftRateMPC():
         #Add another input for slack variable
         self.nu = self.nu_phys + 2 
 
-        self.r_robot = 0.20
-        self.r_object = 0.20
+        self.r_robot = 0.21
+        self.r_object = 0.21
         # cost matrices (SITL)
         # self.Q = np.diag([10e0, 10e0, 10e0, 10e-1, 10e-1, 10e-1, 8e-1])
         # self.Q_e = 10 * self.Q
