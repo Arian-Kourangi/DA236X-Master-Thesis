@@ -45,7 +45,7 @@ class SpacecraftRateMPC():
         # px4-mpc
         # To test the normal MPC without the reactive part, double the weights 
         #self.Q = 10*np.diag([5e1, 5e1, 5e1, 5e1, 5e1, 5e1, 8e2, 8e2, 8e2, 8e2])
-        self.Q = np.diag([5e1, 5e1, 5e1, 5e1, 5e1, 5e1, 8e3, 8e3, 8e3, 8e3])
+        self.Q = 10*np.diag([5e1, 5e1, 5e1, 5e1, 5e1, 5e1, 8e4, 8e3, 8e3, 8e3])
         self.Q_e = 10 * self.Q
         self.R = 2*np.diag([1e-2, 1e-2, 1e-2, 2e0, 2e0, 2e0])
         
@@ -336,9 +336,9 @@ class SpacecraftRateMPC():
         s_z = np.array([s_z]).ravel()
         
         for k in range(self.N+1):
-            s = np.array([selectors[k]]).ravel()
+            #s = np.array([selectors[k]]).ravel()
             # To turn off the reactive MPC, use s = 0 for all k
-            #s = np.array([0.0]).ravel()
+            s = np.array([0.0]).ravel()
             yref = xref[:, k].ravel()
             p_stacked = np.concatenate((s, yref, delta_V, v_des, s_k,s_z))
             self.solver.set(k, "p", p_stacked)
