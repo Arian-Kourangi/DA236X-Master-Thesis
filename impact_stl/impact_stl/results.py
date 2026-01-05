@@ -4,6 +4,24 @@ from helpers.read_write_plan import csv_to_plan
 from robustness_calc import signed_distance_point_to_polygon
 from helpers.beziers import eval_bezier
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
+import matplotlib as mpl
+
+fm.fontManager.addfont("/usr/share/texmf/fonts/opentype/public/tex-gyre/texgyretermes-regular.otf")
+fm.fontManager.addfont("/usr/share/texmf/fonts/opentype/public/tex-gyre/texgyretermes-bold.otf")
+fm.fontManager.addfont("/usr/share/texmf/fonts/opentype/public/tex-gyre/texgyretermes-italic.otf")
+
+mpl.rcParams.update({
+    "font.size": 15,
+    "axes.labelsize": 15,
+    "axes.titlesize": 15,
+    "legend.fontsize": 15,
+    "xtick.labelsize": 12,
+    "ytick.labelsize": 12,
+    "font.family": "serif",
+    "font.serif": ["TeX Gyre Termes"],
+    "mathtext.fontset": "stix",  # closest match for math
+})
 class Robot:
     def __init__(self, name, scenario, mpc= 'R', run_id = 1, verbose=False):
         self.name = name
@@ -46,8 +64,8 @@ class Robot:
         self.T_final_plan = self.original_plan['hvars'][self.inter_idxs[-1]][0, -1]
         print(f"Final time for {name}: {self.T_final_plan}") if verbose else None
 
-SCENARIO = 'test4'
-MPC = 'N'  # 'R' for reactive MPC, models the interaction and reacts to state of the object
+SCENARIO = 'test1'
+MPC = 'R'  # 'R' for reactive MPC, models the interaction and reacts to state of the object
             # N for nominal MPC, ignores the interaction altogether and just follows the plan
 if SCENARIO not in ['test1','test2']: #These test do not have obstacles
     metrics = {'delta_V_pre':[], 'delta_V_post':[], 'delta_V_final':[], 'delta_pos_final':[], 'delta_T':[],'robustness':[]}
@@ -183,7 +201,7 @@ if SCENARIO not in ['test1','test2']: #These test do not have obstacles
 # Then the realised trajectories from the logs
 # Enough to do it for one run_id per scenario
 # Make seperate plots for Original, replanned, and realised trajectories
-
+names = {'snap':r'$R_1$', 'crackle':r'$R_2$'}
 if MPC == 'R':
     if SCENARIO == 'test1':
         offset = 5
@@ -193,7 +211,8 @@ if MPC == 'R':
         offset = 0.0
         xlim = (0,30)
         ylim = (0,30)
-    fig, (ax1,ax2, ax3) = plt.subplots(1, 3,  figsize=(14, 6))
+    # fig, (ax1,ax2, ax3) = plt.subplots(1, 3,  figsize=(14, 6))
+    fig, ax1 = plt.subplots(1, 1,  figsize=(7, 6))
     colors = {'snap':'black', 'crackle':'y', 'object':'red'}
     ls = {'snap':'k-', 'crackle':'y-', 'object':'r-'}
     inter_ls = {'snap':'cornflowerblue', 'crackle':'orange'}
@@ -214,13 +233,13 @@ if MPC == 'R':
         for i,rvar in enumerate(robot.original_plan['rvars']):
             if robot.original_plan['ids'][i] != 'inter':
                 evals = eval_bezier(rvar[0:2,:], N=100).T if evals is None else np.vstack((evals, eval_bezier(rvar[0:2], N=100).T))
-        ax1.plot(evals[:,0] + offset, evals[:,1],ls[name], label=f'{name[0].capitalize() + name[1:]} plan', linewidth=lw, zorder=1)
+        ax1.plot(evals[:,0] + offset, evals[:,1],ls[name], label=f'{names[name]} plan', linewidth=lw, zorder=1)
         labeled = False
         for i,rvar in enumerate(robot.original_plan['rvars']):
             if robot.original_plan['ids'][i] == 'inter':
                 evals = eval_bezier(rvar[0:2,:], N=100).T #if evals is None else np.vstack((evals, eval_bezier(rvar[0:2], N=100).T))
                 if not labeled:
-                    ax1.plot(evals[:,0] + offset, evals[:,1],inter_ls[name], label=f'{name[0].capitalize() + name[1:]} interaction', linewidth=thick_lw, zorder = 3)
+                    ax1.plot(evals[:,0] + offset, evals[:,1],inter_ls[name], label=f'{names[name]} interaction', linewidth=thick_lw, zorder = 3)
                     labeled = True
                 else:
                     ax1.plot(evals[:,0] + offset, evals[:,1],inter_ls[name], linewidth=thick_lw, zorder = 3)
@@ -230,12 +249,12 @@ if MPC == 'R':
             for i,rvar in enumerate(robot.original_plan_obj['rvars']):
                 if robot.original_plan_obj['ids'][i] != 'inter':
                     evals = eval_bezier(rvar, N=100).T if evals is None else np.vstack((evals, eval_bezier(rvar, N=100).T))
-            ax1.plot(evals[:,0] + offset, evals[:,1], ls['object'], label='Object plan', linewidth=lw, zorder=2)
+            ax1.plot(evals[:,0] + offset, evals[:,1], ls['object'], label=r'$O_1$ plan', linewidth=lw, zorder=2)
     # Plot start positions
     for name, robot in robots.items():
-        ax1.plot(robot.robot_start_pos[0] + offset, robot.robot_start_pos[1], marker='o', color=colors[name], label=f'{name[0].capitalize() + name[1:]} start', markersize=ms, zorder=4)
+        ax1.plot(robot.robot_start_pos[0] + offset, robot.robot_start_pos[1], marker='o', color=colors[name], label=f'{names[name]} start', markersize=ms, zorder=4)
         if name == ref_rob.name:
-            ax1.plot(robot.object_start_pos[0]+offset, robot.object_start_pos[1], marker='o', color=colors['object'], label='Object start', markersize=ms, zorder=4)
+            ax1.plot(robot.object_start_pos[0]+offset, robot.object_start_pos[1], marker='o', color=colors['object'], label=r'$O_1$ start', markersize=ms, zorder=4)
             ax1.plot(robot.goal_pos[0] + offset, robot.goal_pos[1], marker='*', color='green', label='Goal', markersize=ms, zorder=4)
     ax1.set_title(f'Original Plans - Scenario {SCENARIO[-1]}')
     ax1.set_xlabel('X position [m]')
@@ -248,13 +267,19 @@ if MPC == 'R':
     ax1.set_yticklabels(np.arange(ylim[0],ylim[1]+1,5))
     ax1.legend()
     ax1.grid(True, alpha=0.3)
+    plt.tight_layout()
+    #plt.show()
+    plt.savefig(f'/home/arian/repos/thesis/impact_stl/impact_stl/plots/{SCENARIO}_original_trajectories.pdf', bbox_inches="tight")
+    # Subplot 2: Replanned Trajectories
+    fig, ax2 = plt.subplots(1, 1,  figsize=(7, 6))
+
 
     if SCENARIO not in ['test1','test2']:
         lb = obstacles[SCENARIO][0]
         ub = obstacles[SCENARIO][1]
         rect = plt.Rectangle((lb[0], lb[1]), ub[0]-lb[0], ub[1]-lb[1], color='gray', alpha=0.8, label='Obstacle')
         ax2.add_patch(rect)
-    # Plot original planned trajectories
+    # Plot replanned trajectories
     for name, robot in robots.items():
         if SCENARIO not in ['test1','test2']:
             ids_printed = []
@@ -266,7 +291,7 @@ if MPC == 'R':
                     ids_printed.append(robot.log['replan_ids'][i])
                     evals = eval_bezier(pre[0:2], N=100).T #if evals is None else np.vstack((evals, eval_bezier(pre[0:2], N=100).T))
                     if not labeled:
-                        ax2.plot(evals[:,0] + offset, evals[:,1],inter_ls[name], label=f'{name[0].capitalize() + name[1:]} replans', linewidth=thick_lw, zorder = 3)
+                        ax2.plot(evals[:,0] + offset, evals[:,1],inter_ls[name], label=f'{names[name]} replans', linewidth=thick_lw, zorder = 3)
                         labeled = True
                     else:
                         ax2.plot(evals[:,0] + offset, evals[:,1],inter_ls[name], linewidth=thick_lw, zorder = 3)
@@ -274,12 +299,12 @@ if MPC == 'R':
             evals = None
             for rvar in robot.log['replans']:
                 evals = eval_bezier(rvar[0:2,:], N=100).T if evals is None else np.vstack((evals, eval_bezier(rvar[0:2], N=100).T))
-            ax2.plot(evals[:,0] + offset, evals[:,1],inter_ls[name], label=f'{name[0].capitalize() + name[1:]} replans', linewidth=thick_lw, zorder = 3)
+            ax2.plot(evals[:,0] + offset, evals[:,1],inter_ls[name], label=f'{names[name]} replans', linewidth=thick_lw, zorder = 3)
     # Plot start positions
     for name, robot in robots.items():
-        ax2.plot(robot.robot_start_pos[0] + offset, robot.robot_start_pos[1], marker='o', color=colors[name], label=f'{name[0].capitalize() + name[1:]} start', markersize=ms, zorder=4)
+        ax2.plot(robot.robot_start_pos[0] + offset, robot.robot_start_pos[1], marker='o', color=colors[name], label=f'{names[name]} start', markersize=ms, zorder=4)
         if name == ref_rob.name:
-            ax2.plot(robot.object_start_pos[0]+offset, robot.object_start_pos[1], marker='o', color=colors['object'], label='Object start', markersize=ms, zorder=4)
+            ax2.plot(robot.object_start_pos[0]+offset, robot.object_start_pos[1], marker='o', color=colors['object'], label=r'$O_1$ start', markersize=ms, zorder=4)
             ax2.plot(robot.goal_pos[0] + offset, robot.goal_pos[1], marker='*', color='green', label='Goal', markersize=ms, zorder=4)
     ax2.set_title(f'Re-Plans - Scenario {SCENARIO[-1]}')
     ax2.set_xlabel('X position [m]')
@@ -292,11 +317,14 @@ if MPC == 'R':
     ax2.set_yticklabels(np.arange(ylim[0],ylim[1]+1,5))
     ax2.legend()
     ax2.grid(True, alpha=0.3)
+    plt.tight_layout()
+    #plt.show()
+    plt.savefig(f'/home/arian/repos/thesis/impact_stl/impact_stl/plots/{SCENARIO}_replanned_trajectories.pdf', bbox_inches="tight")
 
 
 
 
-
+    fig, ax3 = plt.subplots(1, 1,  figsize=(7, 6))
 
     # Subplot 3: Realized Trajectories
     # Plot obstacles
@@ -307,14 +335,14 @@ if MPC == 'R':
         ax3.add_patch(rect)
     # Plot realised trajectories from logs
     for name, robot in robots.items():
-        ax3.plot(robot.log['x'][:,0] + offset, robot.log['x'][:,1],ls[name] , label=f'{name[0].capitalize() + name[1:]} realized', linewidth=lw)
+        ax3.plot(robot.log['x'][:,0] + offset, robot.log['x'][:,1],ls[name] , label=f'{names[name]} realized', linewidth=lw)
         if name == ref_rob.name:
             ax3.plot(robot.log['xobj'][:ref_rob.inter_sets[-1][-1],0] + offset, robot.log['xobj'][:ref_rob.inter_sets[-1][-1],1], ls['object'], label='Object realized', linewidth=lw, zorder=3)
     # Plot start positions
     for name, robot in robots.items():
-        ax3.plot(robot.robot_start_pos[0] + offset, robot.robot_start_pos[1], marker='o', color=colors[name], label=f'{name[0].capitalize() + name[1:]} start', markersize=ms, zorder =4)
+        ax3.plot(robot.robot_start_pos[0] + offset, robot.robot_start_pos[1], marker='o', color=colors[name], label=f'{names[name]} start', markersize=ms, zorder =4)
         if name == ref_rob.name:
-            ax3.plot(robot.object_start_pos[0]+offset, robot.object_start_pos[1], marker='o', color=colors['object'], label='Object start', markersize=ms, zorder=4)
+            ax3.plot(robot.object_start_pos[0]+offset, robot.object_start_pos[1], marker='o', color=colors['object'], label=r'$O_1$ start', markersize=ms, zorder=4)
             ax3.plot(robot.goal_pos[0] + offset, robot.goal_pos[1], marker='*', color='red', label='Goal', markersize=ms, zorder =4)
     ax3.set_title(f'Realized Trajectories - Scenario {SCENARIO[-1]}')
     ax3.set_xlabel('X position [m]')
@@ -329,4 +357,50 @@ if MPC == 'R':
     ax3.grid(True, alpha=0.3)
     
     plt.tight_layout()
-    plt.show()
+    #plt.show()
+    plt.savefig(f'/home/arian/repos/thesis/impact_stl/impact_stl/plots/{SCENARIO}_trajectories.pdf', bbox_inches="tight")
+
+if MPC == 'R':
+    if SCENARIO == 'test1':
+        offset = 5
+        xlim = (-5,25)
+        ylim = (-5,25)
+    else:
+        offset = 0.0
+        xlim = (0,30)
+        ylim = (0,30)
+    fig, ax = plt.subplots(1, 1,  figsize=(7, 6))
+    colors = {'snap':'black', 'crackle':'y', 'object':'red'}
+    ls = {'snap':'k-', 'crackle':'y-', 'object':'r-'}
+    inter_ls = {'snap':'cornflowerblue', 'crackle':'orange'}
+    lw = 2
+    thick_lw = 4
+    ms = 15
+ 
+    # Subplot 1: Original Plan
+    # Plot obstacles
+    if SCENARIO not in ['test1','test2']:
+        lb = obstacles[SCENARIO][0]
+        ub = obstacles[SCENARIO][1]
+        rect = plt.Rectangle((lb[0], lb[1]), ub[0]-lb[0], ub[1]-lb[1], color='gray', alpha=0.8, label='Obstacle')
+        ax.add_patch(rect)
+    # Plot start positions
+    for name, robot in robots.items():
+        ax.plot(robot.robot_start_pos[0] + offset, robot.robot_start_pos[1], marker='o', color=colors[name], label=f'{names[name]} start', markersize=ms, zorder=4)
+        if name == ref_rob.name:
+            ax.plot(robot.object_start_pos[0]+offset, robot.object_start_pos[1], marker='o', color=colors['object'], label=r'$O_1$ start', markersize=ms, zorder=4)
+            ax.plot(robot.goal_pos[0] + offset, robot.goal_pos[1], marker='*', color='green', label='Goal', markersize=ms, zorder=4)
+    ax.set_title(f'Original Plans - Scenario {SCENARIO[-1]}')
+    ax.set_xlabel('X position [m]')
+    ax.set_ylabel('Y position [m]')
+    ax.set_xlim(xlim[0],xlim[1])
+    ax.set_ylim(ylim[0],ylim[1])
+    ax.set_xticks(np.arange(xlim[0],xlim[1]+1,5))
+    ax.set_yticks(np.arange(ylim[0],ylim[1]+1,5))
+    ax.set_xticklabels(np.arange(xlim[0],xlim[1]+1,5))
+    ax.set_yticklabels(np.arange(ylim[0],ylim[1]+1,5))
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    #plt.show()
+    plt.savefig(f'/home/arian/repos/thesis/impact_stl/impact_stl/plots/{SCENARIO}_setup.pdf', bbox_inches="tight")
