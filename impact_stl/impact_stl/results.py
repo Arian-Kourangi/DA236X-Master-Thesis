@@ -12,12 +12,12 @@ fm.fontManager.addfont("/usr/share/texmf/fonts/opentype/public/tex-gyre/texgyret
 fm.fontManager.addfont("/usr/share/texmf/fonts/opentype/public/tex-gyre/texgyretermes-italic.otf")
 
 mpl.rcParams.update({
-    "font.size": 15,
-    "axes.labelsize": 15,
-    "axes.titlesize": 15,
-    "legend.fontsize": 15,
-    "xtick.labelsize": 12,
-    "ytick.labelsize": 12,
+    "font.size": 25,
+    "axes.labelsize": 20,
+    "axes.titlesize": 25,
+    "legend.fontsize": 18,
+    "xtick.labelsize": 18,
+    "ytick.labelsize": 18,
     "font.family": "serif",
     "font.serif": ["TeX Gyre Termes"],
     "mathtext.fontset": "stix",  # closest match for math
@@ -64,7 +64,7 @@ class Robot:
         self.T_final_plan = self.original_plan['hvars'][self.inter_idxs[-1]][0, -1]
         print(f"Final time for {name}: {self.T_final_plan}") if verbose else None
 
-SCENARIO = 'test1'
+SCENARIO = 'test4'
 MPC = 'R'  # 'R' for reactive MPC, models the interaction and reacts to state of the object
             # N for nominal MPC, ignores the interaction altogether and just follows the plan
 if SCENARIO not in ['test1','test2']: #These test do not have obstacles
@@ -211,8 +211,9 @@ if MPC == 'R':
         offset = 0.0
         xlim = (0,30)
         ylim = (0,30)
-    # fig, (ax1,ax2, ax3) = plt.subplots(1, 3,  figsize=(14, 6))
-    fig, ax1 = plt.subplots(1, 1,  figsize=(7, 6))
+    fig, axes = plt.subplots(2, 2,  figsize=(14, 12))
+    ax0, ax1, ax2, ax3 = axes.flatten()
+    #fig, ax1 = plt.subplots(1, 1,  figsize=(7, 6))
     colors = {'snap':'black', 'crackle':'y', 'object':'red'}
     ls = {'snap':'k-', 'crackle':'y-', 'object':'r-'}
     inter_ls = {'snap':'cornflowerblue', 'crackle':'orange'}
@@ -256,7 +257,7 @@ if MPC == 'R':
         if name == ref_rob.name:
             ax1.plot(robot.object_start_pos[0]+offset, robot.object_start_pos[1], marker='o', color=colors['object'], label=r'$O_1$ start', markersize=ms, zorder=4)
             ax1.plot(robot.goal_pos[0] + offset, robot.goal_pos[1], marker='*', color='green', label='Goal', markersize=ms, zorder=4)
-    ax1.set_title(f'Original Plans - Scenario {SCENARIO[-1]}')
+    #ax1.set_title(f'Original Plans - Scenario {SCENARIO[-1]}')
     ax1.set_xlabel('X position [m]')
     ax1.set_ylabel('Y position [m]')
     ax1.set_xlim(xlim[0],xlim[1])
@@ -265,13 +266,17 @@ if MPC == 'R':
     ax1.set_yticks(np.arange(ylim[0],ylim[1]+1,5))
     ax1.set_xticklabels(np.arange(xlim[0],xlim[1]+1,5))
     ax1.set_yticklabels(np.arange(ylim[0],ylim[1]+1,5))
-    ax1.legend()
+    ax1.legend(
+    frameon=False,
+    handlelength=1.5,
+    labelspacing=0.3
+)
     ax1.grid(True, alpha=0.3)
-    plt.tight_layout()
+    #plt.tight_layout()
     #plt.show()
-    plt.savefig(f'/home/arian/repos/thesis/impact_stl/impact_stl/plots/{SCENARIO}_original_trajectories.pdf', bbox_inches="tight")
+    #plt.savefig(f'/home/arian/repos/thesis/impact_stl/impact_stl/plots/{SCENARIO}_original_trajectories.pdf', bbox_inches="tight")
     # Subplot 2: Replanned Trajectories
-    fig, ax2 = plt.subplots(1, 1,  figsize=(7, 6))
+    #fig, ax2 = plt.subplots(1, 1,  figsize=(7, 6))
 
 
     if SCENARIO not in ['test1','test2']:
@@ -306,7 +311,7 @@ if MPC == 'R':
         if name == ref_rob.name:
             ax2.plot(robot.object_start_pos[0]+offset, robot.object_start_pos[1], marker='o', color=colors['object'], label=r'$O_1$ start', markersize=ms, zorder=4)
             ax2.plot(robot.goal_pos[0] + offset, robot.goal_pos[1], marker='*', color='green', label='Goal', markersize=ms, zorder=4)
-    ax2.set_title(f'Re-Plans - Scenario {SCENARIO[-1]}')
+    #ax2.set_title(f'Re-Plans - Scenario {SCENARIO[-1]}')
     ax2.set_xlabel('X position [m]')
     ax2.set_ylabel('Y position [m]')
     ax2.set_xlim(xlim[0],xlim[1])
@@ -315,16 +320,19 @@ if MPC == 'R':
     ax2.set_yticks(np.arange(ylim[0],ylim[1]+1,5))
     ax2.set_xticklabels(np.arange(xlim[0],xlim[1]+1,5))
     ax2.set_yticklabels(np.arange(ylim[0],ylim[1]+1,5))
-    ax2.legend()
+    ax2.legend(
+    frameon=False,
+    handlelength=1.5,
+    labelspacing=0.3)
     ax2.grid(True, alpha=0.3)
-    plt.tight_layout()
+    #plt.tight_layout()
     #plt.show()
-    plt.savefig(f'/home/arian/repos/thesis/impact_stl/impact_stl/plots/{SCENARIO}_replanned_trajectories.pdf', bbox_inches="tight")
+    #plt.savefig(f'/home/arian/repos/thesis/impact_stl/impact_stl/plots/{SCENARIO}_replanned_trajectories.pdf', bbox_inches="tight")
 
 
 
 
-    fig, ax3 = plt.subplots(1, 1,  figsize=(7, 6))
+    #fig, ax3 = plt.subplots(1, 1,  figsize=(7, 6))
 
     # Subplot 3: Realized Trajectories
     # Plot obstacles
@@ -337,14 +345,14 @@ if MPC == 'R':
     for name, robot in robots.items():
         ax3.plot(robot.log['x'][:,0] + offset, robot.log['x'][:,1],ls[name] , label=f'{names[name]} realized', linewidth=lw)
         if name == ref_rob.name:
-            ax3.plot(robot.log['xobj'][:ref_rob.inter_sets[-1][-1],0] + offset, robot.log['xobj'][:ref_rob.inter_sets[-1][-1],1], ls['object'], label='Object realized', linewidth=lw, zorder=3)
+            ax3.plot(robot.log['xobj'][:ref_rob.inter_sets[-1][-1],0] + offset, robot.log['xobj'][:ref_rob.inter_sets[-1][-1],1], ls['object'], label=r'$O_1$ realized', linewidth=lw, zorder=3)
     # Plot start positions
     for name, robot in robots.items():
         ax3.plot(robot.robot_start_pos[0] + offset, robot.robot_start_pos[1], marker='o', color=colors[name], label=f'{names[name]} start', markersize=ms, zorder =4)
         if name == ref_rob.name:
             ax3.plot(robot.object_start_pos[0]+offset, robot.object_start_pos[1], marker='o', color=colors['object'], label=r'$O_1$ start', markersize=ms, zorder=4)
             ax3.plot(robot.goal_pos[0] + offset, robot.goal_pos[1], marker='*', color='red', label='Goal', markersize=ms, zorder =4)
-    ax3.set_title(f'Realized Trajectories - Scenario {SCENARIO[-1]}')
+    #ax3.set_title(f'Realized Trajectories - Scenario {SCENARIO[-1]}')
     ax3.set_xlabel('X position [m]')
     ax3.set_ylabel('Y position [m]')
     ax3.set_xlim(xlim[0],xlim[1])
@@ -353,29 +361,13 @@ if MPC == 'R':
     ax3.set_yticks(np.arange(ylim[0],ylim[1]+1,5))
     ax3.set_xticklabels(np.arange(xlim[0],xlim[1]+1,5))
     ax3.set_yticklabels(np.arange(ylim[0],ylim[1]+1,5))
-    ax3.legend()
+    ax3.legend(
+    frameon=False,
+    handlelength=1.5,
+    labelspacing=0.3)
     ax3.grid(True, alpha=0.3)
     
-    plt.tight_layout()
-    #plt.show()
-    plt.savefig(f'/home/arian/repos/thesis/impact_stl/impact_stl/plots/{SCENARIO}_trajectories.pdf', bbox_inches="tight")
 
-if MPC == 'R':
-    if SCENARIO == 'test1':
-        offset = 5
-        xlim = (-5,25)
-        ylim = (-5,25)
-    else:
-        offset = 0.0
-        xlim = (0,30)
-        ylim = (0,30)
-    fig, ax = plt.subplots(1, 1,  figsize=(7, 6))
-    colors = {'snap':'black', 'crackle':'y', 'object':'red'}
-    ls = {'snap':'k-', 'crackle':'y-', 'object':'r-'}
-    inter_ls = {'snap':'cornflowerblue', 'crackle':'orange'}
-    lw = 2
-    thick_lw = 4
-    ms = 15
  
     # Subplot 1: Original Plan
     # Plot obstacles
@@ -383,24 +375,64 @@ if MPC == 'R':
         lb = obstacles[SCENARIO][0]
         ub = obstacles[SCENARIO][1]
         rect = plt.Rectangle((lb[0], lb[1]), ub[0]-lb[0], ub[1]-lb[1], color='gray', alpha=0.8, label='Obstacle')
-        ax.add_patch(rect)
+        ax0.add_patch(rect)
     # Plot start positions
     for name, robot in robots.items():
-        ax.plot(robot.robot_start_pos[0] + offset, robot.robot_start_pos[1], marker='o', color=colors[name], label=f'{names[name]} start', markersize=ms, zorder=4)
+        ax0.plot(robot.robot_start_pos[0] + offset, robot.robot_start_pos[1], marker='o', color=colors[name], label=f'{names[name]} start', markersize=ms, zorder=4)
         if name == ref_rob.name:
-            ax.plot(robot.object_start_pos[0]+offset, robot.object_start_pos[1], marker='o', color=colors['object'], label=r'$O_1$ start', markersize=ms, zorder=4)
-            ax.plot(robot.goal_pos[0] + offset, robot.goal_pos[1], marker='*', color='green', label='Goal', markersize=ms, zorder=4)
-    ax.set_title(f'Original Plans - Scenario {SCENARIO[-1]}')
-    ax.set_xlabel('X position [m]')
-    ax.set_ylabel('Y position [m]')
-    ax.set_xlim(xlim[0],xlim[1])
-    ax.set_ylim(ylim[0],ylim[1])
-    ax.set_xticks(np.arange(xlim[0],xlim[1]+1,5))
-    ax.set_yticks(np.arange(ylim[0],ylim[1]+1,5))
-    ax.set_xticklabels(np.arange(xlim[0],xlim[1]+1,5))
-    ax.set_yticklabels(np.arange(ylim[0],ylim[1]+1,5))
-    ax.legend()
-    ax.grid(True, alpha=0.3)
+            ax0.plot(robot.object_start_pos[0]+offset, robot.object_start_pos[1], marker='o', color=colors['object'], label=r'$O_1$ start', markersize=ms, zorder=4)
+            ax0.plot(robot.goal_pos[0] + offset, robot.goal_pos[1], marker='*', color='green', label='Goal', markersize=ms, zorder=4)
+    #ax0.set_title(f'Setup - Scenario {SCENARIO[-1]}')
+    ax0.set_xlabel('X position [m]')
+    ax0.set_ylabel('Y position [m]')
+    ax0.set_xlim(xlim[0],xlim[1])
+    ax0.set_ylim(ylim[0],ylim[1])
+    ax0.set_xticks(np.arange(xlim[0],xlim[1]+1,5))
+    ax0.set_yticks(np.arange(ylim[0],ylim[1]+1,5))
+    ax0.set_xticklabels(np.arange(xlim[0],xlim[1]+1,5))
+    ax0.set_yticklabels(np.arange(ylim[0],ylim[1]+1,5))
+    ax0.legend(
+    frameon=False,
+    handlelength=1.5,
+    labelspacing=0.3)
+    ax0.grid(True, alpha=0.3)
+
+
+    labels = ['(a)', '(b)', '(c)', '(d)']
+    if SCENARIO == 'test3':
+        for ax, lab in zip(axes.flatten(), labels):
+            ax.text(
+                0.98, 0.05,
+                lab,
+                transform=ax.transAxes,
+                fontsize=25,
+                fontweight="bold",
+                va="bottom",
+                ha="right"
+            )
+    else:
+        for ax, lab in zip(axes.flatten(), labels):
+            if SCENARIO == 'test2' and ax == ax1:
+                ax.text(
+                    0.98, 0.95,
+                    lab,
+                    transform=ax.transAxes,
+                    fontsize=25,
+                    fontweight="bold",
+                    va="top",
+                    ha="right"
+                )
+            else:
+                ax.text(
+                    0.02, 0.95,
+                    lab,
+                    transform=ax.transAxes,
+                    fontsize=25,
+                    fontweight="bold",
+                    va="top",
+                    ha="left"
+                )
+    
     plt.tight_layout()
     #plt.show()
-    plt.savefig(f'/home/arian/repos/thesis/impact_stl/impact_stl/plots/{SCENARIO}_setup.pdf', bbox_inches="tight")
+    plt.savefig(f'/home/arian/repos/thesis/impact_stl/impact_stl/plots/{SCENARIO}_trajectories.pdf', bbox_inches="tight")
