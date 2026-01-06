@@ -19,7 +19,7 @@ def generate_launch_description():
             name='pop_mpc',
             output='screen',
             emulate_tty=True,
-            parameters=[{'x0':0.3, 'y0':0.0, 'z0':0.0, 'vx0':0.0, 'vy0':0.0, 'vz0':0.0},
+            parameters=[{'x0':0.5, 'y0':-1.25, 'z0':0.0, 'vx0':0.0, 'vy0':0.0, 'vz0':0.0},
                         {'scenario_name':'hw_test3'},
                         {'object_ns':'/snap'},
                         {'enable_cbf':True},
@@ -32,7 +32,7 @@ def generate_launch_description():
            name='crackle_mpc',
            output='screen',
            emulate_tty=True,
-           parameters=[{'x0':3.25, 'y0':0.0, 'z0':0.0, 'vx0':0.0, 'vy0':0.0, 'vz0':0.0},
+           parameters=[{'x0':3.25, 'y0':1.5, 'z0':0.0, 'vx0':0.0, 'vy0':0.0, 'vz0':0.0},
                        {'scenario_name':'hw_test3'},
                        {'object_ns':'/snap'},
                        {'enable_cbf':True},
@@ -90,7 +90,7 @@ def generate_launch_description():
             name='snap_velocity_keeping_mpc',
             output='screen',
             emulate_tty=True,
-            parameters=[{'x0':1.0, 'y0':0.0, 'z0':0.0, 'vx0':0.0, 'vy0':0.0, 'vz0':0.0},
+            parameters=[{'x0':1.25, 'y0':-0.5, 'z0':0.0, 'vx0':0.0, 'vy0':0.0, 'vz0':0.0},
                         {'hw':HW}]
         ),
 

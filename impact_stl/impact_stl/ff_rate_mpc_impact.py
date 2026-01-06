@@ -55,6 +55,8 @@ class SpacecraftImpactMPC(Node):
             "x": [],
             "xobj": [],
             "inter": [],
+            "replans": [],
+            'replan_ids': []
         }
 
         self.robot_name = self.get_namespace()
@@ -525,6 +527,17 @@ class SpacecraftImpactMPC(Node):
         if request.replanned:
             #Save the object plan with new times
             self.plan_object = VerboseBezierPlan2NumpyArray(request.object_plan)
+
+            pre_indices = [i for i, x in enumerate(self.plan['ids']) if x == 'pre']
+            pre_tIs = [self.plan['hvar'][i][0,-1] for i in pre_indices]
+            t = (Clock().now().nanoseconds / 1000 - self.start_time) / 1e6
+            # impacts may only occur in the future, so we find the first for which tI > t
+            pre_ids = next((pre_indices[i] for i, tI in enumerate(pre_tIs) if tI > t), -1)
+            
+            self.log_data['replans'].append(np.hstack((self.plan['rvar'][pre_ids], self.plan['rvar'][pre_ids+1])))
+            #self.log_data['replans'].append(self.plan['rvar'][pre_ids+1])
+            self.log_data['replan_ids'].append(pre_ids)
+        
         self.publish_plan(request.replanned)
         return response
     

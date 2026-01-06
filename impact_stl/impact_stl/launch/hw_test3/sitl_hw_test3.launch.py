@@ -28,14 +28,14 @@ def generate_launch_description():
        PythonLaunchDescriptionSource(
            [get_package_share_directory('impact_stl'), '/px4.launch.py']),
 
-       launch_arguments={'id':'1', 'pose':'1.0,-0.75,0', 'name':'snap', 'delay':'5', 'headless':'0', 'world' : 'frictionless_kth'}.items()
+       launch_arguments={'id':'1', 'pose':'1.25,-0.5,0', 'name':'snap', 'delay':'5', 'headless':'0', 'world' : 'frictionless_kth'}.items()
     )
 
     lf_3 = IncludeLaunchDescription(
        PythonLaunchDescriptionSource(
            [get_package_share_directory('impact_stl'), '/px4.launch.py']),
 
-       launch_arguments={'id':'2', 'pose':'3,1.25,0', 'name':'crackle', 'delay':'10', 'headless':'0', 'world': 'frictionless_kth'}.items()
+       launch_arguments={'id':'2', 'pose':'3.25,1.5,0', 'name':'crackle', 'delay':'10', 'headless':'0', 'world': 'frictionless_kth'}.items()
     )
 
     ld.add_action(lf_1)

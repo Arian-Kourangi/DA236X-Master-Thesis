@@ -324,7 +324,7 @@ class RePlanner(Node):
             self.opti.set_value(self.params['s'], 1.0)
             #self.get_logger().info("Using higher end velocity weight since desired end velocity is 0")
         else:
-            w_s_val = np.array([1e0, 1e3, 1e0, 1e3])
+            w_s_val = np.array([1e0, 1e4, 1e0, 1e4])
             if reset:
                 w_s_val = np.array([1e0, 1e4, 1e0, 1e4])
             self.opti.set_value(self.params['s'], 0.0)
