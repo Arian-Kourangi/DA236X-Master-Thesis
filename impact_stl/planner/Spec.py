@@ -548,3 +548,54 @@ def spatial_specifications(world: Object ,specification: str) -> None:
 
         # Area's of interest
         world.areas = [area1]
+
+    elif specification == "test5":
+        tf = 122
+
+        world.spec = Spec(t0=0,tf=tf)
+        bz = 10
+        
+        area1 = Area(x_min=np.array([9,6]),x_max=np.array([11,8]))
+        phi11 = Pred(type="MU",preds=area1,io="in")
+        phi1 = Pred(type="F",I=[0,60],preds=[phi11])
+
+        area2 = Area(x_min=np.array([18,20]),x_max=np.array([20,22]))
+        phi21 = Pred(type="MU",preds=area2,io="in")
+        phi2 = Pred(type="F",I=[80,tf],preds=[phi21])
+        world.spec.add_pred(copy.deepcopy(phi2),
+                            name='pop')
+        world.spec.add_pred(copy.deepcopy(phi1),
+                           name='pop')
+
+        robot1 = Robot(name="snap",
+                       x0=np.array([2,2]),
+                       dx0=np.array([0,0]),
+                       xf=None,
+                       dxf=np.array([0,0]),nbz=bz, dq_lb=np.array([-2,-2]),dq_ub=np.array([2,2]))
+        
+        robot2 = Robot(name="crackle",
+                       x0=np.array([1,5]),
+                       dx0=np.array([0,0]),
+                       xf=None,
+                       dxf=np.array([0,0]),nbz=bz, dq_lb=np.array([-2,-2]),dq_ub=np.array([2,2]))
+        
+        object1 = Object(name="pop",
+                         x0=np.array([2,4]),
+                         dx0=np.array([0,0]),
+                         xf=np.array([25,25]),
+                         dxf=np.array([0,0]),nbz=bz, dq_lb=np.array([-2,-2]),dq_ub=np.array([2,2]))
+        
+
+        world.dim = 2
+        world.robots = [robot1,robot2]
+        world.objects = [object1]
+
+        # World bounding box
+        world.x_lb = np.array([0,0])
+        world.x_ub = np.array([30,30])
+
+        # Obstacles
+        world.obstacles= []
+
+        # Area's of interest
+        world.areas = [area1,area2]

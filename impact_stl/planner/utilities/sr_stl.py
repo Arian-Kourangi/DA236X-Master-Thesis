@@ -101,7 +101,7 @@ def quant_MU_predicate(obj,mu,robot_vars,rho):
     try:
         for idx in range(robot_vars['nbzs']):
             # a zs per control point
-            cps = [-1]
+            cps = [-1] # change to 0 for test5
             zss = obj.prog.addMVar(shape=(len(cps),),vtype=gp.GRB.BINARY)
             for cp in cps:
                 for face in range(mu.preds.nfaces):
