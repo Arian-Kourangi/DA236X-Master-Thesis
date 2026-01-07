@@ -64,8 +64,8 @@ class Robot:
         self.T_final_plan = self.original_plan['hvars'][self.inter_idxs[-1]][0, -1]
         print(f"Final time for {name}: {self.T_final_plan}") if verbose else None
 
-SCENARIO = 'test4'
-MPC = 'R'  # 'R' for reactive MPC, models the interaction and reacts to state of the object
+SCENARIO = 'test5'
+MPC = 'N'  # 'R' for reactive MPC, models the interaction and reacts to state of the object
             # N for nominal MPC, ignores the interaction altogether and just follows the plan
 if SCENARIO not in ['test1','test2']: #These test do not have obstacles
     metrics = {'delta_V_pre':[], 'delta_V_post':[], 'delta_V_final':[], 'delta_pos_final':[], 'delta_T':[],'robustness':[]}
@@ -105,7 +105,7 @@ for run_id in range(1,11):
             print(f"Robot {robot.name} interaction {i} delta_V_post: {delta_V_post}") if Verbose else None
         
     # Robustness metrics
-    if SCENARIO not in ['test1','test2']: #These test do not have obstacles
+    if SCENARIO not in ['test1','test2','test5']: #These test do not have obstacles
         lb = obstacles[SCENARIO][0]
         ub = obstacles[SCENARIO][1]
         for name, robot in robots.items():
@@ -121,7 +121,20 @@ for run_id in range(1,11):
         metrics['robustness'].append(robustness)
         print(f"Robustness for run ID {run_id}: {robustness}") if Verbose else None
 
-        
+    elif SCENARIO == 'test5':
+        lb1 = np.array([9,6])
+        ub1 = np.array([11,8])
+        lb2 = np.array([18,20])
+        ub2 = np.array([20,22])
+        for name, robot in robots.items():
+            for log_idx in range(len(robot.log['t'])):
+                pos = robot.log['xobj'][log_idx, 0:2]
+                sd1 = -signed_distance_point_to_polygon(pos, lb1, ub1)
+                sd2 = -signed_distance_point_to_polygon(pos, lb2, ub2)
+                rhos.append(sd1)
+                rhos.append(sd2)
+        robustness = np.max(rhos)
+        metrics['robustness'].append(robustness)
 
     # Find the robot with the largest final time, compare the planned vel, pos and time
     max_T_final = -np.inf
@@ -170,7 +183,7 @@ for key, values in metrics.items():
 # Original robustness of the plan
 rhos_plan = []
 
-if SCENARIO not in ['test1','test2']: #These test do not have obstacles
+if SCENARIO not in ['test1','test2','test5']: #These test do not have obstacles
     lb = obstacles[SCENARIO][0]
     ub = obstacles[SCENARIO][1]
     for name in robots.keys():
@@ -190,7 +203,23 @@ if SCENARIO not in ['test1','test2']: #These test do not have obstacles
         
     robustness_plan = np.min(rhos_plan)
     print(f"Original plan robustness for scenario {SCENARIO}: {robustness_plan}")
-
+elif SCENARIO == 'test5':
+    lb1 = np.array([9,6])
+    ub1 = np.array([11,8])
+    lb2 = np.array([18,20])
+    ub2 = np.array([20,22])
+    for name in robots.keys():
+        robot = robots[name]
+        for i in range(len(robot.original_plan_obj['rvars'])):
+            rvar = robot.original_plan_obj['rvars'][i]
+            evals = eval_bezier(rvar, N=100)
+            for pos in evals.T:
+                sd1 = -signed_distance_point_to_polygon(pos[0:2], lb1, ub1)
+                sd2 = -signed_distance_point_to_polygon(pos[0:2], lb2, ub2)
+                rhos_plan.append(sd1)
+                rhos_plan.append(sd2)
+    robustness_plan = np.max(rhos_plan)
+    print(f"Original plan robustness for scenario {SCENARIO}: {robustness_plan}")
 
 #### Plotting #####
 # Plot the setup first, including start pose of all robots and object, goal pose, and obstacles if ann
@@ -223,11 +252,20 @@ if MPC == 'R':
     
     # Subplot 1: Original Plan
     # Plot obstacles
-    if SCENARIO not in ['test1','test2']:
+    if SCENARIO not in ['test1','test2','test5']:
         lb = obstacles[SCENARIO][0]
         ub = obstacles[SCENARIO][1]
         rect = plt.Rectangle((lb[0], lb[1]), ub[0]-lb[0], ub[1]-lb[1], color='gray', alpha=0.8, label='Obstacle')
         ax1.add_patch(rect)
+    elif SCENARIO == 'test5':
+        lb1 = np.array([9,6])
+        ub1 = np.array([11,8])
+        rect1 = plt.Rectangle((lb1[0], lb1[1]), ub1[0]-lb1[0], ub1[1]-lb1[1], color='gray', alpha=0.8, label='RoI 1')
+        ax1.add_patch(rect1)
+        lb2 = np.array([18,20])
+        ub2 = np.array([20,22])
+        rect2 = plt.Rectangle((lb2[0], lb2[1]), ub2[0]-lb2[0], ub2[1]-lb2[1], color='darkgray', alpha=0.8, label='RoI 2')
+        ax1.add_patch(rect2)
     # Plot original planned trajectories
     for name, robot in robots.items():
         evals = None
@@ -279,11 +317,20 @@ if MPC == 'R':
     #fig, ax2 = plt.subplots(1, 1,  figsize=(7, 6))
 
 
-    if SCENARIO not in ['test1','test2']:
+    if SCENARIO not in ['test1','test2','test5']:
         lb = obstacles[SCENARIO][0]
         ub = obstacles[SCENARIO][1]
         rect = plt.Rectangle((lb[0], lb[1]), ub[0]-lb[0], ub[1]-lb[1], color='gray', alpha=0.8, label='Obstacle')
         ax2.add_patch(rect)
+    elif SCENARIO == 'test5':
+        lb1 = np.array([9,6])
+        ub1 = np.array([11,8])
+        rect1 = plt.Rectangle((lb1[0], lb1[1]), ub1[0]-lb1[0], ub1[1]-lb1[1], color='gray', alpha=0.8, label='RoI 1')
+        ax2.add_patch(rect1)
+        lb2 = np.array([18,20])
+        ub2 = np.array([20,22])
+        rect2 = plt.Rectangle((lb2[0], lb2[1]), ub2[0]-lb2[0], ub2[1]-lb2[1], color='darkgray', alpha=0.8, label='RoI 2')
+        ax2.add_patch(rect2)
     # Plot replanned trajectories
     for name, robot in robots.items():
         if SCENARIO not in ['test1','test2']:
@@ -345,11 +392,20 @@ if MPC == 'R':
 
     # Subplot 3: Realized Trajectories
     # Plot obstacles
-    if SCENARIO not in ['test1','test2']:
+    if SCENARIO not in ['test1','test2','test5']:
         lb = obstacles[SCENARIO][0]
         ub = obstacles[SCENARIO][1]
         rect = plt.Rectangle((lb[0], lb[1]), ub[0]-lb[0], ub[1]-lb[1], color='gray', alpha=0.8, label='Obstacle')
         ax3.add_patch(rect)
+    elif SCENARIO == 'test5':
+        lb1 = np.array([9,6])
+        ub1 = np.array([11,8])
+        rect1 = plt.Rectangle((lb1[0], lb1[1]), ub1[0]-lb1[0], ub1[1]-lb1[1], color='gray', alpha=0.8, label='RoI 1')
+        ax3.add_patch(rect1)
+        lb2 = np.array([18,20])
+        ub2 = np.array([20,22])
+        rect2 = plt.Rectangle((lb2[0], lb2[1]), ub2[0]-lb2[0], ub2[1]-lb2[1], color='darkgray', alpha=0.8, label='RoI 2')
+        ax3.add_patch(rect2)
     # Plot realised trajectories from logs
     for name, robot in robots.items():
         ax3.plot(robot.log['x'][:,0] + offset, robot.log['x'][:,1],ls[name] , label=f'{names[name]} realized', linewidth=lw)
@@ -380,11 +436,20 @@ if MPC == 'R':
  
     # Subplot 1: Original Plan
     # Plot obstacles
-    if SCENARIO not in ['test1','test2']:
+    if SCENARIO not in ['test1','test2','test5']:
         lb = obstacles[SCENARIO][0]
         ub = obstacles[SCENARIO][1]
         rect = plt.Rectangle((lb[0], lb[1]), ub[0]-lb[0], ub[1]-lb[1], color='gray', alpha=0.8, label='Obstacle')
         ax0.add_patch(rect)
+    elif SCENARIO == 'test5':
+        lb1 = np.array([9,6])
+        ub1 = np.array([11,8])
+        rect1 = plt.Rectangle((lb1[0], lb1[1]), ub1[0]-lb1[0], ub1[1]-lb1[1], color='gray', alpha=0.8, label='RoI 1')
+        ax0.add_patch(rect1)
+        lb2 = np.array([18,20])
+        ub2 = np.array([20,22])
+        rect2 = plt.Rectangle((lb2[0], lb2[1]), ub2[0]-lb2[0], ub2[1]-lb2[1], color='darkgray', alpha=0.8, label='RoI 2')
+        ax0.add_patch(rect2)
     # Plot start positions
     for name, robot in robots.items():
         ax0.plot(robot.robot_start_pos[0] + offset, robot.robot_start_pos[1], marker='o', color=colors[name], label=f'{names[name]} start', markersize=ms, zorder=4)
