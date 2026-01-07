@@ -218,7 +218,7 @@ if MPC == 'R':
     ls = {'snap':'k-', 'crackle':'y-', 'object':'r-'}
     inter_ls = {'snap':'cornflowerblue', 'crackle':'orange'}
     lw = 2
-    thick_lw = 4
+    thick_lw = 5
     ms = 15
     
     # Subplot 1: Original Plan
@@ -240,10 +240,10 @@ if MPC == 'R':
             if robot.original_plan['ids'][i] == 'inter':
                 evals = eval_bezier(rvar[0:2,:], N=100).T #if evals is None else np.vstack((evals, eval_bezier(rvar[0:2], N=100).T))
                 if not labeled:
-                    ax1.plot(evals[:,0] + offset, evals[:,1],inter_ls[name], label=f'{names[name]} interaction', linewidth=thick_lw, zorder = 3)
+                    ax1.plot(evals[:,0] + offset, evals[:,1],ls[name], label=f'{names[name]} interaction', linewidth=thick_lw, zorder = 3)
                     labeled = True
                 else:
-                    ax1.plot(evals[:,0] + offset, evals[:,1],inter_ls[name], linewidth=thick_lw, zorder = 3)
+                    ax1.plot(evals[:,0] + offset, evals[:,1],ls[name], linewidth=thick_lw, zorder = 3)
         
         if name == ref_rob.name:
             evals = None
@@ -269,7 +269,7 @@ if MPC == 'R':
     ax1.legend(
     frameon=False,
     handlelength=1.5,
-    labelspacing=0.3
+    labelspacing=0.1
 )
     ax1.grid(True, alpha=0.3)
     #plt.tight_layout()
@@ -292,19 +292,28 @@ if MPC == 'R':
             labeled = False
             for i in range(len(robot.log['replans'])):
                 if robot.log['replan_ids'][i] not in ids_printed:
-                    pre = robot.log['replans'][i]
+                    pre = robot.log['replans'][i][0:2,0:6]
+                    inter = robot.log['replans'][i][0:2,6:]
                     ids_printed.append(robot.log['replan_ids'][i])
-                    evals = eval_bezier(pre[0:2], N=100).T #if evals is None else np.vstack((evals, eval_bezier(pre[0:2], N=100).T))
+                    evals1 = eval_bezier(pre, N=100).T #if evals is None else np.vstack((evals, eval_bezier(pre[0:2], N=100).T))
+                    evals2 = eval_bezier(inter, N=100).T #if evals is None else np.vstack((evals, eval_bezier(inter[0:2], N=100).T))
                     if not labeled:
-                        ax2.plot(evals[:,0] + offset, evals[:,1],inter_ls[name], label=f'{names[name]} replans', linewidth=thick_lw, zorder = 3)
+                        ax2.plot(evals1[:,0] + offset, evals1[:,1],ls[name], label=f'{names[name]} pre replan', linewidth=lw, zorder = 3)
+                        ax2.plot(evals2[:,0] + offset, evals2[:,1],ls[name], label=f'{names[name]} inter replan', linewidth=thick_lw, zorder = 3)
                         labeled = True
                     else:
-                        ax2.plot(evals[:,0] + offset, evals[:,1],inter_ls[name], linewidth=thick_lw, zorder = 3)
+                        ax2.plot(evals1[:,0] + offset, evals1[:,1],ls[name], linewidth=lw, zorder = 3)
+                        ax2.plot(evals2[:,0] + offset, evals2[:,1],ls[name], linewidth=thick_lw, zorder = 3)
         else:
-            evals = None
-            for rvar in robot.log['replans']:
-                evals = eval_bezier(rvar[0:2,:], N=100).T if evals is None else np.vstack((evals, eval_bezier(rvar[0:2], N=100).T))
-            ax2.plot(evals[:,0] + offset, evals[:,1],inter_ls[name], label=f'{names[name]} replans', linewidth=thick_lw, zorder = 3)
+            evals1 = None
+            evals2 = None
+            rvar1 = robot.log['replans'][0]
+            rvar2 = robot.log['replans'][1]
+
+            evals1 = eval_bezier(rvar1[0:2], N=100).T if evals1 is None else np.vstack((evals1, eval_bezier(rvar1[0:2], N=100).T))
+            evals2 = eval_bezier(rvar2[0:2], N=100).T if evals2 is None else np.vstack((evals2, eval_bezier(rvar2[0:2], N=100).T))
+            ax2.plot(evals1[:,0] + offset, evals1[:,1],ls[name], label=f'{names[name]} pre replan', linewidth=lw, zorder = 3)
+            ax2.plot(evals2[:,0] + offset, evals2[:,1],ls[name], label=f'{names[name]} inter replan', linewidth=thick_lw, zorder = 3)
     # Plot start positions
     for name, robot in robots.items():
         ax2.plot(robot.robot_start_pos[0] + offset, robot.robot_start_pos[1], marker='o', color=colors[name], label=f'{names[name]} start', markersize=ms, zorder=4)
@@ -323,7 +332,7 @@ if MPC == 'R':
     ax2.legend(
     frameon=False,
     handlelength=1.5,
-    labelspacing=0.3)
+    labelspacing=0.1)
     ax2.grid(True, alpha=0.3)
     #plt.tight_layout()
     #plt.show()
@@ -364,7 +373,7 @@ if MPC == 'R':
     ax3.legend(
     frameon=False,
     handlelength=1.5,
-    labelspacing=0.3)
+    labelspacing=0.1)
     ax3.grid(True, alpha=0.3)
     
 
@@ -394,7 +403,7 @@ if MPC == 'R':
     ax0.legend(
     frameon=False,
     handlelength=1.5,
-    labelspacing=0.3)
+    labelspacing=0.1)
     ax0.grid(True, alpha=0.3)
 
 
