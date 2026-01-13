@@ -12,14 +12,14 @@
   <!-- TODO: Add 5-10 relevant keywords for your research area -->
   <meta name="keywords" content="KEYWORD1, KEYWORD2, KEYWORD3, machine learning, computer vision, AI">
   <!-- TODO: List all authors -->
-  <meta name="author" content="FIRST_AUTHOR_NAME, SECOND_AUTHOR_NAME">
+  <meta name="author" content="Arian Kourangi Esfahani">
   <meta name="robots" content="index, follow">
   <meta name="language" content="English">
   
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="article">
   <!-- TODO: Replace with your institution or lab name -->
-  <meta property="og:site_name" content="INSTITUTION_OR_LAB_NAME">
+  <meta property="og:site_name" content="KTH Royal Institute of Technology">
   <!-- TODO: Same as paper title above -->
   <meta property="og:title" content="PAPER_TITLE">
   <!-- TODO: Same as description above -->
@@ -96,6 +96,21 @@
   
   <!-- Fonts - Optimized loading -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- KaTeX for math rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      renderMathInElement(document.body, {
+        delimiters: [
+          {left: "$$", right: "$$", display: true},
+          {left: "$", right: "$", display: false}
+        ]
+      });
+    });
+  </script>
   
   <!-- Defer non-critical JavaScript -->
   <script defer src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
@@ -115,20 +130,12 @@
     "author": [
       {
         "@type": "Person",
-        "name": "FIRST_AUTHOR_NAME",
+        "name": "Arian Kourangi Esfahani",
         "affiliation": {
           "@type": "Organization",
-          "name": "INSTITUTION_NAME"
+          "name": "KTH Royal Institute of Technology"
         }
       },
-      {
-        "@type": "Person",
-        "name": "SECOND_AUTHOR_NAME",
-        "affiliation": {
-          "@type": "Organization",
-          "name": "INSTITUTION_NAME"
-        }
-      }
     ],
     "datePublished": "2024-01-01",
     "publisher": {
@@ -164,8 +171,8 @@
   {
     "@context": "https://schema.org",
     "@type": "Organization",
-    "name": "INSTITUTION_OR_LAB_NAME",
-    "url": "https://YOUR_INSTITUTION_WEBSITE.com",
+    "name": "KTH Royal Institute of Technology",
+    "url": "https://kth.se",
     "logo": "https://YOUR_DOMAIN.com/static/images/favicon.ico",
     "sameAs": [
       "https://twitter.com/YOUR_TWITTER_HANDLE",
@@ -191,19 +198,13 @@
             <div class="is-size-5 publication-authors">
               <!-- TODO: Replace with your paper authors and their personal links -->
               <span class="author-block">
-                <a href="FIRST AUTHOR PERSONAL LINK" target="_blank">First Author</a><sup>*</sup>,</span>
-                <span class="author-block">
-                  <a href="SECOND AUTHOR PERSONAL LINK" target="_blank">Second Author</a><sup>*</sup>,</span>
-                  <span class="author-block">
-                    <a href="THIRD AUTHOR PERSONAL LINK" target="_blank">Third Author</a>
+                <a href="https://www.linkedin.com/in/arian-kourangi-esfahani" target="_blank">Arian Kourangi Esfahani</a>                <span class="author-block">
                   </span>
                   </div>
 
                   <div class="is-size-5 publication-authors">
                     <!-- TODO: Replace with your institution and conference/journal info -->
-                    <span class="author-block">Institution Name<br>Conference name and year</span>
-                    <!-- TODO: Remove this line if no equal contribution -->
-                    <span class="eql-cntrb"><small><br><sup>*</sup>Indicates Equal Contribution</small></span>
+                    <span class="author-block">KTH Royal Institute of Technology<br>Conference name and year</span>
                   </div>
 
                   <div class="column has-text-centered">
@@ -232,7 +233,7 @@
 
                   <!-- TODO: Replace with your GitHub repository URL -->
                   <span class="link-block">
-                    <a href="https://github.com/YOUR REPO HERE" target="_blank"
+                    <a href="https://github.com/Arian-Kourangi/DA236X-Master-Thesis" target="_blank"
                     class="external-link button is-normal is-rounded is-dark">
                     <span class="icon">
                       <i class="fab fa-github"></i>
@@ -258,73 +259,19 @@
     </div>
   </div>
 </section>
+
 <!-- Teaser video-->
 <section class="hero teaser">
   <div class="container is-max-desktop">
     <div class="hero-body">
       <!-- TODO: Replace with your teaser video -->
-      <h2 class="title is-3 has-text-centered">Scenario 1</h2>
-      <video poster="" id="scen1" autoplay controls muted loop height="100%" preload="metadata">
-        <!-- TODO: Add your video file path here -->
-        <source src="static/videos/test2.mp4" type="video/mp4">
-      </video>
-      <!-- TODO: Replace with your video description -->
-      <h2 class="subtitle has-text-centered">
-        Recording of simulation results, scenario 1.
-      </h2>
-    </div>
-  </div>
-</section>
-<!-- End teaser video -->
-<!-- Teaser video-->
-<section class="hero teaser">
-  <div class="container is-max-desktop">
-    <div class="hero-body">
-      <!-- TODO: Replace with your teaser video -->
-      <h2 class="title is-3 has-text-centered">Scenario 2</h2>
       <video poster="" id="scen2" autoplay controls muted loop height="100%" preload="metadata">
         <!-- TODO: Add your video file path here -->
         <source src="static/videos/test3.mp4" type="video/mp4">
       </video>
       <!-- TODO: Replace with your video description -->
       <h2 class="subtitle has-text-centered">
-        Recording of simulation results, scenario 2.
-      </h2>
-    </div>
-  </div>
-</section>
-<!-- End teaser video -->
-<!-- Teaser video-->
-<section class="hero teaser">
-  <div class="container is-max-desktop">
-    <div class="hero-body">
-      <!-- TODO: Replace with your teaser video -->
-      <h2 class="title is-3 has-text-centered">Scenario 3</h2>
-      <video poster="" id="scen3" autoplay controls muted loop height="100%" preload="metadata">
-        <!-- TODO: Add your video file path here -->
-        <source src="static/videos/test4.mp4" type="video/mp4">
-      </video>
-      <!-- TODO: Replace with your video description -->
-      <h2 class="subtitle has-text-centered">
-        Recording of simulation results, scenario 3.
-      </h2>
-    </div>
-  </div>
-</section>
-<!-- End teaser video -->
-<!-- Teaser video-->
-<section class="hero teaser">
-  <div class="container is-max-desktop">
-    <div class="hero-body">
-      <!-- TODO: Replace with your teaser video -->
-      <h2 class="title is-3 has-text-centered">Scenario 4</h2>
-      <video poster="" id="scen4" autoplay controls muted loop height="100%" preload="metadata">
-        <!-- TODO: Add your video file path here -->
-        <source src="static/videos/test5.mp4" type="video/mp4">
-      </video>
-      <!-- TODO: Replace with your video description -->
-      <h2 class="subtitle has-text-centered">
-        Recording of simulation results, scenario 4.
+        Simulation demonstrating autonomous tetherless object transportation in a microgravity environment.
       </h2>
     </div>
   </div>
@@ -353,22 +300,96 @@
 
 <!-- Section with Graph/Plot and Video Side by Side -->
 <section class="section">
-  <div class="container is-max-desktop">
-    <h2 class="title is-3 has-text-centered">Section Title</h2>
+  <div class="container">
+    <h2 class="title is-3 has-text-centered"> Basic Transportation </h2>
+    <div class="content has-text-centered">
+    <p>Shown in Figure 1(a) is the setup for scenario 1. The transportation tasks involves robots $R_1$ and $R_2$ transporting the object $O_1$ from its starting position to the goal. This scenario excludes any obstacles or \glspl{RoI}, as such no STL formulas are used. The total allotted time for the task is $T = 65$ seconds and the initial conditions are as follows: $R_1(0) = [2,2]$, $R_2(0) = [20,20]$, $O_1(0) = [4,4]$. The goal of the task is $O_1(T) = [25,25]$.</p>
+    </div>
     <div class="columns is-vcentered">
       <!-- Graph/Plot Column -->
-      <div class="column is-half">
+      <div class="column is-7">
         <figure class="image">
           <img src="static/plots/test2-1.png" alt="Description of graph">
         </figure>
-        <p class="has-text-centered">Caption for graph/plot</p>
+        <p class="has-text-centered"> Figure 1. (a) Setup for scenario 1. (b)
+                          the original plans produced by the MILP. (c) the re-planned trajectories of
+                          robots during task execution. (d) the final realized trajectories of all robots and objects 
+      </p>
       </div>
       <!-- Video Column -->
-      <div class="column is-half">
-        <video poster="" controls muted loop height="100%" preload="metadata">
+      <div class="column is-7">
+        <video poster="" autoplay controls muted loop height="100%" preload="metadata">
           <source src="static/videos/test2.mp4" type="video/mp4">
         </video>
-        <p class="has-text-centered">Caption for video</p>
+        <p class="has-text-centered">Simulation Recording</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <h2 class="title is-3 has-text-centered"> Transportation & Obstacle Avoidance </h2>
+    <div class="content has-text-centered">
+    <p>
+      To evaluate the performance of the proposed method on non-linear trajectories, Scenario 3 is designed and simulated with an obstacle located between the initial and goal positions of the object. This scenario is intended to assess the method's ability to operate in environments with obstacles and hazards, particularly when interactions induce changes in the object's direction rather than simple acceleration or deceleration along a straight line.
+      The initial conditions for the robots and the object in Scenario 3 are given by $R_1(0) = [1,4]$, $R_2(0) = [2,9]$, and $O_1(0) = [3,3]$.
+      The corresponding setup is shown in Figure 2(a), with a task horizon of $T = 90$. The objective of the task is for the object to reach the final goal position $O_1(T) = [25,25]$, while ensuring obstacle avoidance for all systems throughout the execution:
+    </p>
+    <p style="text-align: center; margin: 1em 0;">
+      $$\varphi = \bigwedge_{S_i\in\mathcal{S}} \mathbf{G}_{[0,T]}(p_{S_i} \in \mathcal{W}_{\text{free}})$$
+    </p>
+    </div>
+    <div class="columns is-vcentered">
+      <!-- Graph/Plot Column -->
+      <div class="column is-7">
+        <figure class="image">
+          <img src="static/plots/test4-1.png" alt="Description of graph">
+        </figure>
+        <p class="has-text-centered"> Figure 2. (a) Setup for scenario 3. (b)
+                          the original plans produced by the MILP. (c) the re-planned trajectories of
+                          robots during task execution. (d) the final realized trajectories of all robots and objects 
+      </p>
+      </div>
+      <!-- Video Column -->
+      <div class="column is-7">
+        <video poster="" autoplay controls muted loop height="100%" preload="metadata">
+          <source src="static/videos/test4.mp4" type="video/mp4">
+        </video>
+        <p class="has-text-centered">Simulation Recording</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <h2 class="title is-3 has-text-centered"> Transportation with Waypoint Regions </h2>
+    <div class="content has-text-centered">
+    <p>
+    The final scenario evaluates the performance of the proposed method in the presence of intermediary goals during transport, which also serves to assess its behavior under a more complex STL specification. Figure 3(a) illustrates the setup for scenario 4. The initial conditions are $R_1(0) = [2,2]$, $R_2(0) = [1,5]$, and $O_1(0) = [2,4]$. The task is to transport $O_1$ to the goal position at $T=122$, $O_1(T) = [25,25]$, while visiting two regions of interest, $RoI_1 = [10,7]$ and $RoI_2 = [19,21]$, each defined as a square of side length 2. The specification is given by
+    </p>
+    <p style="text-align: center; margin: 1em 0;">
+    $$\varphi = \mathbf{F}_{[0,60]}(p_{O_1} \in RoI_1) \wedge \mathbf{F}_{[80,T]}(p_{O_1} \in RoI_2)$$
+    </p>
+    </div>
+    <div class="columns is-vcentered">
+      <!-- Graph/Plot Column -->
+      <div class="column is-7">
+        <figure class="image">
+          <img src="static/plots/test5-1.png" alt="Description of graph">
+        </figure>
+        <p class="has-text-centered"> Figure 3. (a) Setup for scenario 4. (b)
+                          the original plans produced by the MILP. (c) the re-planned trajectories of
+                          robots during task execution. (d) the final realized trajectories of all robots and objects 
+      </p>
+      </div>
+      <!-- Video Column -->
+      <div class="column is-7">
+        <video poster="" autoplay controls muted loop height="100%" preload="metadata">
+          <source src="static/videos/test5.mp4" type="video/mp4">
+        </video>
+        <p class="has-text-centered">Simulation Recording</p>
       </div>
     </div>
   </div>
@@ -381,7 +402,7 @@
       <h2 class="title">Poster</h2>
 
       <!-- TODO: Replace with your poster PDF -->
-      <iframe  src="static/pdfs/sample.pdf" width="100%" height="550">
+      <iframe  src="static/pdfs/Master_Thesis_Arian_Kourangi.pdf" width="100%" height="550">
           </iframe>
         
       </div>
