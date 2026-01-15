@@ -46,7 +46,6 @@ setup(
                 'main_planner = impact_stl.planners.main_planner:main',
                 'replanner = impact_stl.planners.replanner:main',
                 'scenario = impact_stl.scenario:main',
-                'reset = impact_stl.reset:main',
 
                 # controllers
                 'ff_rate_mpc_impact = impact_stl.ff_rate_mpc_impact:main',

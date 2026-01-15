@@ -35,7 +35,7 @@ from impact_stl.models.spacecraft_rate_model import SpacecraftRateModel
 from impact_stl.planners.main_planner import plan_to_plan_msg
 # from impact_stl.controller.rate_mpc import SpacecraftRateMPC
 from impact_stl.controllers.rate_mpc_acados import SpacecraftRateMPC
-from impact_stl.controllers.rate_inter_mpc_acados import SpacecraftInterMPC
+#from impact_stl.controllers.rate_inter_mpc_acados import SpacecraftInterMPC
 
 from impact_stl.helpers.helpers import vector2PoseMsg, BezierCurve2NumpyArray, \
                             BezierPlan2NumpyArray, interpolate_bezier, VerboseBezierPlan2NumpyArray,\

@@ -19,7 +19,6 @@ from px4_msgs.msg import VehicleLocalPosition
 from impact_stl.helpers.beziers import get_derivative_control_points_gurobi
 from ament_index_python.packages import get_package_share_directory
 from impact_stl.helpers.read_write_plan import csv_to_plan
-from impact_stl.helpers.solve_a_b_plan import solve_a_b_plan
 
 def plan_to_plan_msg(rvars,hvars,idvars,other_names):
 
@@ -134,12 +133,7 @@ class MainPlanner(Node):
             'impact_stl/compute_plan',
             self.compute_plan_callback,
             new_qos_profile)
-        self.compute_reset_plan_sub = self.create_subscription(
-            StampedBool,
-            'impact_stl/compute_reset_plan',
-            self.compute_reset_plan_callback,
-            new_qos_profile)
-        
+
         self.vehicle_local_position = np.array([0.0, 0.0, 0.0])
         self.vehicle_local_velocity = np.array([0.0, 0.0, 0.0])
         self.init_position = np.array([0.0, 0.0, 0.0])
@@ -174,29 +168,6 @@ class MainPlanner(Node):
             self.get_logger().info('Sending plan')
             self.minimal_client.send_request(self.rvars, self.hvars, self.idvars, self.other_names)
             self.get_logger().info('Plan received')
-
-    def compute_reset_plan_callback(self,msg):
-        self.get_logger().info('Computing reset plan')
-        self.rvars,self.hvars,self.idvars = self.compute_reset_plan()
-        self.get_logger().info('Reset plan computed')
-
-        if msg.data:
-            self.get_logger().info('Sending reset plan')
-            self.minimal_client.send_request(self.rvars, self.hvars, self.idvars, self.other_names)
-            self.get_logger().info('Reset plan received')
-
-    def compute_reset_plan(self):
-        dt = 20
-        rvars,hvars,idvars = solve_a_b_plan(self.vehicle_local_position[0:2],
-                                            self.vehicle_local_velocity[0:2],
-                                            self.init_position[0:2],
-                                            self.init_velocity[0:2],dt)
-        # add another segment to stay there for a bit as well
-        rvars.append(np.zeros((3,4)))
-        hvars.append(np.linspace(dt,dt+10,4).reshape(1,4))
-        idvars.append('none')
-        return rvars,hvars,idvars
-
 
 
 def main(args=None):

@@ -1,3 +1,6 @@
+__author__ = "Arian Kourangi"
+__contact__ = "arianke@kth.se"
+
 import numpy as np
 from helpers.beziers import get_derivative_control_points_gurobi
 from helpers.read_write_plan import csv_to_plan
