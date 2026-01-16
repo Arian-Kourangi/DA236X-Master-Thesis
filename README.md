@@ -1,5 +1,5 @@
 # inter_stl
-Code for the paper "----"
+Code for the paper "Compliant, Non-Grasping Collaborative Transport of Free-Floating Objects in Microgravity"
 
 The project page can be found [here](https://arian-kourangi.github.io/DA236X-Master-Thesis/).
 
@@ -117,19 +117,10 @@ If you found this code useful, please consider citing my paper or the original:
 
 
 ```bibtex
-@article{kourangi2026tetherless,
-  title={Collaborative Object Transportation in Space via Impact Interactions},
+@article{kourangi2026compliant,
+  title={Compliant, Non-Grasping Collaborative Transport of Free-Floating Objects in Microgravity},
   author={Kourangi, Arian},
-  journal={arXiv preprint arXiv:2504.18667},
+  journal={},
   year={2026}
-}
-```
-
-```bibtex
-@article{verhagen2025collaborative,
-  title={Collaborative Object Transportation in Space via Impact Interactions},
-  author={Verhagen, Joris and Tumova, Jana},
-  journal={arXiv preprint arXiv:2504.18667},
-  year={2025}
 }
 ```
