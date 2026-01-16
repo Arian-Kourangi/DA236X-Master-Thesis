@@ -101,11 +101,12 @@ Then, run the following command to start the PX4 autopilot in SITL mode:
 ```ros2 launch inter_stl sitl_test1.launch.py```
 
 ### Scenario launch file
-In the `inter_stl` directory, run the following command to start the scenario:
+Run the following command to start the MPC and the planners:
 ```ros2 launch inter_stl test1.launch.py```
 
+Open QGroundControl, change to "Multi-Vehicle" and change mode from "Hold" to "Offboard" for vehicle 1 and 2.
 ### Start launch file
-In the `inter_stl` directory, run the following command to start the simulation:
+Run the following command to start the simulation:
 ```ros2 launch inter_stl start_scenario.launch.py```
 
 ### Additional Scenarios
