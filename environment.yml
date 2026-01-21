@@ -1,4 +1,4 @@
-name: impact_stl
+name: inter_stl
 channels:
   - defaults
   - https://repo.anaconda.com/pkgs/main

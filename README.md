@@ -70,7 +70,7 @@ The script allows you to change robustness type and scenario. See the `World.py`
 
 In the `inter_stl` directory, run the following commands:
 
-```conda activate impact_stl```
+```conda activate inter_stl```
 
 ```python main.py```
 

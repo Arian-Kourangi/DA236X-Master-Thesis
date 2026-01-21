@@ -3,7 +3,7 @@
 <package format="3">
   <name>inter_stl</name>
   <version>0.0.0</version>
-  <description>Collaborative Object Transportation in Space via Impact Interactions</description>
+  <description>Compliant, Non-Grasping Collaborative Transport of Free-Floating Objects in Microgravity</description>
   <maintainer email="arianke@kth.se">Arian Kourangi</maintainer>
   <license>BSD-3</license>
 
