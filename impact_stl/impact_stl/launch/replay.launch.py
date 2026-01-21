@@ -33,7 +33,7 @@ def generate_launch_description():
         )),
     
     # replay rosbag
-    rosbag_name = '/home/none/temp_ws/rosbag2_2026_01_21-09_29_30'
+    rosbag_name = '/home/px4space/Rosbags/rosbag2_2026_01_21-10_09_54'
     replay_cmd = ['ros2','bag','play', rosbag_name]
     ld.add_action(ExecuteProcess(cmd=replay_cmd))
 
