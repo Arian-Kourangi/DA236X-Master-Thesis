@@ -17,7 +17,7 @@ Assuming you have already built the Docker image specified on the main branch, m
   -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
   -v /dev/dri:/dev/dri \
   -e XDG_RUNTIME_DIR=/tmp/runtime-root \
-  -v /home/DA236X_Master_Thesis/impact_stl:/home/px4space/space_ws/src/impact_stl \
+  -v /home/DA236X_Master_Thesis/inter_stl:/home/px4space/space_ws/src/inter_stl \
   --name hw_cont \
   inter_stl:latest 
   ```
@@ -36,13 +36,13 @@ docker exec -it hw_cont /bin/bash
 
 To ensure we get the correct ros packages
 ```
-cp -f -r ~/space_ws/src/impact_stl/resource/my_msgs/ ~/space_ws/src/ 
-cp -f -r ~/space_ws/src/impact_stl/resource/px4-offboard/ ~/space_ws/src/ 
+cp -f -r ~/space_ws/src/inter_stl/resource/my_msgs/ ~/space_ws/src/ 
+cp -f -r ~/space_ws/src/inter_stl/resource/px4-offboard/ ~/space_ws/src/ 
 ```
 In order to run the code on the ATMOS platform, we have to upgrade one of the packages used. Run the following commands inside the container
 ```
 rm -r ~/PX4/ros2_ws/src/px4_msgs
-rm -r PX4/ros2_ws/build install log
+rm -rf ~/PX4/ros2_ws/{build,install,log}
 cd ~/PX4/ros2_ws/src/
 git clone https://github.com/PX4/px4_msgs.git
 cd ~/PX4/ros2_ws
@@ -61,17 +61,17 @@ Source the workspace:
 ```source install/setup.bash```
 
 Then, run the following command to start the Rvizz
-```ros2 launch impact_stl hwitl_hw_test3.launch.py```
+```ros2 launch inter_stl hwitl_hw_test3.launch.py```
 
 ### Scenario launch file
 Run the following command to start the MPC and the planners:
-```ros2 launch impact_stl hw_test3.launch.py```
+```ros2 launch inter_stl hw_test3.launch.py```
 
 NOTE: Before running the MPC, make sure the robots and object are within 90 degrees of the correct orientation (zero quaternion), or ACADOS will fail.
 
 ### Start launch file
 Run the following command to start the simulation:
-```ros2 launch impact_stl start_scenario.launch.py```
+```ros2 launch inter_stl start_scenario.launch.py```
 
 
 # Citation
