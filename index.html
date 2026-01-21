@@ -346,6 +346,58 @@
 </section>
 
 
+<section class="section">
+  <div class="container">
+    <h2 class="title is-3 has-text-centered"> Experimental Hardware Validation </h2>
+    
+    <!-- Text Row -->
+    <div class="content has-text-centered">
+      <p>
+        The experiment consists of a basic transportation task equivalent to Scenario 1, scaled to fit the constraints of the \glspl{ATMOS} platform.
+        Two robots, $R_1$ and $R_2$, are tasked with transporting a single object $O_1$ from its initial position to the target location $O_1(T) = [2.5,\,0.75]$.
+        The experimental setup is illustrated in Figure 4(a), with initial conditions
+        $R_1(0) = [0.5,\,-1.25]$,
+        $R_2(0) = [3.25,\,1.5]$,
+        $O_1(0) = [1.25,\,-0.5]$,
+        and a total task duration of $T = 32$.
+      </p>
+    </div>
+    
+    <!-- Figure Row - Centered -->
+    <div class="columns is-centered">
+      <div class="column is-8">
+        <figure class="image">
+          <img src="static/plots/hw_test3_trajectories.png" alt="Description of graph">
+        </figure>
+        <p class="has-text-centered"> Figure 4. (a) Setup for experiment. (b)
+                          the original plans produced by the MILP. (c) the re-planned trajectories of
+                          robots during task execution. (d) the final realized trajectories of all robots and objects 
+        </p>
+      </div>
+    </div>
+    
+    <!-- Videos Row - Side by Side -->
+    <div class="columns is-centered">
+      <!-- Video Column 1 -->
+      <div class="column is-5">
+        <video class="normal-speed" poster="" autoplay controls muted loop height="100%" preload="metadata">
+          <source src="static/videos/run 5.mp4" type="video/mp4">
+        </video>
+        <p class="has-text-centered">Recording of experiment. Thick blue lines indicate re-planned trajectories. This is the most successful run, where both robots re-planned properly and executed rendezvous before the interaction. Note the object's wobbling during rendezvous with Robot 1, caused by the robots' thrusters. The Velocity Keeping MPC actively counteracts these disturbances.</p>
+      </div>
+      <!-- Video Column 2 -->
+      <div class="column is-5">
+        <video class="normal-speed" poster="" autoplay controls muted loop height="100%" preload="metadata">
+          <source src="static/videos/run 6.mp4" type="video/mp4">
+        </video>
+        <p class="has-text-centered">Recording of experiment. Thick blue lines indicate re-planned trajectories. This shows a typical run where Robot 1 replans only once before the interaction. Due to noise and inadequate time/space for correction, the rendezvous is unsatisfactory. The robot "bumps" into the object before the interaction starts. However, the active "Velocity Keeping" MPC on the object minimizes the impact.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
 
 
 <!--BibTex citation -->
@@ -362,8 +414,8 @@
   title={Compliant, Non-Grasping Collaborative Transport of Free-Floating Objects in Microgravity},
   author={Arian Kourangi,
   journal={Conference/Journal Name},
-  year={2026},
-  url={https://your-domain.com/your-project-page}}</code></pre>
+  year={2026}
+}</code></pre>
     </div>
 </section>
 <!--End BibTex citation -->
@@ -394,9 +446,12 @@
     <!-- End of Statcounter Code -->
 <script>
   document.querySelectorAll("video").forEach(video => {
-    video.addEventListener("loadedmetadata", () => {
-      video.playbackRate = 4.0;
-    });
+    // Skip videos with the 'normal-speed' class
+    if (!video.classList.contains('normal-speed')) {
+      video.addEventListener("loadedmetadata", () => {
+        video.playbackRate = 4.0;
+      });
+    }
   });
 </script>
   </body>
