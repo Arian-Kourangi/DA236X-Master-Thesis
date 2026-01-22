@@ -59,6 +59,7 @@ setup(
                 'odom_to_vehicle_local_position = inter_stl.helpers.odom_to_vehicle_local_position:main',
                 'odom_to_vehicle_angular_velocity = inter_stl.helpers.odom_to_vehicle_angular_velocity:main',
                 'odom_to_vehicle_attitude = inter_stl.helpers.odom_to_vehicle_attitude:main',
+                'repeater = inter_stl.repeater:main',
         ],
     },
 )

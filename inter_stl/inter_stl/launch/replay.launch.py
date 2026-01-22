@@ -5,7 +5,7 @@ from ament_index_python import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
+from launch_ros.actions import Node, SetParameter
 
 def generate_launch_description():
     ld = LaunchDescription()
@@ -54,8 +54,49 @@ def generate_launch_description():
     def launch_rosbag(context):
         rosbag_index = context.launch_configurations['index']
         rosbag_name = f'/home/px4space/Rosbags/{bags_names[rosbag_index]}'
-        return [ExecuteProcess(cmd=['ros2', 'bag', 'play', rosbag_name])]
+        return [ExecuteProcess(cmd=['ros2', 'bag', 'play', rosbag_name,'--clock'])]
     
-    ld.add_action(OpaqueFunction(function=launch_rosbag))
 
+    ld.add_action(OpaqueFunction(function=launch_rosbag))
+    
+    
+    int_region = ExecuteProcess(
+            cmd=[
+                'ros2 topic pub --once --qos-reliability reliable /regions/goal_region \
+                    visualization_msgs/msg/Marker \
+                    "{header: {frame_id: \'world\', stamp: {sec: 0, nanosec: 0}},\
+                    ns: \'rectangles\', id: 1, type: 1, action: 0,\
+                    pose: {position: {x: 2.5, y: 0.75, z: 0.0},\
+                    orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}},\
+                    scale: {x: 0.5, y: 0.5, z: 0.01},\
+                    color: {r: 0.0, g: 1.0, b: 0.0, a: 0.4},\
+                    lifetime: {sec: 0, nanosec: 0}, frame_locked: false}"'
+            ],shell=True)
+    ld.add_action(int_region)  
+
+    
+    
+    set_sim_time = SetParameter(name='use_sim_time', value=True)
+
+    ld.add_action(Node(
+            package='inter_stl',
+            namespace='pop',
+            executable='repeater',
+            name='visualizer_1',
+            parameters=[{'use_sim_time': True}]
+    )),
+    ld.add_action(Node(
+            package='inter_stl',
+            namespace='crackle',
+            executable='repeater',
+            name='visualizer_2',
+            parameters=[{'use_sim_time': True}]
+    )),
+    ld.add_action(Node(
+            package='inter_stl',
+            namespace='snap',
+            executable='repeater',
+            name='visualizer_3',
+            parameters=[{'use_sim_time': True}]
+    )),
     return ld

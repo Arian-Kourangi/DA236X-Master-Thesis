@@ -42,4 +42,4 @@ dependencies:
       - scienceplots==2.1.1
       - scipy==1.15.2
       - six==1.17.0
-prefix: /home/none/anaconda3/envs/impact_stl
+prefix: /home/none/anaconda3/envs/inter_stl
