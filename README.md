@@ -117,7 +117,7 @@ If you have access to the ATMOS at KTH and would like to run the code on the pla
 ![hippo](media/output2.gif)
 
 # Citation
-If you found this code useful, please consider citing my paper or the original:
+If you found this code useful, please consider citing my paper:
 
 
 ```bibtex
