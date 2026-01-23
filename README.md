@@ -112,6 +112,10 @@ Run the following command to start the simulation:
 ### Additional Scenarios
 There are 6 total scenarios, out which 1-5 are currently working well. The final scenario called final_test highlight some of flaws that are still present in the stack.
 
+If you have access to the ATMOS at KTH and would like to run the code on the platform, switch to the hw_testing branch.
+
+![hippo](media/output2.gif)
+
 # Citation
 If you found this code useful, please consider citing my paper or the original:
 
