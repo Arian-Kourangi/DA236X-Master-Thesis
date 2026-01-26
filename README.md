@@ -72,17 +72,3 @@ NOTE: Before running the MPC, make sure the robots and object are within 90 degr
 ### Start launch file
 Run the following command to start the simulation:
 ```ros2 launch inter_stl start_scenario.launch.py```
-
-
-# Citation
-If you found this code useful, please consider citing my paper or the original:
-
-
-```bibtex
-@article{kourangi2026tetherless,
-  title={Compliant, Non-Grasping Collaborative Transport of Free-Floating Objects in Microgravity},
-  author={Kourangi, Arian},
-  journal={},
-  year={2026}
-}
-```
