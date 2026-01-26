@@ -206,13 +206,13 @@
   <div class="container is-max-desktop">
     <div class="hero-body">
       <!-- TODO: Replace with your teaser video -->
-      <video poster="" id="scen2" autoplay controls muted loop height="100%" preload="metadata">
+      <video poster="" id="scen3" autoplay controls muted loop height="100%" preload="metadata">
         <!-- TODO: Add your video file path here -->
         <source src="static/videos/test3.mp4" type="video/mp4">
       </video>
       <!-- TODO: Replace with your video description -->
       <h2 class="subtitle has-text-centered">
-        Simulation demonstrating autonomous tetherless object transportation in a microgravity environment.
+        Simulation demonstrating autonomous non-grasping object transportation in a microgravity environment.
       </h2>
     </div>
   </div>
@@ -228,16 +228,16 @@
         <div class="content has-text-justified">
           <!-- TODO: Replace with your paper abstract -->
           <p>
-            Collaborative transport of passive objects in microgravity is a key capability for emerging space applications such as on-orbit servicing, debris removal, and in-space assembly. Traditional approaches largely rely on rigid connections or manipulators, in which the robot and object are mechanically coupled before transport commences. Such methods are typically costly and limited in scalability and reusability, as they require precise and often complex docking procedures prior to transport. More recently, impact-based approaches have been proposed to enable anchor-free collaborative transport, eliminating the need for rigid attachments. Despite it's relevance, anchor-free collaborative transport in microgravity remains challenging due to the absence of stabilizing forces, strong coupling between contact dynamics and global motion, and the difficulty of guaranteeing safety under intermittent interactions. These challenges require the integration of formal task specification, optimization-based planning, and feedback control, placing the problem at a level of complexity well suited to a Master’s thesis but largely unexplored in existing literature.
+            Collaborative transport of passive objects in microgravity is a key capability for emerging space applications such as on-orbit servicing, debris removal, and in-space assembly. Traditional approaches largely rely on rigid connections or manipulators, in which the robot and object are mechanically coupled before transport commences. Such methods are typically costly and limited in scalability and reusability, as they require precise and often complex docking procedures prior to transport. More recently, impact-based approaches have been proposed to enable non-grasping collaborative transport, eliminating the need for rigid attachments.
           </p>
           <p>
             This thesis presents a formal planning and control framework for compliant, non-grasping collaborative transport of a free-floating, non-cooperative object in microgravity. The proposed method replaces impulsive interactions with rendezvous-preceded, non-grasping contacts, enabling gentle momentum transfer while maintaining stability and safety. High-level task requirements and safety constraints are formally specified using Signal Temporal Logic and encoded into a Mixed-Integer Linear Programming problem.
           </p>
           <p>
-            The resulting framework follows a hierarchical structure consisting of a Mixed-Integer Linear Programming–based offline planner, an online re-planner that enforces geometric feasibility, and a Model Predictive Control layer for trajectory tracking and interaction execution. The approach is evaluated in a two-dimensional microgravity analog environment using high-fidelity simulations of free-flying robots and objects.
+            The resulting framework follows a hierarchical structure consisting of a Mixed-Integer Linear Programming–based offline planner, an online re-planner that enforces geometric feasibility, and a Model Predictive Control layer for trajectory tracking and interaction execution. The approach is evaluated in a two-dimensional microgravity analogue environment using high-fidelity simulations of free-flying robots and objects.
           </p>
           <p>
-            The results indicate that rendezvous-based, compliant interactions enable collaborative, anchor-free transport with low interaction forces and adequate accuracy over short- to medium-duration planning horizons. Beyond demonstrating feasibility, the proposed framework provides a systematic way to formally specify, plan, and execute non-grasping interactions in two-dimensional microgravity analog environments. This enables the synthesis of safe and reusable transport strategies that could not be rigorously designed or verified prior to this work, supporting future autonomous space operations.
+            The results indicate that rendezvous-based, compliant interactions enable collaborative, anchor-free transport with low interaction forces and adequate accuracy over short- to medium-duration planning horizons. Beyond demonstrating feasibility, the proposed framework provides a systematic way to formally specify, plan, and execute non-grasping interactions in two-dimensional microgravity analogue environments. This enables the synthesis of safe and reusable transport strategies, supporting future autonomous space operations.
           </p>
         </div>
       </div>
@@ -246,6 +246,26 @@
 </section>
 <!-- End paper abstract -->
 
+<!-- Paper method -->
+<section class="section hero is-light">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Method</h2>
+        <div class="content has-text-justified">
+          <!-- TODO: Replace with your paper abstract -->
+          <p>
+            We base our method on the hierarchical planning and control framework presented in <a href="#ref1">[1]</a>. The framework consists of three layers: an offline MILP planner, an online geometric re-planner, and a low-level MPC controller. 
+            The offline MILP planner generates high-level plans that satisfy the STL specifications and constraints, reconciling when, where, and between whom interactions occur. The online re-planner ensures geometric feasibility during execution, and updates the offline generated plans using online measurements of robot and object states. 
+            The low-level MPC controller tracks the planned trajectories and executes the rendezvous-based interactions, modeling the interaction forces necessary to track both robot and object trajectories.
+          </p>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- End paper method -->
 
 
 <!-- Section with Graph/Plot and Video Side by Side -->
@@ -262,8 +282,8 @@
           <img src="static/plots/test2-1.png" alt="Description of graph">
         </figure>
         <p class="has-text-centered"> Figure 1. (a) Setup for scenario 1. (b)
-                          the original plans produced by the MILP. (c) the re-planned trajectories of
-                          robots during task execution. (d) the final realized trajectories of all robots and objects 
+                          The original plans produced by the MILP. (c) The re-planned trajectories of
+                          robots during task execution. (d) The final realized trajectories of all robots and objects 
       </p>
       </div>
       <!-- Video Column -->
@@ -271,7 +291,7 @@
         <video poster="" autoplay controls muted loop height="100%" preload="metadata">
           <source src="static/videos/test2.mp4" type="video/mp4">
         </video>
-        <p class="has-text-centered">Simulation Recording</p>
+        <p class="has-text-centered">Simulation recording of Scenario 1</p>
       </div>
     </div>
   </div>
@@ -297,8 +317,8 @@
           <img src="static/plots/test4-1.png" alt="Description of graph">
         </figure>
         <p class="has-text-centered"> Figure 2. (a) Setup for scenario 3. (b)
-                          the original plans produced by the MILP. (c) the re-planned trajectories of
-                          robots during task execution. (d) the final realized trajectories of all robots and objects 
+                          The original plans produced by the MILP. (c) The re-planned trajectories of
+                          robots during task execution. (d) The final realized trajectories of all robots and objects 
       </p>
       </div>
       <!-- Video Column -->
@@ -306,7 +326,7 @@
         <video poster="" autoplay controls muted loop height="100%" preload="metadata">
           <source src="static/videos/test4.mp4" type="video/mp4">
         </video>
-        <p class="has-text-centered">Simulation Recording</p>
+        <p class="has-text-centered">Simulation recording of Scenario 3</p>
       </div>
     </div>
   </div>
@@ -330,8 +350,8 @@
           <img src="static/plots/test5-1.png" alt="Description of graph">
         </figure>
         <p class="has-text-centered"> Figure 3. (a) Setup for scenario 4. (b)
-                          the original plans produced by the MILP. (c) the re-planned trajectories of
-                          robots during task execution. (d) the final realized trajectories of all robots and objects 
+                          The original plans produced by the MILP. (c) The re-planned trajectories of
+                          robots during task execution. (d) The final realized trajectories of all robots and objects 
       </p>
       </div>
       <!-- Video Column -->
@@ -339,7 +359,7 @@
         <video poster="" autoplay controls muted loop height="100%" preload="metadata">
           <source src="static/videos/test5.mp4" type="video/mp4">
         </video>
-        <p class="has-text-centered">Simulation Recording</p>
+        <p class="has-text-centered">Simulation recording of Scanrio 4</p>
       </div>
     </div>
   </div>
@@ -353,7 +373,7 @@
     <!-- Text Row -->
     <div class="content has-text-centered">
       <p>
-        The experiment consists of a basic transportation task equivalent to Scenario 1, scaled to fit the constraints of the \glspl{ATMOS} platform.
+        The experiment consists of a basic transportation task equivalent to Scenario 1, scaled to fit the constraints of the ATMOS platform.
         Two robots, $R_1$ and $R_2$, are tasked with transporting a single object $O_1$ from its initial position to the target location $O_1(T) = [2.5,\,0.75]$.
         The experimental setup is illustrated in Figure 4(a), with initial conditions
         $R_1(0) = [0.5,\,-1.25]$,
@@ -370,8 +390,8 @@
           <img src="static/plots/hw_test3_trajectories.png" alt="Description of graph">
         </figure>
         <p class="has-text-centered"> Figure 4. (a) Setup for experiment. (b)
-                          the original plans produced by the MILP. (c) the re-planned trajectories of
-                          robots during task execution. (d) the final realized trajectories of all robots and objects 
+                          The original plans produced by the MILP. (c) The re-planned trajectories of
+                          robots during task execution. (d) The final realized trajectories of all robots and objects 
         </p>
       </div>
     </div>
@@ -396,7 +416,17 @@
   </div>
 </section>
 
-
+<section id="references">
+  <div class="container is-max-desktop content">
+  <h2>References</h2>
+  <ol>
+    <li id="ref1">J. Verhagen and J. Tumova, “Collaborative object transportation in
+    space via impact interactions,” 2025, Publisher: arXiv Version Number:
+  1. DOI: 10.48550/ARXIV.2504.18667. [Online]. Available: <a href="https://arxiv.org/abs/2504.18667" target="_blank">https://arxiv.org/abs/2504.18667</a>.
+  </li>
+  </ol>
+  </div>
+</section>
 
 
 
