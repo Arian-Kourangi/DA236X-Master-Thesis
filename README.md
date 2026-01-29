@@ -1,5 +1,5 @@
 # inter_stl ATMOS
-Code for the paper "Compliant, Non-Grasping Collaborative Transport of Free-Floating Objects in Microgravity"
+Code for the paper "Collaborative Untethered Transport of Free-Floating Objects in Microgravity"
 
 The project page can be found [here](https://arian-kourangi.github.io/DA236X-Master-Thesis/).
 
