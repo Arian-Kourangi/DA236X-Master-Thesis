@@ -116,6 +116,7 @@ If you have access to the ATMOS at KTH and would like to run the code on the pla
 
 ![hippo](media/output2.gif)
 
+<!--
 # Citation
 If you found this code useful, please consider citing my paper:
 
@@ -128,3 +129,4 @@ If you found this code useful, please consider citing my paper:
   year={2026}
 }
 ```
+-->
