@@ -116,17 +116,16 @@ If you have access to the ATMOS at KTH and would like to run the code on the pla
 
 ![hippo](media/output2.gif)
 
-<!--
+
 # Citation
 If you found this code useful, please consider citing my paper:
 
 
 ```bibtex
-@article{kourangi2026collaborative,
+﻿@mastersthesis{KourangiEsfahani2057413,
   title={Collaborative Untethered Transport of Free-Floating Objects in Microgravity},
-  author={Kourangi, Arian},
-  journal={},
+  author={Kourangi Esfahani, Arian},
+  institution = {KTH, School of Electrical Engineering and Computer Science (EECS)},
   year={2026}
 }
 ```
--->
